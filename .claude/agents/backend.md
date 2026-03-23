@@ -262,3 +262,11 @@ You're successful when:
 
 ### Planning Participation
 `shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 시스템 아키텍처, 데이터 모델, API 설계 관점을 제공한다. 기술 검증 루프에서 백엔드 실현 가능성과 확장성을 검증한다.
+
+### Implementation Pipeline
+`shared/processes/implementation-pipeline.md` 준수. Task 수행 시 자가 리뷰 체크리스트:
+- [ ] API 엔드포인트 응답 스키마 계약 준수
+- [ ] DB 마이그레이션 안전성 확인 (롤백 가능)
+- [ ] 에러 핸들링 완전성 (모든 실패 경로 처리)
+- [ ] 보안 기본 확인 (입력 검증, 인증/인가, SQL 인젝션 방지)
+- [ ] 성능 기준 충족 (p95 < 200ms)

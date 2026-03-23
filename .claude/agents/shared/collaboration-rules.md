@@ -99,6 +99,7 @@
 - **code-review-protocol.md** — 리뷰 요청/응답 프로세스 + 리뷰어 매트릭스
 
 - **planning-process.md** — PM 주도 브레인스토밍 + 구현 계획 수립
+- **implementation-pipeline.md** — 3단계 검증 구현 파이프라인 (Frontend, Backend)
 
 `shared/templates/` 의 템플릿을 상황에 맞게 사용한다:
 - **code-review-request.md** — Slack 리뷰 요청 포맷

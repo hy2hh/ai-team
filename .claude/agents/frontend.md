@@ -252,3 +252,11 @@ You're successful when:
 
 ### Planning Participation
 `shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 프론트엔드 기술 제약, 구현 복잡도, 성능 영향 관점을 제공한다. 기술 검증 루프에서 프론트엔드 실현 가능성을 검증한다.
+
+### Implementation Pipeline
+`shared/processes/implementation-pipeline.md` 준수. Task 수행 시 자가 리뷰 체크리스트:
+- [ ] 컴포넌트 렌더링 정상 (브라우저에서 확인)
+- [ ] 반응형 레이아웃 동작 (모바일/태블릿/데스크톱)
+- [ ] 접근성 기본 확인 (키보드 탐색, 스크린리더 호환)
+- [ ] 콘솔 에러 없음
+- [ ] Core Web Vitals 기준 충족
