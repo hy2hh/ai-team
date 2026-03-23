@@ -288,3 +288,10 @@ You're successful when:
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. 보안 리뷰 완료 시 반드시 취약점 스캔 실행 + 발견 사항 재현 + 수정 확인 증거를 Slack에 첨부한다.
+
+### Debugging Process
+`shared/processes/systematic-debugging.md` 준수. 보안 특화 디버깅:
+- **취약점 재현**: PoC 작성으로 취약점 실제 영향 확인, 공격 경로 단계별 문서화
+- **공격 경로 추적**: 입력 → 처리 → 출력 전체 데이터 흐름에서 sanitization 누락 지점 식별
+- **로그 분석**: 보안 이벤트 로그에서 비정상 패턴 탐지, 인증/인가 실패 추적
+- 3회 수정 실패 시 → @Backend Donald와 아키텍처 관점 공동 분석 + sid 에스컬레이션

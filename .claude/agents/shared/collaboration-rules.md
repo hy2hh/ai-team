@@ -95,3 +95,4 @@
 모든 에이전트가 따라야 하는 공통 프로세스는 `shared/processes/`에 위치한다:
 
 - **verification-before-completion.md** — 완료 선언 전 필수 검증 게이트
+- **systematic-debugging.md** — 4-Phase 체계적 디버깅 (Frontend, Backend, SecOps)

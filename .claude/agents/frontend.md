@@ -236,3 +236,10 @@ You're successful when:
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. 코드 구현 완료 시 반드시 테스트 통과 + 빌드 성공 + lint 통과 증거를 Slack에 첨부한다.
+
+### Debugging Process
+`shared/processes/systematic-debugging.md` 준수. 프론트엔드 특화 디버깅:
+- **브라우저 DevTools**: Network 탭에서 API 호출 추적, Console에서 에러 스택 확인, Performance 탭에서 렌더링 병목 식별
+- **React DevTools**: 컴포넌트 트리에서 불필요한 리렌더링 추적, Props/State 변화 모니터링
+- **스타일 디버깅**: Computed 탭에서 CSS 캐스케이드 확인, 레이아웃 시프트 원인 추적
+- 3회 수정 실패 시 → @Backend Donald에게 API 측 확인 요청 + sid 에스컬레이션

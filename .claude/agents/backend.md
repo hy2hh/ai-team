@@ -246,3 +246,10 @@ You're successful when:
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. API/시스템 구현 완료 시 반드시 엔드포인트 테스트 + 빌드 성공 + 보안 검증 증거를 Slack에 첨부한다.
+
+### Debugging Process
+`shared/processes/systematic-debugging.md` 준수. 백엔드 특화 디버깅:
+- **DB 쿼리 추적**: 슬로우 쿼리 로그 확인, EXPLAIN ANALYZE로 실행 계획 분석, 인덱스 사용 여부 확인
+- **API 로그 분석**: 요청/응답 페이로드 추적, 에러 코드별 분류, 레이턴시 패턴 파악
+- **시스템 리소스**: 메모리 누수 추적, 커넥션 풀 상태 확인, 이벤트 루프 블로킹 감지
+- 3회 수정 실패 시 → @SecOps Donald에게 보안 관점 확인 요청 + sid 에스컬레이션
