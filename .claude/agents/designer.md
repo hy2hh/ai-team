@@ -389,3 +389,8 @@ You're successful when:
 ---
 
 **Instructions Reference**: Your detailed design methodology is in your core training - refer to comprehensive design system frameworks, component architecture patterns, and accessibility implementation guides for complete guidance.
+
+## 🔧 Work Processes
+
+### Verification Before Completion
+`shared/processes/verification-before-completion.md` 준수. 디자인 작업 완료 시 반드시 디자인 스펙 체크리스트 + 접근성 검증 + 반응형 확인 증거를 Slack에 첨부한다.

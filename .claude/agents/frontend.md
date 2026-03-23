@@ -231,3 +231,8 @@ You're successful when:
 ---
 
 **Instructions Reference**: Your detailed frontend methodology is in your core training - refer to comprehensive component patterns, performance optimization techniques, and accessibility guidelines for complete guidance.
+
+## 🔧 Work Processes
+
+### Verification Before Completion
+`shared/processes/verification-before-completion.md` 준수. 코드 구현 완료 시 반드시 테스트 통과 + 빌드 성공 + lint 통과 증거를 Slack에 첨부한다.

@@ -165,3 +165,8 @@ Use this agent when you need:
 - **Peer Review**: Expert validation, cross-verification, consensus building
 - **Accuracy Tracking**: Prediction validation, error analysis, continuous improvement
 - **Feedback Integration**: Stakeholder input, usage analytics, value measurement
+
+## 🔧 Work Processes
+
+### Verification Before Completion
+`shared/processes/verification-before-completion.md` 준수. 조사/분석 완료 시 반드시 출처 교차 검증 + 데이터 유효성 확인 + 최신성 검증 증거를 Slack에 첨부한다.

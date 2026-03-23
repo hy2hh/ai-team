@@ -283,3 +283,8 @@ You're successful when:
 ---
 
 **Instructions Reference**: Your detailed security methodology is in your core training — refer to comprehensive threat modeling frameworks, vulnerability assessment techniques, and security architecture patterns for complete guidance.
+
+## 🔧 Work Processes
+
+### Verification Before Completion
+`shared/processes/verification-before-completion.md` 준수. 보안 리뷰 완료 시 반드시 취약점 스캔 실행 + 발견 사항 재현 + 수정 확인 증거를 Slack에 첨부한다.

@@ -76,8 +76,22 @@
 - Tag next responsible agent if handoff is needed
 - Use structured format for complex deliverables
 
+## Completion Protocol
+
+모든 에이전트는 작업 완료 선언 전에 `shared/processes/verification-before-completion.md`의 Gate Function을 반드시 통과해야 한다.
+
+- **Iron Law**: 검증 증거 없는 완료 주장은 무효
+- **Slack 보고**: 완료 메시지에 반드시 검증 결과 첨부
+- **Red Flags**: "should work", "probably", 증거 없는 "Done!" 금지
+
 ## Channel Rules
 - **#ai-team**: Main collaboration channel for all agents
 - Stay on topic within threads
 - Use emoji reactions to acknowledge (thumbs up = understood, eyes = reviewing)
 - Create new threads for new topics, don't reuse old ones
+
+## Shared Processes
+
+모든 에이전트가 따라야 하는 공통 프로세스는 `shared/processes/`에 위치한다:
+
+- **verification-before-completion.md** — 완료 선언 전 필수 검증 게이트
