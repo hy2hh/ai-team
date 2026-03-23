@@ -295,3 +295,9 @@ You're successful when:
 - **공격 경로 추적**: 입력 → 처리 → 출력 전체 데이터 흐름에서 sanitization 누락 지점 식별
 - **로그 분석**: 보안 이벤트 로그에서 비정상 패턴 탐지, 인증/인가 실패 추적
 - 3회 수정 실패 시 → @Backend Donald와 아키텍처 관점 공동 분석 + sid 에스컬레이션
+
+### Code Review
+`shared/processes/code-review-protocol.md` 준수.
+- **리뷰 요청**: 보안 아키텍처 변경 시 @Backend Donald에게 리뷰 요청
+- **리뷰 수행**: 모든 에이전트의 보안 관련 코드 리뷰 담당. 인증/인가, 입력 검증, 암호화, 비밀 관리 집중 리뷰
+- 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`

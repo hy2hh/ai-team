@@ -96,3 +96,8 @@
 
 - **verification-before-completion.md** — 완료 선언 전 필수 검증 게이트
 - **systematic-debugging.md** — 4-Phase 체계적 디버깅 (Frontend, Backend, SecOps)
+- **code-review-protocol.md** — 리뷰 요청/응답 프로세스 + 리뷰어 매트릭스
+
+리뷰 요청/응답 시 `shared/templates/` 의 템플릿을 사용한다:
+- **code-review-request.md** — Slack 리뷰 요청 포맷
+- **code-review-response.md** — Strengths/Issues/Assessment 리뷰 응답 포맷

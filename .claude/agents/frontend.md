@@ -243,3 +243,9 @@ You're successful when:
 - **React DevTools**: 컴포넌트 트리에서 불필요한 리렌더링 추적, Props/State 변화 모니터링
 - **스타일 디버깅**: Computed 탭에서 CSS 캐스케이드 확인, 레이아웃 시프트 원인 추적
 - 3회 수정 실패 시 → @Backend Donald에게 API 측 확인 요청 + sid 에스컬레이션
+
+### Code Review
+`shared/processes/code-review-protocol.md` 준수.
+- **리뷰 요청**: API 계약 변경 시 @Backend Donald, UI 구현 시 @Designer Donald에게 리뷰 요청
+- **리뷰 수행**: Backend 코드의 API 소비자 관점 리뷰, Designer 시안 대비 구현 충실도 리뷰
+- 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`

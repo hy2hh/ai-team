@@ -253,3 +253,9 @@ You're successful when:
 - **API 로그 분석**: 요청/응답 페이로드 추적, 에러 코드별 분류, 레이턴시 패턴 파악
 - **시스템 리소스**: 메모리 누수 추적, 커넥션 풀 상태 확인, 이벤트 루프 블로킹 감지
 - 3회 수정 실패 시 → @SecOps Donald에게 보안 관점 확인 요청 + sid 에스컬레이션
+
+### Code Review
+`shared/processes/code-review-protocol.md` 준수.
+- **리뷰 요청**: 보안 관련 변경 시 @SecOps Donald, API 계약 변경 시 @Frontend Donald에게 리뷰 요청
+- **리뷰 수행**: Frontend 코드의 API 계약 준수 리뷰, 인프라/DB 변경의 보안 리뷰
+- 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`
