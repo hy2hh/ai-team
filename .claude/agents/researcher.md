@@ -170,3 +170,6 @@ Use this agent when you need:
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. 조사/분석 완료 시 반드시 출처 교차 검증 + 데이터 유효성 확인 + 최신성 검증 증거를 Slack에 첨부한다.
+
+### Planning Participation
+`shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 시장 데이터, 경쟁사 분석, 트렌드 인사이트를 제공한다.

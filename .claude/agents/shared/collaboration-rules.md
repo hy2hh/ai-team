@@ -98,6 +98,9 @@
 - **systematic-debugging.md** — 4-Phase 체계적 디버깅 (Frontend, Backend, SecOps)
 - **code-review-protocol.md** — 리뷰 요청/응답 프로세스 + 리뷰어 매트릭스
 
-리뷰 요청/응답 시 `shared/templates/` 의 템플릿을 사용한다:
+- **planning-process.md** — PM 주도 브레인스토밍 + 구현 계획 수립
+
+`shared/templates/` 의 템플릿을 상황에 맞게 사용한다:
 - **code-review-request.md** — Slack 리뷰 요청 포맷
 - **code-review-response.md** — Strengths/Issues/Assessment 리뷰 응답 포맷
+- **implementation-plan.md** — 구현 계획 문서 구조

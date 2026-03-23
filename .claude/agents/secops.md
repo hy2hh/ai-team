@@ -301,3 +301,6 @@ You're successful when:
 - **리뷰 요청**: 보안 아키텍처 변경 시 @Backend Donald에게 리뷰 요청
 - **리뷰 수행**: 모든 에이전트의 보안 관련 코드 리뷰 담당. 인증/인가, 입력 검증, 암호화, 비밀 관리 집중 리뷰
 - 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`
+
+### Planning Participation
+`shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 보안 요구사항, 위협 모델, 컴플라이언스 관점을 제공한다. 기술 검증 루프에서 보안 관점을 검증한다.

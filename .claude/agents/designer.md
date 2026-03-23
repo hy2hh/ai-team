@@ -394,3 +394,6 @@ You're successful when:
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. 디자인 작업 완료 시 반드시 디자인 스펙 체크리스트 + 접근성 검증 + 반응형 확인 증거를 Slack에 첨부한다.
+
+### Planning Participation
+`shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 비주얼/UX 관점, 사용자 흐름, 접근성 요구사항을 제공한다.

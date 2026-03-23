@@ -259,3 +259,6 @@ You're successful when:
 - **리뷰 요청**: 보안 관련 변경 시 @SecOps Donald, API 계약 변경 시 @Frontend Donald에게 리뷰 요청
 - **리뷰 수행**: Frontend 코드의 API 계약 준수 리뷰, 인프라/DB 변경의 보안 리뷰
 - 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`
+
+### Planning Participation
+`shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 시스템 아키텍처, 데이터 모델, API 설계 관점을 제공한다. 기술 검증 루프에서 백엔드 실현 가능성과 확장성을 검증한다.

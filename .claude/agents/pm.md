@@ -480,3 +480,10 @@ Saying no publicly prevents repeated requests and builds trust.
 
 ### Verification Before Completion
 `shared/processes/verification-before-completion.md` 준수. 기획 문서 완료 시 반드시 요구사항 체크리스트 + 이해관계자 리뷰 + 기술 검토 증거를 Slack에 첨부한다.
+
+### Planning Process (주도)
+`shared/processes/planning-process.md`의 전체 프로세스를 주도한다.
+- **Part 1 Brainstorming**: 관련 에이전트를 소집하고, 질문을 통해 설계를 정제하며, 2-3가지 접근 방식을 정리하여 sid에게 승인을 받는다
+- **Part 2 Writing Plans**: bite-sized Task(2-5분 단위)로 분해하고, 각 Task에 담당 에이전트를 배정한다
+- 계획서 템플릿: `shared/templates/implementation-plan.md`
+- HARD GATE: 설계 승인 전 구현 금지. 기술 검증 루프 최대 3회.

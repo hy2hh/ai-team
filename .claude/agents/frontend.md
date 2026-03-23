@@ -249,3 +249,6 @@ You're successful when:
 - **리뷰 요청**: API 계약 변경 시 @Backend Donald, UI 구현 시 @Designer Donald에게 리뷰 요청
 - **리뷰 수행**: Backend 코드의 API 소비자 관점 리뷰, Designer 시안 대비 구현 충실도 리뷰
 - 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`
+
+### Planning Participation
+`shared/processes/planning-process.md` 참조. PM Donald 주도의 브레인스토밍에서 프론트엔드 기술 제약, 구현 복잡도, 성능 영향 관점을 제공한다. 기술 검증 루프에서 프론트엔드 실현 가능성을 검증한다.
