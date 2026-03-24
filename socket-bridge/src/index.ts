@@ -10,6 +10,7 @@ const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 const EVENTS_DIR = join(PROJECT_DIR, '.events');
 const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10분마다 정리 실행
 const EVENT_TTL_MS = 60 * 60 * 1000; // 1시간 후 파일 삭제
+const TEST_MODE = process.env.BRIDGE_TEST_MODE === '1';
 
 const AGENTS: AgentConfig[] = [
   {
@@ -48,6 +49,9 @@ const AGENTS: AgentConfig[] = [
 
 /** botUserId → agentName 역방향 매핑 (런타임에 채워짐) */
 const botUserIdToAgent = new Map<string, string>();
+
+/** 우리 봇의 bot_id 집합 (런타임에 채워짐, 자기 메시지 필터용) */
+const ownBotIds = new Set<string>();
 
 // ─── 채널 이름 캐시 ──────────────────────────────────────
 
@@ -174,21 +178,26 @@ const main = async () => {
     try {
       const authResult = await app.client.auth.test();
       agent.botUserId = authResult.user_id as string;
+      const botId = authResult.bot_id as string;
       botUserIdToAgent.set(agent.botUserId, agent.name);
+      ownBotIds.add(botId);
       console.log(
-        `[init] ${agent.name}: botUserId=${agent.botUserId}`,
+        `[init] ${agent.name}: botUserId=${agent.botUserId}, botId=${botId}`,
       );
     } catch (err) {
       console.error(`[error] ${agent.name} auth.test 실패:`, err);
       process.exit(1);
     }
 
-    // 메시지 이벤트 핸들러
+    // message 이벤트는 첫 번째 앱(PM)에서만 처리 (중복 방지)
+    // 모든 앱에서 message 이벤트 수신 (어떤 앱에 구독이 있는지 모르므로)
+    // 중복 방지는 파일명(ts 기반)으로 자동 처리됨 (같은 파일 덮어쓰기)
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
 
-      // bot 메시지 무시
-      if (msg.bot_id || msg.subtype === 'bot_message') {
+      // 우리 봇 메시지 무시 (테스트 모드에서는 통과)
+      const msgBotId = msg.bot_id as string | undefined;
+      if (!TEST_MODE && msgBotId && ownBotIds.has(msgBotId)) {
         return;
       }
 
@@ -224,39 +233,16 @@ const main = async () => {
       }
     });
 
-    // app_mention 이벤트 핸들러
-    app.event('app_mention', async ({ event }) => {
-      const msg = event as unknown as Record<string, unknown>;
-      const text = (msg.text as string) ?? '';
-      const channel = (msg.channel as string) ?? '';
-      const user = (msg.user as string) ?? '';
-      const ts = (msg.ts as string) ?? '';
-      const threadTs = (msg.thread_ts as string) ?? null;
-
-      const channelName = await getChannelName(apps, channel);
-
-      const slackEvent: SlackEvent = {
-        type: 'app_mention',
-        channel,
-        channel_name: channelName,
-        user,
-        text,
-        ts,
-        thread_ts: threadTs,
-        mentions: [agent.name],
-        raw: msg,
-      };
-
-      writeEvent(agent.name, slackEvent);
-    });
-
     apps.push(app);
   }
 
-  // 모든 앱 Socket Mode 시작
+  // 앱 순차 시작 (동시 연결 시 Slack rate limit 408 방지)
   console.log('[start] Socket Mode 연결 중...');
-  await Promise.all(apps.map((app) => app.start()));
-  console.log('[start] 6개 에이전트 Socket Mode 연결 완료');
+  for (let i = 0; i < apps.length; i++) {
+    await apps[i].start();
+    console.log(`[start] ${AGENTS[i].name} 연결 완료 (${i + 1}/${apps.length})`);
+  }
+  console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
   console.log(`[start] 이벤트 디렉토리: ${EVENTS_DIR}`);
 
   // 주기적 정리 스케줄
