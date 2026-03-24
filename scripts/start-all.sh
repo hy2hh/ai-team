@@ -62,8 +62,11 @@ for agent_config in "${AGENTS[@]}"; do
     continue
   fi
 
+  # 허용 도구 목록
+  ALLOWED_TOOLS="Read,Write,Edit,Glob,Grep,Bash(ls:*),Bash(cat:*),Bash(rm:*.json),Bash(find:*),Bash(mkdir:*),Bash(date:*),Bash(echo:*),Bash(sleep:*),Bash(wc:*),Bash(head:*),Bash(tail:*),mcp__slack__slack_post_message,mcp__slack__slack_reply_to_thread,mcp__slack__slack_get_channel_history,mcp__slack__slack_get_thread_replies,mcp__slack__slack_get_user_profile,mcp__slack__slack_get_users,mcp__slack__slack_list_channels,mcp__slack__slack_add_reaction,Agent,WebSearch,WebFetch"
+
   tmux new-session -d -s "$session_name" -c "$PROJECT_DIR" \
-    "export SLACK_BOT_TOKEN=\"$bot_token\" SLACK_APP_TOKEN=\"$app_token\" SLACK_TEAM_ID=\"$SLACK_TEAM_ID\" && claude --agent \"$PROJECT_DIR/$agent_file\""
+    "export SLACK_BOT_TOKEN=\"$bot_token\" SLACK_APP_TOKEN=\"$app_token\" SLACK_TEAM_ID=\"$SLACK_TEAM_ID\" && claude --agent \"$PROJECT_DIR/$agent_file\" --allowedTools \"$ALLOWED_TOOLS\""
 
   echo "  ✅ $name 시작 (세션: $session_name)"
   STARTED=$((STARTED + 1))
@@ -79,7 +82,7 @@ if [ "$STARTED" -gt 0 ]; then
     IFS='|' read -r name agent_file bot_token app_token <<< "$agent_config"
     session_name="${SESSION_PREFIX}-${name}"
     if tmux has-session -t "$session_name" 2>/dev/null; then
-      tmux send-keys -t "$session_name" ".events/${name}/ 디렉토리를 감시하세요. 새 JSON 파일이 생기면 읽고 처리한 뒤 삭제하세요. 파일이 없으면 5초 간격으로 확인하세요." Enter
+      tmux send-keys -t "$session_name" ".events/${name}/ 디렉토리의 JSON 파일을 Glob과 Read 도구로 감시하세요. 새 파일이 있으면 Read로 읽고 처리한 뒤 Bash로 삭제하세요. 파일이 없으면 5초 후 다시 Glob으로 확인하세요. Bash로 while 루프를 사용하지 마세요." Enter
     fi
   done
 fi
