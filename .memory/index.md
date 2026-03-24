@@ -12,9 +12,12 @@
 │   ├── project-context.md — Goals, tech stack, constraints
 │   └── {topic}.md        — Add as needed (e.g., api-contracts.md)
 ├── tasks/
-│   ├── active.md         — In-progress tasks
+│   ├── active.md         — Index (역할별 파일 링크)
+│   ├── active-{role}.md  — 역할별 진행 중 태스크 (6개)
 │   ├── backlog.md        — Queued tasks (prioritized)
 │   └── done.md           — Completed (rotate monthly)
+├── handoff/
+│   └── {from}-to-{to}_{topic}.md — 에이전트 간 인수인계 문서
 ├── decisions/
 │   └── YYYY-MM-DD_{topic}.md — Architectural/strategic decisions
 └── conversations/
@@ -22,10 +25,11 @@
 ```
 
 ## Session Start Checklist
-1. Read `tasks/active.md` — what's in progress?
+1. Read `tasks/active-{your-role}.md` — your current tasks
 2. Read `facts/project-context.md` — current project state
 3. Scan `decisions/` — recent architectural choices
-4. Check Slack #ai-team for unread mentions
+4. Check `handoff/` — pending handoffs for you
+5. Check Slack #ai-team for unread mentions
 
 ## Writing Rules
 
@@ -35,10 +39,15 @@
 - Keep files under 200 lines — split if growing
 
 ### tasks/
-- Any agent can update tasks they own
-- Format: `- [ ] task description | owner | created | priority`
+- Each agent updates ONLY their own `active-{role}.md`
+- Format: `- [ ] task description | created | priority`
 - Move to done.md with completion date when finished
 - Backlog sorted by priority: HIGH → MEDIUM → LOW
+
+### handoff/
+- 에이전트 간 작업 인수인계 시 사용
+- Format: `{from}-to-{to}_{topic}.md`
+- 7일 이상 된 문서는 승격 또는 삭제
 
 ### decisions/
 - One file per decision
@@ -61,6 +70,6 @@
 - Don't log: greetings, small talk, debug sessions
 
 ## Conflict Resolution
-- If two agents update the same file: last write wins, notify in Slack
+- Each agent writes only to their own active file (동시쓰기 방지)
 - If facts conflict: escalate to sid
 - If task ownership is unclear: PM Donald assigns
