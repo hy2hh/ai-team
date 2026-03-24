@@ -12,14 +12,15 @@ Human lead: **sid (zosept)** — all final decisions require his approval.
 All agents share a file-based memory at `.memory/`. You MUST use this system.
 
 ### Session Start Protocol
-1. Read `.memory/tasks/active.md` — check current work
+1. Read `.memory/tasks/active-{your-role}.md` — check your current tasks
 2. Read `.memory/facts/project-context.md` — understand project state
 3. Read `.memory/facts/team-profile.md` — know your team
 4. Check `.memory/decisions/` for recent architectural decisions
+5. Check `.memory/handoff/` for pending handoffs addressed to you
 
 ### Memory Read/Write Rules
 - **facts/**: Read always. Write only when you learn persistent information (team changes, tech stack updates).
-- **tasks/**: Update when you start, complete, or create tasks.
+- **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Move completed tasks to `done.md`.
 - **decisions/**: Write when an architectural or strategic decision is made. Format: `YYYY-MM-DD_{topic}.md`
 - **conversations/**: Log important cross-agent interactions. Format: `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
 
@@ -44,7 +45,12 @@ All agents share a file-based memory at `.memory/`. You MUST use this system.
 ## Task Management
 - Before starting work: move task from backlog to active
 - After completing: move from active to done with date
-- If blocked: note the blocker in active.md and escalate
+- If blocked: note the blocker in your active-{role}.md and escalate
+
+## Extended Context
+
+역할별 상세 자료(코드 예시, 템플릿, 도구 설정)는 `.claude/context/{role}/`에 위치합니다.
+에이전트 파일의 `📂 Extended Context` 섹션에서 필요 시 로드합니다.
 
 ## Code Quality
 - Follow existing project conventions

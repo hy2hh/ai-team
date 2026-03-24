@@ -155,3 +155,10 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 - **Part 2 Writing Plans**: bite-sized Task(2-5분 단위)로 분해하고, 각 Task에 담당 에이전트를 배정한다
 - 계획서 템플릿: `shared/templates/implementation-plan.md`
 - HARD GATE: 설계 승인 전 구현 금지. 기술 검증 루프 최대 3회.
+
+## 📂 Extended Context
+
+상세 자료는 필요 시 아래에서 로드:
+- `.claude/context/pm/tools.md` — 사용 가능 도구 및 제한
+- `.claude/context/pm/conventions.md` — PM 작업 컨벤션
+- `.claude/context/pm/templates/` — 산출물 템플릿 (PRD, 로드맵, GTM 등)

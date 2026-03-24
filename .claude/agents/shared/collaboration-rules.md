@@ -16,7 +16,7 @@
    - **Why**: Context and motivation
    - **When**: Priority level (urgent / normal / low)
    - **Dependencies**: What they need from you or others
-3. Update `.memory/tasks/active.md` with the new task
+3. Update `.memory/tasks/active-{delegatee-role}.md` with the new task
 
 ### When Receiving
 1. Acknowledge receipt immediately
@@ -49,25 +49,28 @@
 
 ### Before Starting Any Task
 ```
-1. Read .memory/tasks/active.md
+1. Read .memory/tasks/active-{your-role}.md — your tasks only
 2. Read .memory/facts/project-context.md
 3. Check if related decisions exist in .memory/decisions/
+4. Check .memory/handoff/ for pending handoffs
 ```
 
 ### After Completing a Task
 ```
-1. Update .memory/tasks/active.md → move to done.md
+1. Update .memory/tasks/active-{your-role}.md → move to done.md
 2. If new knowledge was gained → update relevant facts/ file
 3. If architectural decision was made → create decisions/ entry
 4. If important discussion happened → log to conversations/
+5. If handing off to another agent → create handoff/{from}-to-{to}_{topic}.md
 ```
 
 ### Memory File Ownership
 - **facts/team-profile.md**: PM Donald (others can suggest edits)
 - **facts/project-context.md**: PM Donald (others can suggest edits)
-- **tasks/***: Any agent can update their own tasks
+- **tasks/active-{role}.md**: Each agent writes ONLY their own file (동시쓰기 방지)
 - **decisions/***: The agent who made the decision writes it
 - **conversations/***: Any agent participating in the conversation
+- **handoff/***: The handing-off agent creates, the receiving agent acknowledges
 
 ## Response Format
 - Lead with action/decision, not preamble
@@ -105,3 +108,13 @@
 - **code-review-request.md** — Slack 리뷰 요청 포맷
 - **code-review-response.md** — Strengths/Issues/Assessment 리뷰 응답 포맷
 - **implementation-plan.md** — 구현 계획 문서 구조
+
+## Context Loading
+
+각 에이전트는 상세 자료가 필요할 때 `.claude/context/{role}/`에서 로드한다:
+- **tools.md** — 역할별 사용 가능 도구 및 제한
+- **conventions.md** — 역할별 작업 컨벤션
+- **examples/** — 코드 예시 및 참조 패턴
+- **templates/** — 산출물 템플릿
+
+에이전트 파일의 `📂 Extended Context` 섹션에서 경로를 확인할 수 있다.
