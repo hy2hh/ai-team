@@ -1,15 +1,11 @@
 import 'dotenv/config';
 import { App } from '@slack/bolt';
-import { writeFileSync, mkdirSync, readdirSync, statSync, unlinkSync } from 'fs';
-import { join } from 'path';
 import type { AgentConfig, SlackEvent } from './types.js';
+import { registerBotUser, routeMessage } from './router.js';
+import { handleMessage } from './agent-runtime.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
-const PROJECT_DIR = join(import.meta.dirname, '..', '..');
-const EVENTS_DIR = join(PROJECT_DIR, '.events');
-const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10분마다 정리 실행
-const EVENT_TTL_MS = 60 * 60 * 1000; // 1시간 후 파일 삭제
 const TEST_MODE = process.env.BRIDGE_TEST_MODE === '1';
 
 const AGENTS: AgentConfig[] = [
@@ -45,80 +41,19 @@ const AGENTS: AgentConfig[] = [
   },
 ];
 
-// ─── Bot User ID → Agent 이름 매핑 ──────────────────────
+// ─── Bot 자기 메시지 필터용 ──────────────────────────────
 
-/** botUserId → agentName 역방향 매핑 (런타임에 채워짐) */
-const botUserIdToAgent = new Map<string, string>();
-
-/** 우리 봇의 bot_id 집합 (런타임에 채워짐, 자기 메시지 필터용) */
+/** 우리 봇의 bot_id 집합 (런타임에 채워짐) */
 const ownBotIds = new Set<string>();
+
+// ─── Slack App → agentName 매핑 ─────────────────────────
+
+/** Slack App 인스턴스를 에이전트 이름으로 조회 */
+const appToAgent = new Map<App, AgentConfig>();
 
 // ─── 채널 이름 캐시 ──────────────────────────────────────
 
 const channelNameCache = new Map<string, string>();
-
-// ─── 유틸리티 ────────────────────────────────────────────
-
-/** 에이전트별 .events 디렉토리 초기화 */
-const ensureEventDirs = () => {
-  const dirs = [...AGENTS.map((a) => a.name), 'triage'];
-  for (const dir of dirs) {
-    mkdirSync(join(EVENTS_DIR, dir), { recursive: true });
-  }
-};
-
-/** 이벤트를 JSON 파일로 기록 */
-const writeEvent = (agentName: string, event: SlackEvent) => {
-  const dir = join(EVENTS_DIR, agentName);
-  const filename = `${event.ts.replace('.', '-')}.json`;
-  const filepath = join(dir, filename);
-  writeFileSync(filepath, JSON.stringify(event, null, 2), 'utf-8');
-  console.log(`[event] → .events/${agentName}/${filename}`);
-};
-
-/** 메시지 텍스트에서 멘션된 에이전트 목록 추출 */
-const parseMentions = (text: string): string[] => {
-  const mentions: string[] = [];
-  // <@U12345> 형태의 멘션을 찾아서 botUserId → agentName 변환
-  const mentionPattern = /<@(U[A-Z0-9]+)>/g;
-  let match: RegExpExecArray | null;
-  while ((match = mentionPattern.exec(text)) !== null) {
-    const userId = match[1];
-    const agentName = botUserIdToAgent.get(userId);
-    if (agentName) {
-      mentions.push(agentName);
-    }
-  }
-  return mentions;
-};
-
-/** 1시간 지난 이벤트 파일 정리 */
-const cleanupOldEvents = () => {
-  const now = Date.now();
-  const dirs = [...AGENTS.map((a) => a.name), 'triage'];
-
-  for (const dir of dirs) {
-    const dirPath = join(EVENTS_DIR, dir);
-    try {
-      const files = readdirSync(dirPath);
-      for (const file of files) {
-        if (!file.endsWith('.json')) {
-          continue;
-        }
-        const filepath = join(dirPath, file);
-        const stat = statSync(filepath);
-        if (now - stat.mtimeMs > EVENT_TTL_MS) {
-          unlinkSync(filepath);
-          console.log(`[cleanup] deleted .events/${dir}/${file}`);
-        }
-      }
-    } catch {
-      // 디렉토리가 없으면 무시
-    }
-  }
-};
-
-// ─── 채널 이름 조회 ──────────────────────────────────────
 
 /** 첫 번째 유효한 Bolt App으로 채널 이름 조회 */
 const getChannelName = async (
@@ -146,6 +81,11 @@ const getChannelName = async (
   return channelId;
 };
 
+// ─── 처리 중인 메시지 중복 방지 ─────────────────────────
+
+/** 현재 처리 중인 메시지 ts 집합 */
+const processingMessages = new Set<string>();
+
 // ─── 메인 ────────────────────────────────────────────────
 
 const main = async () => {
@@ -161,8 +101,6 @@ const main = async () => {
     process.exit(1);
   }
 
-  ensureEventDirs();
-
   // 6개 Bolt App 인스턴스 생성
   const apps: App[] = [];
 
@@ -171,15 +109,14 @@ const main = async () => {
       token: agent.botToken,
       appToken: agent.appToken,
       socketMode: true,
-      // 각 앱의 이벤트는 공통 핸들러로 라우팅
     });
 
-    // Bot User ID 조회 및 매핑 등록
+    // Bot User ID 조회 및 라우터에 등록
     try {
       const authResult = await app.client.auth.test();
       agent.botUserId = authResult.user_id as string;
       const botId = authResult.bot_id as string;
-      botUserIdToAgent.set(agent.botUserId, agent.name);
+      registerBotUser(agent.botUserId, agent.name);
       ownBotIds.add(botId);
       console.log(
         `[init] ${agent.name}: botUserId=${agent.botUserId}, botId=${botId}`,
@@ -189,9 +126,7 @@ const main = async () => {
       process.exit(1);
     }
 
-    // message 이벤트는 첫 번째 앱(PM)에서만 처리 (중복 방지)
-    // 모든 앱에서 message 이벤트 수신 (어떤 앱에 구독이 있는지 모르므로)
-    // 중복 방지는 파일명(ts 기반)으로 자동 처리됨 (같은 파일 덮어쓰기)
+    // 메시지 이벤트 핸들러
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
 
@@ -207,7 +142,14 @@ const main = async () => {
       const ts = (msg.ts as string) ?? '';
       const threadTs = (msg.thread_ts as string) ?? null;
 
-      const mentions = parseMentions(text);
+      // 중복 처리 방지 (같은 메시지가 여러 앱에서 수신될 수 있음)
+      if (processingMessages.has(ts)) {
+        return;
+      }
+      processingMessages.add(ts);
+      // 5분 후 자동 삭제 (메모리 누수 방지)
+      setTimeout(() => processingMessages.delete(ts), 5 * 60 * 1000);
+
       const channelName = await getChannelName(apps, channel);
 
       const slackEvent: SlackEvent = {
@@ -218,21 +160,43 @@ const main = async () => {
         text,
         ts,
         thread_ts: threadTs,
-        mentions,
+        mentions: [],
         raw: msg,
       };
 
-      if (mentions.length > 0) {
-        // 멘션된 에이전트별 디렉토리에 기록
-        for (const agentName of mentions) {
-          writeEvent(agentName, slackEvent);
-        }
-      } else {
-        // 멘션 없음 → triage로 라우팅
-        writeEvent('triage', slackEvent);
-      }
+      // 3단계 라우팅
+      const routing = routeMessage(text);
+      slackEvent.mentions = routing.method === 'mention'
+        ? [routing.agentName]
+        : [];
+
+      console.log(
+        `[route] "${text.slice(0, 50)}..." → ${routing.agentName} (${routing.method})`,
+      );
+
+      // 대상 에이전트의 Slack App 인스턴스 찾기
+      const targetAgent = AGENTS.find(
+        (a) => a.name === routing.agentName,
+      );
+      const targetApp = targetAgent
+        ? apps[AGENTS.indexOf(targetAgent)]
+        : apps[0]; // 폴백: PM의 앱
+
+      // Agent SDK로 직접 처리 (비동기 — 블로킹하지 않음)
+      handleMessage(
+        routing.agentName,
+        slackEvent,
+        routing.method,
+        targetApp,
+      ).catch((err) => {
+        console.error(
+          `[error] ${routing.agentName} handleMessage 실패:`,
+          err,
+        );
+      });
     });
 
+    appToAgent.set(app, agent);
     apps.push(app);
   }
 
@@ -240,15 +204,13 @@ const main = async () => {
   console.log('[start] Socket Mode 연결 중...');
   for (let i = 0; i < apps.length; i++) {
     await apps[i].start();
-    console.log(`[start] ${AGENTS[i].name} 연결 완료 (${i + 1}/${apps.length})`);
+    console.log(
+      `[start] ${AGENTS[i].name} 연결 완료 (${i + 1}/${apps.length})`,
+    );
   }
   console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
-  console.log(`[start] 이벤트 디렉토리: ${EVENTS_DIR}`);
-
-  // 주기적 정리 스케줄
-  setInterval(cleanupOldEvents, CLEANUP_INTERVAL_MS);
   console.log(
-    `[cleanup] ${EVENT_TTL_MS / 1000 / 60}분 이상 된 이벤트 자동 삭제 (${CLEANUP_INTERVAL_MS / 1000 / 60}분 간격)`,
+    '[start] Agent SDK 런타임 활성 — .events/ 파일 중간 단계 제거됨',
   );
 
   // 종료 시그널 처리
