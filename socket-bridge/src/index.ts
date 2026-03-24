@@ -6,7 +6,7 @@ import type { AgentConfig, SlackEvent } from './types.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
-const PROJECT_DIR = join(import.meta.dirname, '..');
+const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 const EVENTS_DIR = join(PROJECT_DIR, '.events');
 const CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10분마다 정리 실행
 const EVENT_TTL_MS = 60 * 60 * 1000; // 1시간 후 파일 삭제

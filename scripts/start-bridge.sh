@@ -35,9 +35,9 @@ fi
 # .events 디렉토리 생성
 mkdir -p "$PROJECT_DIR/.events"
 
-# tmux 세션으로 bridge 실행
+# tmux 세션으로 bridge 실행 (set -a로 환경변수를 자동 export)
 tmux new-session -d -s "$SESSION_NAME" -c "$BRIDGE_DIR" \
-  "source $ENV_FILE && npm start"
+  "set -a && source $ENV_FILE && set +a && npm start"
 
 echo "🌉 Socket Bridge 시작 (세션: $SESSION_NAME)"
 echo ""

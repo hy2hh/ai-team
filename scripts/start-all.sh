@@ -45,7 +45,7 @@ else
   fi
   mkdir -p "$PROJECT_DIR/.events"
   tmux new-session -d -s "$BRIDGE_SESSION" -c "$BRIDGE_DIR" \
-    "source $ENV_FILE && npm start"
+    "set -a && source $ENV_FILE && set +a && npm start"
   echo "  🌉 bridge 시작 (세션: $BRIDGE_SESSION)"
   sleep 3
 fi
