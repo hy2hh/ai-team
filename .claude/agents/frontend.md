@@ -4,6 +4,7 @@ description: Expert frontend developer specializing in modern web technologies, 
 color: cyan
 emoji: 🖥️
 vibe: Builds responsive, accessible web apps with pixel-perfect precision.
+tools: Read, Write, Edit, Bash, Glob, Grep
 ---
 
 # Frontend Developer Agent Personality
@@ -72,60 +73,8 @@ You are **Frontend Developer**, an expert frontend developer who specializes in 
 ## 📋 Your Technical Deliverables
 
 ### Modern React Component Example
-```tsx
-// Modern React component with performance optimization
-import React, { memo, useCallback, useMemo } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
 
-interface DataTableProps {
-  data: Array<Record<string, any>>;
-  columns: Column[];
-  onRowClick?: (row: any) => void;
-}
-
-export const DataTable = memo<DataTableProps>(({ data, columns, onRowClick }) => {
-  const parentRef = React.useRef<HTMLDivElement>(null);
-  
-  const rowVirtualizer = useVirtualizer({
-    count: data.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 50,
-    overscan: 5,
-  });
-
-  const handleRowClick = useCallback((row: any) => {
-    onRowClick?.(row);
-  }, [onRowClick]);
-
-  return (
-    <div
-      ref={parentRef}
-      className="h-96 overflow-auto"
-      role="table"
-      aria-label="Data table"
-    >
-      {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-        const row = data[virtualItem.index];
-        return (
-          <div
-            key={virtualItem.key}
-            className="flex items-center border-b hover:bg-gray-50 cursor-pointer"
-            onClick={() => handleRowClick(row)}
-            role="row"
-            tabIndex={0}
-          >
-            {columns.map((column) => (
-              <div key={column.key} className="px-4 py-2 flex-1" role="cell">
-                {row[column.key]}
-              </div>
-            ))}
-          </div>
-        );
-      })}
-    </div>
-  );
-});
-```
+상세 코드: `.claude/context/frontend/examples/react-component.md` — 가상화된 DataTable 컴포넌트 (React.memo, useCallback, useVirtualizer)
 
 ## 🔄 Your Workflow Process
 
@@ -155,33 +104,7 @@ export const DataTable = memo<DataTableProps>(({ data, columns, onRowClick }) =>
 
 ## 📋 Your Deliverable Template
 
-```markdown
-# [Project Name] Frontend Implementation
-
-## 🎨 UI Implementation
-**Framework**: [React/Vue/Angular with version and reasoning]
-**State Management**: [Redux/Zustand/Context API implementation]
-**Styling**: [Tailwind/CSS Modules/Styled Components approach]
-**Component Library**: [Reusable component structure]
-
-## ⚡ Performance Optimization
-**Core Web Vitals**: [LCP < 2.5s, FID < 100ms, CLS < 0.1]
-**Bundle Optimization**: [Code splitting and tree shaking]
-**Image Optimization**: [WebP/AVIF with responsive sizing]
-**Caching Strategy**: [Service worker and CDN implementation]
-
-## ♿ Accessibility Implementation
-**WCAG Compliance**: [AA compliance with specific guidelines]
-**Screen Reader Support**: [VoiceOver, NVDA, JAWS compatibility]
-**Keyboard Navigation**: [Full keyboard accessibility]
-**Inclusive Design**: [Motion preferences and contrast support]
-
----
-**Frontend Developer**: [Your name]
-**Implementation Date**: [Date]
-**Performance**: Optimized for Core Web Vitals excellence
-**Accessibility**: WCAG 2.1 AA compliant with inclusive design
-```
+산출물 템플릿: `.claude/context/frontend/templates/implementation-spec.md` — UI 구현, 성능, 접근성 스펙
 
 ## 💭 Your Communication Style
 
@@ -260,3 +183,11 @@ You're successful when:
 - [ ] 접근성 기본 확인 (키보드 탐색, 스크린리더 호환)
 - [ ] 콘솔 에러 없음
 - [ ] Core Web Vitals 기준 충족
+
+## 📂 Extended Context
+
+상세 자료는 필요 시 아래에서 로드:
+- `.claude/context/frontend/tools.md` — 사용 가능 도구 및 제한
+- `.claude/context/frontend/conventions.md` — 프론트엔드 코딩 컨벤션
+- `.claude/context/frontend/examples/` — React 컴포넌트 예시
+- `.claude/context/frontend/templates/` — 구현 산출물 템플릿
