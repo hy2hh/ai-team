@@ -10,6 +10,7 @@
 ├── facts/
 │   ├── team-profile.md   — Team members, roles, Slack bots
 │   ├── project-context.md — Goals, tech stack, constraints
+│   ├── services.md       — External service identifiers per project
 │   └── {topic}.md        — Add as needed (e.g., api-contracts.md)
 ├── tasks/
 │   ├── active.md         — Index (역할별 파일 링크)

@@ -16,5 +16,5 @@
 - Human approval required for production deployments
 
 ## Active Projects
-<!-- Update this section as projects change -->
-(none yet)
+<!-- 프로젝트 추가 시: 이름 + services.md 참조 -->
+(none yet — 프로젝트 시작 시 `facts/services.md`에 서비스 등록)
