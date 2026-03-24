@@ -101,7 +101,7 @@ const createSlackMcpConfig = (botToken: string) => ({
   command: 'npx',
   args: [
     '-y',
-    '@anthropic-ai/claude-code-slack-mcp',
+    '@modelcontextprotocol/server-slack',
   ],
   env: {
     SLACK_BOT_TOKEN: botToken,
