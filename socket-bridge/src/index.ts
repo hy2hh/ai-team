@@ -1,5 +1,9 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { join } from 'path';
 import { App } from '@slack/bolt';
+
+// .env는 프로젝트 루트에 위치
+config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
 import { registerBotUser, routeMessage } from './router.js';
 import { handleMessage } from './agent-runtime.js';

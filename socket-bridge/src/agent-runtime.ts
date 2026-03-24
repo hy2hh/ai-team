@@ -152,6 +152,17 @@ export const handleMessage = async (
 
   const startTime = Date.now();
 
+  // ⏳ 리액션으로 처리 중 표시
+  try {
+    await slackApp.client.reactions.add({
+      channel: event.channel,
+      timestamp: event.ts,
+      name: 'hourglass_flowing_sand',
+    });
+  } catch {
+    // 리액션 실패는 무시
+  }
+
   try {
     // 에이전트별 Slack bot token 조회
     const botToken =
@@ -187,9 +198,24 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
+    // ⏳ → ✅ 완료 리액션 전환
+    try {
+      await slackApp.client.reactions.remove({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'hourglass_flowing_sand',
+      });
+      await slackApp.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'white_check_mark',
+      });
+    } catch {
+      // 리액션 실패는 무시
+    }
+
     // SDK가 Slack MCP를 통해 직접 포스팅하므로
     // 여기서 추가 포스팅은 필요 없음
-    // 만약 SDK가 Slack에 포스팅하지 못한 경우 폴백
     if (!resultText) {
       console.warn(
         `[runtime] ${agentName} 빈 결과 — 에이전트가 직접 Slack에 응답했을 수 있음`,
@@ -198,6 +224,22 @@ export const handleMessage = async (
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
+
+    // ⏳ → ❌ 에러 리액션 전환
+    try {
+      await slackApp.client.reactions.remove({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'hourglass_flowing_sand',
+      });
+      await slackApp.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'x',
+      });
+    } catch {
+      // 리액션 실패는 무시
+    }
 
     // 에러 시 Slack에 알림
     try {
