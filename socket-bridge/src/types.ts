@@ -31,3 +31,21 @@ export interface AgentConfig {
   /** Slack Bot User ID (런타임에 채워짐) */
   botUserId?: string;
 }
+
+/** 라우팅 결과 */
+export interface RoutingResult {
+  /** 라우팅 대상 에이전트 이름 */
+  agentName: string;
+  /** 라우팅 방식 */
+  method: 'mention' | 'keyword' | 'default';
+}
+
+/** 에이전트별 세션 정보 */
+export interface AgentSession {
+  /** 에이전트 이름 */
+  agentName: string;
+  /** 시스템 프롬프트 (persona 파일 내용) */
+  systemPrompt: string;
+  /** SDK 세션 ID (resume용) */
+  sessionId?: string;
+}
