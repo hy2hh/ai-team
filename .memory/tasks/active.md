@@ -10,6 +10,7 @@
 | Designer Donald | `active-designer.md` |
 | Researcher Donald | `active-researcher.md` |
 | SecOps Donald | `active-secops.md` |
+| Triage Agent | `active-triage.md` |
 
 ## 규칙
 - 각 에이전트는 자신의 파일만 수정

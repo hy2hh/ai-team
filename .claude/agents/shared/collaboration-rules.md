@@ -87,6 +87,23 @@
 - **Slack 보고**: 완료 메시지에 반드시 검증 결과 첨부
 - **Red Flags**: "should work", "probably", 증거 없는 "Done!" 금지
 
+## Message Routing Protocol
+
+### Triage Agent 기반 라우팅
+- **일반 메시지** (@ 멘션 없음): **Triage Agent만 반응** → 분류 후 적절한 에이전트에게 위임
+- **@mention 메시지**: 멘션된 에이전트가 직접 반응 (Triage bypass)
+- **sid 직접 지정**: 지정된 에이전트가 즉시 반응
+
+### 에이전트 반응 규칙
+- **@mention 없는 메시지에 직접 반응 금지** — Triage Agent의 위임을 대기
+- Triage로부터 `@에이전트명`으로 위임받았을 때만 작업 시작
+- Triage Agent 다운 시 → 수동 @mention으로 기존 방식 fallback
+
+### 참조 프로토콜
+- **충돌 방지**: `shared/collision-prevention.md`
+- **라우팅 규칙**: `shared/routing-rules.md`
+- **크로스 도메인**: `shared/cross-domain-coordination.md`
+
 ## Channel Rules
 - **#ai-team**: Main collaboration channel for all agents
 - Stay on topic within threads

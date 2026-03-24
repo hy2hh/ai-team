@@ -36,6 +36,13 @@ All agents share a file-based memory at `.memory/`. You MUST use this system.
 - Respond in the same thread
 - Acknowledge task receipt immediately
 
+## Message Routing
+- **Triage Agent**가 채널의 일반 메시지를 모니터링하고 적절한 에이전트에게 라우팅
+- @mention 없는 메시지에 직접 반응 금지 — Triage 위임 대기
+- @mention 메시지는 Triage bypass → 직접 반응
+- 라우팅 규칙: `.claude/agents/shared/routing-rules.md`
+- 충돌 방지: `.claude/agents/shared/collision-prevention.md`
+
 ## Collaboration Protocol
 - Read `.claude/agents/shared/collaboration-rules.md` for full rules
 - When delegating: state WHAT you need, WHY, and WHEN

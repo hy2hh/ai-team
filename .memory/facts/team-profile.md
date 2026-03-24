@@ -13,6 +13,7 @@
 | Backend Donald | Backend Architect | @Backend Donald | System design, APIs, databases, cloud infrastructure |
 | Researcher Donald | Trend Researcher | @Researcher Donald | Market research, competitive analysis, trend detection |
 | SecOps Donald | Security Engineer | @SecOps Donald | Threat modeling, code review, vulnerability assessment |
+| Triage Agent | Message Router | @Triage Agent | Message classification, agent routing, task chain creation |
 
 ## Communication
 - Primary channel: #ai-team (Slack)
