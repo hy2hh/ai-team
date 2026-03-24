@@ -4,14 +4,14 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_DIR/.env"
-SESSION_PREFIX="ai-team"
+BRIDGE_SESSION="ai-team-bridge"
+BRIDGE_DIR="$PROJECT_DIR/socket-bridge"
 
 # .env 로드
 if [ ! -f "$ENV_FILE" ]; then
   echo "❌ .env 파일이 없습니다: $ENV_FILE"
   exit 1
 fi
-source "$ENV_FILE"
 
 # tmux 필수
 if ! command -v tmux &>/dev/null; then
@@ -19,23 +19,12 @@ if ! command -v tmux &>/dev/null; then
   exit 1
 fi
 
-# 에이전트 정의: name|agent_file|bot_token|app_token
-AGENTS=(
-  "pm|.claude/agents/pm.md|$SLACK_BOT_TOKEN_PM|$SLACK_APP_TOKEN_PM"
-  "designer|.claude/agents/designer.md|$SLACK_BOT_TOKEN_DESIGNER|$SLACK_APP_TOKEN_DESIGNER"
-  "frontend|.claude/agents/frontend.md|$SLACK_BOT_TOKEN_FRONTEND|$SLACK_APP_TOKEN_FRONTEND"
-  "backend|.claude/agents/backend.md|$SLACK_BOT_TOKEN_BACKEND|$SLACK_APP_TOKEN_BACKEND"
-  "researcher|.claude/agents/researcher.md|$SLACK_BOT_TOKEN_RESEARCHER|$SLACK_APP_TOKEN_RESEARCHER"
-  "secops|.claude/agents/secops.md|$SLACK_BOT_TOKEN_SECOPS|$SLACK_APP_TOKEN_SECOPS"
-)
-
 echo "🚀 AI Team 시작 ($(date '+%Y-%m-%d %H:%M:%S'))"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Phase 2: Agent SDK 런타임 (통합 프로세스)"
+echo ""
 
-# Socket Bridge 먼저 시작
-BRIDGE_SESSION="ai-team-bridge"
-BRIDGE_DIR="$PROJECT_DIR/socket-bridge"
-
+# Socket Bridge + Agent Runtime 시작 (하나의 프로세스)
 if tmux has-session -t "$BRIDGE_SESSION" 2>/dev/null; then
   echo "  ⏭ bridge 이미 실행 중 (세션: $BRIDGE_SESSION)"
 else
@@ -43,56 +32,20 @@ else
     echo "  📦 socket-bridge 의존성 설치 중..."
     (cd "$BRIDGE_DIR" && npm install)
   fi
-  mkdir -p "$PROJECT_DIR/.events"
   tmux new-session -d -s "$BRIDGE_SESSION" -c "$BRIDGE_DIR" \
     "set -a && source $ENV_FILE && set +a && npm start"
-  echo "  🌉 bridge 시작 (세션: $BRIDGE_SESSION)"
-  sleep 3
-fi
-
-STARTED=0
-
-for agent_config in "${AGENTS[@]}"; do
-  IFS='|' read -r name agent_file bot_token app_token <<< "$agent_config"
-  session_name="${SESSION_PREFIX}-${name}"
-
-  # 이미 실행 중이면 스킵
-  if tmux has-session -t "$session_name" 2>/dev/null; then
-    echo "  ⏭ $name 이미 실행 중 (세션: $session_name)"
-    continue
-  fi
-
-  # 허용 도구 목록
-  ALLOWED_TOOLS="Read,Write,Edit,Glob,Grep,Bash(ls:*),Bash(cat:*),Bash(rm:*.json),Bash(find:*),Bash(mkdir:*),Bash(date:*),Bash(echo:*),Bash(sleep:*),Bash(wc:*),Bash(head:*),Bash(tail:*),mcp__slack__slack_post_message,mcp__slack__slack_reply_to_thread,mcp__slack__slack_get_channel_history,mcp__slack__slack_get_thread_replies,mcp__slack__slack_get_user_profile,mcp__slack__slack_get_users,mcp__slack__slack_list_channels,mcp__slack__slack_add_reaction,Agent,WebSearch,WebFetch"
-
-  tmux new-session -d -s "$session_name" -c "$PROJECT_DIR" \
-    "export SLACK_BOT_TOKEN=\"$bot_token\" SLACK_APP_TOKEN=\"$app_token\" SLACK_TEAM_ID=\"$SLACK_TEAM_ID\" && claude --agent \"$PROJECT_DIR/$agent_file\" --allowedTools \"$ALLOWED_TOOLS\""
-
-  echo "  ✅ $name 시작 (세션: $session_name)"
-  STARTED=$((STARTED + 1))
-done
-
-# claude --agent 초기화 대기 후 모니터링 프롬프트 전송
-if [ "$STARTED" -gt 0 ]; then
-  echo ""
-  echo "⏳ 에이전트 초기화 대기 중 (8초)..."
-  sleep 8
-
-  for agent_config in "${AGENTS[@]}"; do
-    IFS='|' read -r name agent_file bot_token app_token <<< "$agent_config"
-    session_name="${SESSION_PREFIX}-${name}"
-    if tmux has-session -t "$session_name" 2>/dev/null; then
-      tmux send-keys -t "$session_name" ".events/${name}/ 디렉토리의 JSON 파일을 Glob과 Read 도구로 감시하세요. 새 파일이 있으면 Read로 읽고 처리한 뒤 Bash로 삭제하세요. 파일이 없으면 5초 후 다시 Glob으로 확인하세요. Bash로 while 루프를 사용하지 마세요." Enter
-    fi
-  done
+  echo "  🌉 bridge + agent-runtime 시작 (세션: $BRIDGE_SESSION)"
 fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "✅ 에이전트 ${STARTED}개 시작 완료"
+echo "✅ 시작 완료"
+echo ""
+echo "  Socket Bridge: Slack WebSocket 수신"
+echo "  Agent Runtime: SDK query() 직접 호출"
+echo "  모델: claude-sonnet-4-6"
 echo ""
 echo "📋 명령어:"
-echo "  tmux ls                              # 세션 목록"
-echo "  tmux attach -t ${SESSION_PREFIX}-backend   # 세션 접속"
-echo "  Ctrl+B, D                            # 세션에서 빠져나오기"
-echo "  ./scripts/stop-all.sh                # 전체 종료"
+echo "  tmux attach -t $BRIDGE_SESSION    # 세션 접속"
+echo "  Ctrl+B, D                         # 세션에서 빠져나오기"
+echo "  ./scripts/stop-all.sh             # 전체 종료"
 echo ""
