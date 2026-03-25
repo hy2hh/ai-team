@@ -547,8 +547,8 @@ const flushDebounceBuffer = async (
     raw: entry.raw,
   };
 
-  // 라우팅 (합쳐진 텍스트 기준)
-  const routing = await routeMessage(combinedText);
+  // 라우팅 (새 메시지만 기준 — 히스토리 멘션이 라우팅을 오염하지 않도록)
+  const routing = await routeMessage(newMessagesText);
   slackEvent.mentions =
     routing.method === 'mention'
       ? routing.agents.map((a) => a.name)
@@ -673,22 +673,28 @@ const main = async () => {
 
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
+      const text = (msg.text as string) ?? '';
+      const ts = (msg.ts as string) ?? '';
+
+      console.log(
+        `[event] 수신: "${text.slice(0, 40)}..." ts=${ts} bot_id=${msg.bot_id ?? 'none'} thread_ts=${msg.thread_ts ?? 'none'}`,
+      );
 
       // 우리 봇 메시지 무시 (테스트 모드에서는 통과)
       const msgBotId = msg.bot_id as string | undefined;
       if (!TEST_MODE && msgBotId && ownBotIds.has(msgBotId)) {
+        console.log(`[filter] 자체 봇 메시지 무시: ${ts}`);
         return;
       }
 
-      const text = (msg.text as string) ?? '';
       const channel = (msg.channel as string) ?? '';
       const user = (msg.user as string) ?? '';
-      const ts = (msg.ts as string) ?? '';
       const threadTs =
         (msg.thread_ts as string) ?? null;
 
       // 1차 필터: 인메모리 중복 방지 (빠른 체크)
       if (processingMessages.has(ts)) {
+        console.log(`[filter] 중복 메시지 무시: ${ts}`);
         return;
       }
       processingMessages.add(ts);
