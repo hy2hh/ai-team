@@ -1,30 +1,18 @@
 import { writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
-import Anthropic from '@anthropic-ai/sdk';
 import type {
   ChainState,
   ChainStep,
   RoutingAgent,
   SlackEvent,
 } from './types.js';
-import { AGENT_SCOPES } from './router.js';
+import { AGENT_SCOPES, getAnthropicClient } from './router.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 const HANDOFF_DIR = join(PROJECT_DIR, '.memory', 'handoff');
 
 /** LLM 라우팅 타임아웃 (ms) */
 const LLM_TIMEOUT = 5000;
-
-/** Anthropic 클라이언트 (lazy init) */
-let client: Anthropic | null = null;
-
-/** Anthropic 클라이언트 싱글톤 */
-const getClient = (): Anthropic => {
-  if (!client) {
-    client = new Anthropic();
-  }
-  return client;
-};
 
 /** 활성 체인 맵 */
 const activeChains = new Map<string, ChainState>();
@@ -195,21 +183,26 @@ const evaluateNextStep = async (
   ].join('\n');
 
   try {
-    const anthropic = getClient();
+    const anthropic = getAnthropicClient();
 
-    const response = await Promise.race([
-      anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('LLM chain eval timeout')),
-          LLM_TIMEOUT,
-        ),
-      ),
-    ]);
+    const apiCall = anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('LLM chain eval timeout')),
+        LLM_TIMEOUT,
+      );
+    });
+
+    const response = await Promise.race([apiCall, timeout])
+      .finally(() => {
+        clearTimeout(timer!);
+      });
 
     const content = response.content[0];
     if (content.type !== 'text') {

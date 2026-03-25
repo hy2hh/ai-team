@@ -33,7 +33,7 @@ export const AGENT_SCOPES: Record<string, string> = {
 let anthropicClient: Anthropic | null = null;
 
 /** Anthropic 클라이언트 싱글톤 */
-const getAnthropicClient = (): Anthropic => {
+export const getAnthropicClient = (): Anthropic => {
   if (!anthropicClient) {
     anthropicClient = new Anthropic();
   }
@@ -42,6 +42,30 @@ const getAnthropicClient = (): Anthropic => {
 
 /** LLM 라우팅 타임아웃 (ms) */
 const LLM_ROUTING_TIMEOUT = 5000;
+
+/**
+ * 타임아웃 부착 Promise.race 헬퍼 — resolve/reject 후 타이머 정리
+ * @param promise - 원본 Promise
+ * @param ms - 타임아웃 밀리초
+ * @param label - 타임아웃 에러 메시지 라벨
+ * @returns 원본 Promise 결과
+ */
+const withTimeout = <T>(
+  promise: Promise<T>,
+  ms: number,
+  label: string,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timeout`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timer);
+  });
+};
 
 /** 에이전트 이름으로 RoutingAgent 생성 */
 const toRoutingAgent = (name: string): RoutingAgent => ({
@@ -154,19 +178,15 @@ const classifyWithLlm = async (
   try {
     const client = getAnthropicClient();
 
-    const response = await Promise.race([
+    const response = await withTimeout(
       client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 50,
         messages: [{ role: 'user', content: prompt }],
       }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('LLM routing timeout')),
-          LLM_ROUTING_TIMEOUT,
-        ),
-      ),
-    ]);
+      LLM_ROUTING_TIMEOUT,
+      'LLM routing',
+    );
 
     const content = response.content[0];
     if (content.type !== 'text') {
@@ -233,19 +253,15 @@ export const classifyComplexTask = async (
   try {
     const client = getAnthropicClient();
 
-    const response = await Promise.race([
+    const response = await withTimeout(
       client.messages.create({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 200,
         messages: [{ role: 'user', content: prompt }],
       }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error('LLM complex routing timeout')),
-          LLM_ROUTING_TIMEOUT,
-        ),
-      ),
-    ]);
+      LLM_ROUTING_TIMEOUT,
+      'LLM complex routing',
+    );
 
     const content = response.content[0];
     if (content.type !== 'text') {
@@ -263,10 +279,19 @@ export const classifyComplexTask = async (
       return null;
     }
 
-    const validAgents = parsed.firstStep?.agents?.filter(
-      (a) => a in AGENT_SCOPES,
+    const rawAgents = parsed.firstStep?.agents;
+    if (!Array.isArray(rawAgents)) {
+      console.warn(
+        `[router] LLM이 유효하지 않은 에이전트 형식 반환: ${content.text}`,
+      );
+      return null;
+    }
+
+    const validAgents = rawAgents.filter(
+      (a): a is string =>
+        typeof a === 'string' && a in AGENT_SCOPES,
     );
-    if (!validAgents || validAgents.length === 0) {
+    if (validAgents.length === 0) {
       console.warn(
         `[router] LLM이 유효하지 않은 에이전트 반환: ${content.text}`,
       );

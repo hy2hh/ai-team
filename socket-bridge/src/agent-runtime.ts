@@ -136,12 +136,14 @@ const getOrCreateSession = (agentName: string): AgentSession => {
  * @param event - Slack 이벤트
  * @param routingMethod - 라우팅 방식
  * @param slackApp - Slack Bolt App (응답 포스팅용)
+ * @param skipReaction - 리액션 관리 건너뛰기 (병렬 실행 시 첫 에이전트만 관리)
  */
 export const handleMessage = async (
   agentName: string,
   event: SlackEvent,
   routingMethod: string,
   slackApp: App,
+  skipReaction = false,
 ): Promise<void> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
@@ -152,16 +154,18 @@ export const handleMessage = async (
 
   const startTime = Date.now();
 
-  // ⏳ 리액션으로 처리 중 표시
-  try {
-    await slackApp.client.reactions.add({
-      channel: event.channel,
-      timestamp: event.ts,
-      name: 'hourglass_flowing_sand',
-    });
-    console.log(`[reaction] ⏳ 추가 완료: ${event.ts}`);
-  } catch (err) {
-    console.error(`[reaction] ⏳ 추가 실패:`, err);
+  // ⏳ 리액션으로 처리 중 표시 (병렬 실행 시 첫 에이전트만 관리)
+  if (!skipReaction) {
+    try {
+      await slackApp.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'hourglass_flowing_sand',
+      });
+      console.log(`[reaction] ⏳ 추가 완료: ${event.ts}`);
+    } catch (err) {
+      console.error(`[reaction] ⏳ 추가 실패:`, err);
+    }
   }
 
   try {
@@ -199,20 +203,22 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // ⏳ → ✅ 완료 리액션 전환
-    try {
-      await slackApp.client.reactions.remove({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'hourglass_flowing_sand',
-      });
-      await slackApp.client.reactions.add({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'white_check_mark',
-      });
-    } catch {
-      // 리액션 실패는 무시
+    // ⏳ → ✅ 완료 리액션 전환 (리액션 담당 에이전트만)
+    if (!skipReaction) {
+      try {
+        await slackApp.client.reactions.remove({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'hourglass_flowing_sand',
+        });
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'white_check_mark',
+        });
+      } catch {
+        // 리액션 실패는 무시
+      }
     }
 
     // SDK가 Slack MCP를 통해 직접 포스팅하므로
@@ -226,20 +232,22 @@ export const handleMessage = async (
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
 
-    // ⏳ → ❌ 에러 리액션 전환
-    try {
-      await slackApp.client.reactions.remove({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'hourglass_flowing_sand',
-      });
-      await slackApp.client.reactions.add({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'x',
-      });
-    } catch {
-      // 리액션 실패는 무시
+    // ⏳ → ❌ 에러 리액션 전환 (리액션 담당 에이전트만)
+    if (!skipReaction) {
+      try {
+        await slackApp.client.reactions.remove({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'hourglass_flowing_sand',
+        });
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'x',
+        });
+      } catch {
+        // 리액션 실패는 무시
+      }
     }
 
     // 에러 시 Slack에 알림

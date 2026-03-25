@@ -61,11 +61,6 @@ const AGENTS: AgentConfig[] = [
 /** 우리 봇의 bot_id 집합 (런타임에 채워짐) */
 const ownBotIds = new Set<string>();
 
-// ─── Slack App → agentName 매핑 ─────────────────────────
-
-/** Slack App 인스턴스를 에이전트 이름으로 조회 */
-const appToAgent = new Map<App, AgentConfig>();
-
 // ─── 채널 이름 캐시 ──────────────────────────────────────
 
 const channelNameCache = new Map<string, string>();
@@ -148,19 +143,42 @@ const executeParallel = async (
     `[exec] 병렬 실행: [${agentNames.join(', ')}]`,
   );
 
-  const tasks = agentNames.map((name) => {
-    const app = findAgentApp(name, apps);
-    return handleMessage(name, event, method, app).catch(
-      (err) => {
-        console.error(
-          `[error] ${name} 병렬 실행 실패:`,
-          err,
-        );
-      },
-    );
-  });
+  const results = await Promise.allSettled(
+    agentNames.map((name, i) => {
+      const app = findAgentApp(name, apps);
+      // 첫 번째 에이전트만 리액션 관리 (경합 방지)
+      const skipReaction = i > 0;
+      return handleMessage(
+        name,
+        event,
+        method,
+        app,
+        skipReaction,
+      );
+    }),
+  );
 
-  await Promise.all(tasks);
+  const failed = results
+    .map((r, i) => ({ result: r, name: agentNames[i] }))
+    .filter((r) => r.result.status === 'rejected');
+
+  if (failed.length > 0) {
+    const failedNames = failed.map((f) => f.name).join(', ');
+    console.error(
+      `[exec] 병렬 실행 실패: [${failedNames}] (${failed.length}/${agentNames.length})`,
+    );
+    for (const f of failed) {
+      const reason =
+        f.result.status === 'rejected'
+          ? f.result.reason
+          : '';
+      console.error(`[exec]   ${f.name}:`, reason);
+    }
+  }
+
+  console.log(
+    `[exec] 병렬 실행 완료: ${results.length - failed.length}/${agentNames.length} 성공`,
+  );
 };
 
 /**
@@ -174,7 +192,7 @@ const executeSequential = async (
   routing: { agents: Array<{ name: string }>; method: string },
   apps: App[],
 ): Promise<void> => {
-  const firstExecution =
+  const firstExecution: 'single' | 'parallel' =
     routing.agents.length > 1 ? 'parallel' : 'single';
   const chain = createChain(
     event,
@@ -182,7 +200,7 @@ const executeSequential = async (
       name: a.name,
       role: '',
     })),
-    firstExecution as 'single' | 'parallel',
+    firstExecution,
   );
 
   console.log(
@@ -412,7 +430,6 @@ const main = async () => {
         });
     });
 
-    appToAgent.set(app, agent);
     apps.push(app);
   }
 
