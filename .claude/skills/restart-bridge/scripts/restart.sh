@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 BRIDGE_SESSION="ai-team-bridge"
 WEBSOCKET_COOLDOWN=${1:-5}  # 기본 5초, 재시도 시 늘릴 수 있음
 
