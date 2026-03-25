@@ -16,6 +16,8 @@ export interface SlackEvent {
   thread_ts: string | null;
   /** 멘션된 에이전트 목록 */
   mentions: string[];
+  /** 스레드 주제 요약 (프리프로세싱 결과) */
+  threadTopic?: string;
   /** Slack 원본 이벤트 데이터 */
   raw: Record<string, unknown>;
 }
@@ -39,6 +41,7 @@ export type ExecutionMode = 'single' | 'parallel' | 'sequential';
 export type RoutingMethod =
   | 'mention'
   | 'keyword'
+  | 'broadcast'
   | 'llm'
   | 'default';
 
@@ -92,6 +95,6 @@ export interface AgentSession {
   agentName: string;
   /** 시스템 프롬프트 (persona 파일 내용) */
   systemPrompt: string;
-  /** SDK 세션 ID (resume용) */
-  sessionId?: string;
+  /** 스레드별 SDK 세션 ID (thread_ts → sessionId) */
+  threadSessions: Map<string, string>;
 }

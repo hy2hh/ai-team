@@ -1,6 +1,7 @@
 import { config } from 'dotenv';
 import { join } from 'path';
 import { App } from '@slack/bolt';
+import Anthropic from '@anthropic-ai/sdk';
 
 // .env는 프로젝트 루트에 위치
 config({ path: join(import.meta.dirname, '..', '..', '.env') });
@@ -61,6 +62,49 @@ const AGENTS: AgentConfig[] = [
 /** 우리 봇의 bot_id 집합 (런타임에 채워짐) */
 const ownBotIds = new Set<string>();
 
+/** botUserId → 에이전트 표시 이름 (히스토리 포맷용) */
+const botUserIdToName = new Map<string, string>();
+
+/** bot_id → 에이전트 표시 이름 (히스토리 포맷용) */
+const botIdToName = new Map<string, string>();
+
+/** 에이전트 표시 이름 매핑 */
+const AGENT_DISPLAY_NAMES: Record<string, string> = {
+  pm: 'PM Donald',
+  designer: 'Designer Donald',
+  frontend: 'Frontend Donald',
+  backend: 'Backend Donald',
+  researcher: 'Researcher Donald',
+  secops: 'SecOps Donald',
+};
+
+/**
+ * user ID 또는 bot_id로 발신자 표시 이름 반환
+ * @param userId - Slack user ID
+ * @param botId - Slack bot_id
+ * @returns 표시 이름 (에이전트면 역할명, 아니면 user ID)
+ */
+const resolveSenderName = (
+  userId?: string,
+  botId?: string,
+): string => {
+  if (userId) {
+    const agentName = botUserIdToName.get(userId);
+    if (agentName) {
+      return agentName;
+    }
+    return `<@${userId}>`;
+  }
+  if (botId) {
+    const agentName = botIdToName.get(botId);
+    if (agentName) {
+      return agentName;
+    }
+    return `bot:${botId}`;
+  }
+  return 'unknown';
+};
+
 // ─── 채널 이름 캐시 ──────────────────────────────────────
 
 const channelNameCache = new Map<string, string>();
@@ -110,10 +154,96 @@ const getChannelName = async (
   }
 };
 
+// ─── 스레드 주제 요약 ─────────────────────────────────────
+
+const anthropic = new Anthropic();
+
+/**
+ * 스레드 히스토리를 Haiku로 1줄 요약
+ * @param conversationHistory - 스레드 이전 대화 텍스트
+ * @returns 주제 요약 (실패 시 빈 문자열)
+ */
+const summarizeThreadTopic = async (
+  conversationHistory: string,
+): Promise<string> => {
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 100,
+      messages: [
+        {
+          role: 'user',
+          content: `다음 대화의 주제를 한 줄(20자 이내)로 요약하세요. 주제만 출력하고 다른 설명은 하지 마세요.
+
+대화:
+${conversationHistory}`,
+        },
+      ],
+    });
+    const text =
+      response.content[0].type === 'text'
+        ? response.content[0].text.trim()
+        : '';
+    console.log(`[topic] 스레드 주제 요약: "${text}"`);
+    return text;
+  } catch (err) {
+    console.error('[topic] 스레드 주제 요약 실패:', err);
+    return '';
+  }
+};
+
 // ─── 처리 중인 메시지 중복 방지 ─────────────────────────
 
 /** 현재 처리 중인 메시지 ts 집합 */
 const processingMessages = new Set<string>();
+
+// ─── 메시지 디바운스 (연속 메시지 그룹핑) ────────────────
+
+/** 디바운스 대기 시간 (ms) */
+const DEBOUNCE_DELAY = 3000;
+
+/** 디바운스 버퍼 항목 */
+interface DebounceEntry {
+  /** 누적된 메시지 (ts, text, user) */
+  messages: Array<{
+    ts: string;
+    text: string;
+    user: string;
+  }>;
+  /** 디바운스 타이머 */
+  timer: ReturnType<typeof setTimeout>;
+  /** 채널 ID */
+  channel: string;
+  /** 채널 이름 */
+  channelName: string;
+  /** 스레드 ts (스레드가 아니면 null) */
+  threadTs: string | null;
+  /** 원본 raw 이벤트 (마지막 메시지 기준) */
+  raw: Record<string, unknown>;
+}
+
+/**
+ * 디바운스 키 생성 (스레드 기준, 사용자 무관)
+ * @param channel - 채널 ID
+ * @param threadTs - 스레드 ts
+ * @param user - 발신자 ID (채널 메시지에서만 사용)
+ * @returns 디바운스 키
+ */
+const getDebounceKey = (
+  channel: string,
+  threadTs: string | null,
+  user: string,
+): string => {
+  if (threadTs) {
+    // 스레드: 모든 사용자의 메시지를 하나로 그룹핑
+    return `thread:${channel}:${threadTs}`;
+  }
+  // 채널 일반 메시지: 사용자별 그룹핑
+  return `channel:${channel}:${user}`;
+};
+
+/** 디바운스 버퍼 (key → entry) */
+const debounceBuffer = new Map<string, DebounceEntry>();
 
 // ─── 에이전트 Slack App 조회 헬퍼 ───────────────────────
 
@@ -162,17 +292,9 @@ const executeParallel = async (
   );
 
   const results = await Promise.allSettled(
-    agentNames.map((name, i) => {
+    agentNames.map((name) => {
       const app = findAgentApp(name, apps);
-      // 첫 번째 에이전트만 리액션 관리 (경합 방지)
-      const skipReaction = i > 0;
-      return handleMessage(
-        name,
-        event,
-        method,
-        app,
-        skipReaction,
-      );
+      return handleMessage(name, event, method, app);
     }),
   );
 
@@ -291,6 +413,198 @@ const executeSequential = async (
   }
 };
 
+// ─── 디바운스 플러시 ─────────────────────────────────────
+
+/**
+ * 디바운스 버퍼를 플러시하여 누적된 메시지를 하나로 묶어 처리
+ * @param key - 디바운스 키
+ * @param apps - Slack App 인스턴스 목록
+ */
+const flushDebounceBuffer = async (
+  key: string,
+  apps: App[],
+): Promise<void> => {
+  const entry = debounceBuffer.get(key);
+  if (!entry) {
+    return;
+  }
+  debounceBuffer.delete(key);
+
+  const { messages, channel, channelName, threadTs } =
+    entry;
+
+  // 디바운스된 새 메시지 텍스트 합치기
+  const newMessagesText = messages
+    .map((m) => `<@${m.user}>: ${m.text}`)
+    .join('\n');
+  const lastMessage = messages[messages.length - 1];
+  const firstMessage = messages[0];
+
+  // 이전 대화 히스토리 가져오기 (스레드 또는 채널)
+  let conversationHistory = '';
+  try {
+    let historyMessages: Array<Record<string, unknown>> =
+      [];
+
+    if (threadTs) {
+      // 스레드: conversations.replies
+      const replies =
+        await apps[0].client.conversations.replies({
+          channel,
+          ts: threadTs,
+          limit: 30,
+        });
+      historyMessages = (
+        (replies.messages ?? []) as Array<
+          Record<string, unknown>
+        >
+      ).filter(
+        (m) =>
+          !messages.some(
+            (dm) => dm.ts === (m.ts as string),
+          ),
+      );
+    } else {
+      // 채널: conversations.history
+      const history =
+        await apps[0].client.conversations.history({
+          channel,
+          limit: 15,
+        });
+      historyMessages = (
+        (history.messages ?? []) as Array<
+          Record<string, unknown>
+        >
+      )
+        .filter(
+          (m) =>
+            !messages.some(
+              (dm) => dm.ts === (m.ts as string),
+            ),
+        )
+        .reverse(); // 시간순 정렬 (API는 최신순)
+    }
+
+    if (historyMessages.length > 0) {
+      conversationHistory = historyMessages
+        .map((m) => {
+          const sender = resolveSenderName(
+            m.user as string | undefined,
+            m.bot_id as string | undefined,
+          );
+          return `${sender}: ${(m.text as string) ?? ''}`;
+        })
+        .join('\n');
+    }
+    console.log(
+      `[debounce] ${threadTs ? '스레드' : '채널'} 히스토리: ${historyMessages.length}개 메시지 로드`,
+    );
+  } catch (err) {
+    console.error(
+      '[debounce] 히스토리 로드 실패:',
+      err,
+    );
+  }
+
+  // 스레드 주제 프리프로세싱 (스레드 + 히스토리 있을 때만)
+  let threadTopic = '';
+  if (threadTs && conversationHistory) {
+    threadTopic =
+      await summarizeThreadTopic(conversationHistory);
+  }
+
+  // 최종 텍스트: 히스토리 + 새 메시지
+  const combinedText = conversationHistory
+    ? `[이전 대화]\n${conversationHistory}\n\n[새 메시지]\n${newMessagesText}`
+    : newMessagesText;
+
+  console.log(
+    `[debounce] 플러시: ${messages.length}개 메시지 → "${newMessagesText.slice(0, 50)}..."`,
+  );
+
+  const slackEvent: SlackEvent = {
+    type: 'message',
+    channel,
+    channel_name: channelName,
+    user: firstMessage.user,
+    text: combinedText,
+    ts: lastMessage.ts,
+    thread_ts: threadTs,
+    mentions: [],
+    threadTopic,
+    raw: entry.raw,
+  };
+
+  // 라우팅 (합쳐진 텍스트 기준)
+  const routing = await routeMessage(combinedText);
+  slackEvent.mentions =
+    routing.method === 'mention'
+      ? routing.agents.map((a) => a.name)
+      : [];
+
+  const agentNames = routing.agents
+    .map((a) => a.name)
+    .join(', ');
+  console.log(
+    `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
+  );
+
+  // 실행
+  const executeTask = async () => {
+    switch (routing.execution) {
+      case 'parallel': {
+        await executeParallel(
+          routing.agents.map((a) => a.name),
+          slackEvent,
+          routing.method,
+          apps,
+        );
+        break;
+      }
+      case 'sequential': {
+        await executeSequential(
+          slackEvent,
+          routing,
+          apps,
+        );
+        break;
+      }
+      case 'single':
+      default: {
+        const primaryAgent = routing.agents[0];
+        const agentApp = findAgentApp(
+          primaryAgent.name,
+          apps,
+        );
+        await executeSingle(
+          primaryAgent.name,
+          slackEvent,
+          routing.method,
+          agentApp,
+        );
+        break;
+      }
+    }
+  };
+
+  executeTask()
+    .then(() => {
+      // 모든 메시지의 claim을 completed로
+      for (const m of messages) {
+        updateClaim(m.ts, 'completed');
+      }
+    })
+    .catch((err) => {
+      for (const m of messages) {
+        updateClaim(m.ts, 'failed');
+      }
+      console.error(
+        `[error] ${agentNames} 실행 실패:`,
+        err,
+      );
+    });
+};
+
 // ─── 메인 ────────────────────────────────────────────────
 
 const main = async () => {
@@ -323,6 +637,10 @@ const main = async () => {
       const botId = authResult.bot_id as string;
       registerBotUser(agent.botUserId, agent.name);
       ownBotIds.add(botId);
+      const displayName =
+        AGENT_DISPLAY_NAMES[agent.name] ?? agent.name;
+      botUserIdToName.set(agent.botUserId, displayName);
+      botIdToName.set(botId, displayName);
       console.log(
         `[init] ${agent.name}: botUserId=${agent.botUserId}, botId=${botId}`,
       );
@@ -334,7 +652,13 @@ const main = async () => {
       process.exit(1);
     }
 
-    // 메시지 이벤트 핸들러
+    // 메시지 이벤트 핸들러 — 첫 번째 앱(PM)에서만 등록
+    // 6개 앱이 모두 같은 메시지를 수신하므로 1개만 처리
+    if (apps.length > 0) {
+      apps.push(app);
+      continue;
+    }
+
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
 
@@ -369,83 +693,62 @@ const main = async () => {
         return;
       }
 
-      const channelName = await getChannelName(apps, channel);
+      // ⏳ 즉시 리액션 (읽었다는 피드백)
+      try {
+        await apps[0].client.reactions.add({
+          channel,
+          timestamp: ts,
+          name: 'hourglass_flowing_sand',
+        });
+      } catch {
+        // 리액션 실패 무시
+      }
 
-      const slackEvent: SlackEvent = {
-        type: 'message',
+      const channelName = await getChannelName(
+        apps,
         channel,
-        channel_name: channelName,
+      );
+      const debounceKey = getDebounceKey(
+        channel,
+        threadTs,
         user,
-        text,
-        ts,
-        thread_ts: threadTs,
-        mentions: [],
-        raw: msg,
-      };
-
-      // 4단계 라우팅 (LLM 복합 태스크 감지 포함)
-      const routing = await routeMessage(text);
-      slackEvent.mentions =
-        routing.method === 'mention'
-          ? routing.agents.map((a) => a.name)
-          : [];
-
-      const agentNames = routing.agents
-        .map((a) => a.name)
-        .join(', ');
-      console.log(
-        `[route] "${text.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
       );
 
-      // 실행 모드별 분기 (비동기 — 블로킹하지 않음)
-      const executeTask = async () => {
-        switch (routing.execution) {
-          case 'parallel': {
-            await executeParallel(
-              routing.agents.map((a) => a.name),
-              slackEvent,
-              routing.method,
-              apps,
-            );
-            break;
-          }
-          case 'sequential': {
-            await executeSequential(
-              slackEvent,
-              routing,
-              apps,
-            );
-            break;
-          }
-          case 'single':
-          default: {
-            const primaryAgent = routing.agents[0];
-            const app = findAgentApp(
-              primaryAgent.name,
-              apps,
-            );
-            await executeSingle(
-              primaryAgent.name,
-              slackEvent,
-              routing.method,
-              app,
-            );
-            break;
-          }
-        }
-      };
+      const existing = debounceBuffer.get(debounceKey);
 
-      executeTask()
-        .then(() => {
-          updateClaim(ts, 'completed');
-        })
-        .catch((err) => {
-          updateClaim(ts, 'failed');
-          console.error(
-            `[error] ${agentNames} 실행 실패:`,
-            err,
-          );
-        });
+      if (existing) {
+        // 기존 타이머 리셋, 메시지 추가
+        clearTimeout(existing.timer);
+        existing.messages.push({ ts, text, user });
+        existing.raw = msg;
+        console.log(
+          `[debounce] 메시지 추가 (${existing.messages.length}개): "${text.slice(0, 30)}..."`,
+        );
+
+        existing.timer = setTimeout(
+          () =>
+            flushDebounceBuffer(debounceKey, apps),
+          DEBOUNCE_DELAY,
+        );
+      } else {
+        // 새 디바운스 엔트리 생성
+        const entry: DebounceEntry = {
+          messages: [{ ts, text, user }],
+          channel,
+          channelName,
+          threadTs,
+          raw: msg,
+          timer: setTimeout(
+            () =>
+              flushDebounceBuffer(debounceKey, apps),
+            DEBOUNCE_DELAY,
+          ),
+        };
+        debounceBuffer.set(debounceKey, entry);
+        console.log(
+          `[debounce] 새 버퍼: "${text.slice(0, 30)}..." (${DEBOUNCE_DELAY}ms 대기)`,
+        );
+      }
     });
 
     apps.push(app);
