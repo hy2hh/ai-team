@@ -68,30 +68,41 @@ export const parseMentions = (text: string): string[] => {
 };
 
 /**
- * 키워드 패턴 매칭으로 에이전트 결정
+ * 키워드 패턴 매칭으로 모든 매칭 에이전트 반환
  * @param text - Slack 메시지 텍스트
- * @returns 매칭된 에이전트 이름 또는 null
+ * @returns 매칭된 에이전트 이름 배열
  */
-export const matchKeywords = (text: string): string | null => {
+export const matchKeywords = (text: string): string[] => {
+  const matches: string[] = [];
   for (const [agentName, pattern] of Object.entries(ROUTING_RULES)) {
     if (pattern.test(text)) {
-      return agentName;
+      matches.push(agentName);
     }
   }
-  return null;
+  return matches;
 };
 
 /**
  * LLM 기반 의미 분류로 에이전트 결정
  * @param text - Slack 메시지 텍스트
+ * @param candidates - 후보 에이전트 목록 (비어있으면 전체 대상)
  * @returns 에이전트 이름 또는 null (타임아웃/실패 시)
  */
 const classifyWithLlm = async (
   text: string,
+  candidates: string[] = [],
 ): Promise<string | null> => {
-  const scopeList = Object.entries(AGENT_SCOPES)
+  const scopeEntries = candidates.length > 0
+    ? Object.entries(AGENT_SCOPES).filter(([name]) =>
+        candidates.includes(name),
+      )
+    : Object.entries(AGENT_SCOPES);
+
+  const scopeList = scopeEntries
     .map(([name, scope]) => `- ${name}: ${scope}`)
     .join('\n');
+
+  const validNames = scopeEntries.map(([name]) => name).join(', ');
 
   const prompt = [
     '다음 메시지를 가장 적합한 에이전트에게 라우팅해야 합니다.',
@@ -105,7 +116,7 @@ const classifyWithLlm = async (
     '## 규칙',
     '- 반드시 하나의 에이전트만 선택',
     '- JSON으로만 응답: {"agentName":"에이전트이름"}',
-    '- 유효한 에이전트 이름: pm, designer, frontend, backend, researcher, secops',
+    `- 유효한 에이전트 이름: ${validNames}`,
   ].join('\n');
 
   try {
@@ -164,12 +175,28 @@ export const routeMessage = async (
   }
 
   // 2순위: 키워드 매칭
-  const keywordMatch = matchKeywords(text);
-  if (keywordMatch) {
-    return { agentName: keywordMatch, method: 'keyword' };
+  const keywordMatches = matchKeywords(text);
+  if (keywordMatches.length === 1) {
+    return { agentName: keywordMatches[0], method: 'keyword' };
   }
 
-  // 3순위: LLM 의미 분류
+  // 복수 키워드 매칭 → LLM에 후보 목록 제공하여 분류
+  if (keywordMatches.length > 1) {
+    console.log(
+      `[router] 복수 키워드 매칭: [${keywordMatches.join(', ')}] → LLM 분류`,
+    );
+    const llmDisambiguated = await classifyWithLlm(
+      text,
+      keywordMatches,
+    );
+    if (llmDisambiguated) {
+      return { agentName: llmDisambiguated, method: 'keyword' };
+    }
+    // LLM 실패 시 첫 번째 매칭 사용
+    return { agentName: keywordMatches[0], method: 'keyword' };
+  }
+
+  // 3순위: LLM 의미 분류 (키워드 매칭 없음)
   const llmMatch = await classifyWithLlm(text);
   if (llmMatch) {
     return { agentName: llmMatch, method: 'llm' };
