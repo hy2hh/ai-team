@@ -7,6 +7,27 @@ import type { AgentSession, SlackEvent } from './types.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
+/**
+ * 공통 맥락 규칙 prefix — 페르소나보다 앞에 삽입하여 우선순위 확보
+ * 강한 페르소나가 맥락 해석 규칙을 압도하는 것을 방지
+ */
+const CONTEXT_RULES_PREFIX = [
+  '# 최우선 규칙 (페르소나보다 상위)',
+  '',
+  '## 맥락 해석',
+  '- 스레드 주제가 제공되면, 새 메시지를 반드시 해당 주제의 맥락 안에서 해석하세요.',
+  '- 당신의 전문 분석은 스레드 주제가 당신의 전문 영역일 때만 적용하세요.',
+  '- 주제와 무관한 전문 분석을 강제로 끼워넣지 마세요.',
+  '',
+  '## 응답 규칙',
+  '- 반드시 한국어로 응답하세요.',
+  '- Slack mrkdwn 형식만 사용하세요 (Markdown 금지).',
+  '- slack_post_message 또는 slack_reply_to_thread는 전체 응답에서 딱 1번만 호출하세요.',
+  '',
+  '---',
+  '',
+].join('\n');
+
 /** 에이전트 persona 파일 경로 매핑 */
 const AGENT_PERSONA_FILES: Record<string, string> = {
   pm: '.claude/agents/pm.md',
@@ -235,7 +256,8 @@ const loadPersona = (agentName: string): string => {
   }
   const fullPath = join(PROJECT_DIR, relativePath);
   try {
-    return readFileSync(fullPath, 'utf-8');
+    const persona = readFileSync(fullPath, 'utf-8');
+    return CONTEXT_RULES_PREFIX + persona;
   } catch (err) {
     console.error(`[runtime] persona 파일 로드 실패: ${fullPath}`, err);
     return '';

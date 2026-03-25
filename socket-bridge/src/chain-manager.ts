@@ -6,17 +6,10 @@ import type {
   RoutingAgent,
   SlackEvent,
 } from './types.js';
-import {
-  AGENT_SCOPES,
-  getAnthropicClient,
-  withTimeout,
-} from './router.js';
+import { AGENT_SCOPES, queryLlm } from './router.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 const HANDOFF_DIR = join(PROJECT_DIR, '.memory', 'handoff');
-
-/** LLM 라우팅 타임아웃 (ms) */
-const LLM_TIMEOUT = 5000;
 
 /** 활성 체인 맵 */
 const activeChains = new Map<string, ChainState>();
@@ -187,24 +180,12 @@ const evaluateNextStep = async (
   ].join('\n');
 
   try {
-    const anthropic = getAnthropicClient();
-
-    const response = await withTimeout(
-      anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      LLM_TIMEOUT,
-      'LLM chain eval',
-    );
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') {
+    const responseText = await queryLlm(prompt);
+    if (!responseText) {
       return null;
     }
 
-    const parsed = JSON.parse(content.text) as {
+    const parsed = JSON.parse(responseText) as {
       done?: unknown;
       nextStep?: {
         agents?: unknown;

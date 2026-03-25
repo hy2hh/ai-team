@@ -1,4 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import type {
   ExecutionMode,
   RoutingAgent,
@@ -43,19 +44,48 @@ export const AGENT_SCOPES: Record<string, string> = {
   secops: '보안 리뷰, 위협 모델링, 취약점 평가, 인증/인가, 암호화',
 };
 
-/** LLM 라우팅용 Anthropic 클라이언트 (lazy init) */
-let anthropicClient: Anthropic | null = null;
-
-/** Anthropic 클라이언트 싱글톤 */
-export const getAnthropicClient = (): Anthropic => {
-  if (!anthropicClient) {
-    anthropicClient = new Anthropic();
-  }
-  return anthropicClient;
-};
-
 /** LLM 라우팅 타임아웃 (ms) */
-const LLM_ROUTING_TIMEOUT = 5000;
+const LLM_ROUTING_TIMEOUT = 10000;
+
+/**
+ * Agent SDK query()를 사용한 LLM 텍스트 응답 헬퍼
+ * @param prompt - 프롬프트 텍스트
+ * @param timeoutMs - 타임아웃 밀리초
+ * @returns LLM 응답 텍스트 또는 null
+ */
+export const queryLlm = async (
+  prompt: string,
+  timeoutMs = LLM_ROUTING_TIMEOUT,
+): Promise<string | null> => {
+  const run = async (): Promise<string | null> => {
+    let resultText: string | null = null;
+    for await (const message of query({
+      prompt,
+      options: {
+        model: 'claude-haiku-4-5-20251001',
+        systemPrompt:
+          'JSON으로만 응답하세요. 설명이나 부가 텍스트 없이 순수 JSON만 출력하세요.',
+        maxTurns: 1,
+        allowedTools: [],
+      },
+    })) {
+      if (message.type === 'result') {
+        const resultMsg = message as SDKResultMessage;
+        if (resultMsg.subtype === 'success') {
+          resultText = resultMsg.result;
+        }
+      }
+    }
+    return resultText;
+  };
+
+  try {
+    return await withTimeout(run(), timeoutMs, 'LLM routing');
+  } catch (err) {
+    console.warn('[router] LLM 쿼리 실패:', err);
+    return null;
+  }
+};
 
 /**
  * 타임아웃 부착 Promise.race 헬퍼 — resolve/reject 후 타이머 정리
@@ -175,24 +205,12 @@ const classifyWithLlm = async (
   ].join('\n');
 
   try {
-    const client = getAnthropicClient();
-
-    const response = await withTimeout(
-      client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 50,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      LLM_ROUTING_TIMEOUT,
-      'LLM routing',
-    );
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') {
+    const responseText = await queryLlm(prompt);
+    if (!responseText) {
       return null;
     }
 
-    const parsed = JSON.parse(content.text) as Record<
+    const parsed = JSON.parse(responseText) as Record<
       string,
       unknown
     >;
@@ -206,7 +224,7 @@ const classifyWithLlm = async (
     }
 
     console.warn(
-      `[router] LLM이 유효하지 않은 에이전트 반환: ${content.text}`,
+      `[router] LLM이 유효하지 않은 에이전트 반환: ${responseText}`,
     );
     return null;
   } catch (err) {
@@ -257,24 +275,12 @@ export const classifyComplexTask = async (
   ].join('\n');
 
   try {
-    const client = getAnthropicClient();
-
-    const response = await withTimeout(
-      client.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 200,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      LLM_ROUTING_TIMEOUT,
-      'LLM complex routing',
-    );
-
-    const content = response.content[0];
-    if (!content || content.type !== 'text') {
+    const responseText = await queryLlm(prompt);
+    if (!responseText) {
       return null;
     }
 
-    const parsed = JSON.parse(content.text) as Record<
+    const parsed = JSON.parse(responseText) as Record<
       string,
       unknown
     >;
@@ -295,7 +301,7 @@ export const classifyComplexTask = async (
     const rawAgents = firstStep?.agents;
     if (!Array.isArray(rawAgents)) {
       console.warn(
-        `[router] LLM이 유효하지 않은 에이전트 형식 반환: ${content.text}`,
+        `[router] LLM이 유효하지 않은 에이전트 형식 반환: ${responseText}`,
       );
       return null;
     }
@@ -306,7 +312,7 @@ export const classifyComplexTask = async (
     );
     if (validAgents.length === 0) {
       console.warn(
-        `[router] LLM이 유효하지 않은 에이전트 반환: ${content.text}`,
+        `[router] LLM이 유효하지 않은 에이전트 반환: ${responseText}`,
       );
       return null;
     }
@@ -340,18 +346,19 @@ export const routeMessage = async (
     };
   }
 
-  // 2순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)
-  if (BROADCAST_PATTERN.test(text)) {
+  // 2순위: 키워드 매칭 (브로드캐스트 판정보다 먼저 수행)
+  const keywordMatches = matchKeywords(text);
+
+  // 3순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)
+  // 단, 업무 키워드가 포함되면 LLM 복합 분류로 위임
+  if (BROADCAST_PATTERN.test(text) && keywordMatches.length === 0) {
     console.log('[router] 브로드캐스트 감지 → 전체 에이전트');
     return {
       agents: ALL_AGENT_NAMES.map(toRoutingAgent),
       execution: 'parallel',
-      method: 'keyword',
+      method: 'broadcast',
     };
   }
-
-  // 3순위: 키워드 매칭
-  const keywordMatches = matchKeywords(text);
   if (keywordMatches.length === 1) {
     return {
       agents: [toRoutingAgent(keywordMatches[0])],
