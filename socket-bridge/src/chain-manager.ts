@@ -6,7 +6,11 @@ import type {
   RoutingAgent,
   SlackEvent,
 } from './types.js';
-import { AGENT_SCOPES, getAnthropicClient } from './router.js';
+import {
+  AGENT_SCOPES,
+  getAnthropicClient,
+  withTimeout,
+} from './router.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 const HANDOFF_DIR = join(PROJECT_DIR, '.memory', 'handoff');
@@ -185,24 +189,15 @@ const evaluateNextStep = async (
   try {
     const anthropic = getAnthropicClient();
 
-    const apiCall = anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    let timer: ReturnType<typeof setTimeout>;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error('LLM chain eval timeout')),
-        LLM_TIMEOUT,
-      );
-    });
-
-    const response = await Promise.race([apiCall, timeout])
-      .finally(() => {
-        clearTimeout(timer!);
-      });
+    const response = await withTimeout(
+      anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      LLM_TIMEOUT,
+      'LLM chain eval',
+    );
 
     const content = response.content[0];
     if (content.type !== 'text') {

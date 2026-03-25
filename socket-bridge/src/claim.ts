@@ -137,6 +137,9 @@ export const cleanupExpiredClaims = (): number => {
         }
 
         const fileTime = new Date(tsMatch[1]).getTime();
+        if (Number.isNaN(fileTime)) {
+          continue;
+        }
         if (now - fileTime > CLAIM_EXPIRY_MS) {
           unlinkSync(filePath);
           cleaned += 1;

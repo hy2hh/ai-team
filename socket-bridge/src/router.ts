@@ -50,7 +50,7 @@ const LLM_ROUTING_TIMEOUT = 5000;
  * @param label - 타임아웃 에러 메시지 라벨
  * @returns 원본 Promise 결과
  */
-const withTimeout = <T>(
+export const withTimeout = <T>(
   promise: Promise<T>,
   ms: number,
   label: string,
