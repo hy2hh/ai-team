@@ -120,21 +120,6 @@ export const matchKeywords = (text: string): string[] => {
   return matches;
 };
 
-/** LLM 단일 에이전트 분류 응답 */
-interface LlmSingleResponse {
-  agentName: string;
-}
-
-/** LLM 복합 태스크 분류 응답 */
-interface LlmComplexResponse {
-  execution: ExecutionMode;
-  firstStep: {
-    agents: string[];
-    execution: 'single' | 'parallel';
-  };
-  intent: string;
-}
-
 /**
  * LLM 기반 의미 분류로 에이전트 결정 (단일)
  * @param text - Slack 메시지 텍스트
@@ -189,14 +174,20 @@ const classifyWithLlm = async (
     );
 
     const content = response.content[0];
-    if (content.type !== 'text') {
+    if (!content || content.type !== 'text') {
       return null;
     }
 
-    const parsed = JSON.parse(content.text) as LlmSingleResponse;
-    const { agentName } = parsed;
+    const parsed = JSON.parse(content.text) as Record<
+      string,
+      unknown
+    >;
+    const agentName = parsed.agentName;
 
-    if (agentName && agentName in AGENT_SCOPES) {
+    if (
+      typeof agentName === 'string' &&
+      agentName in AGENT_SCOPES
+    ) {
       return agentName;
     }
 
@@ -264,22 +255,29 @@ export const classifyComplexTask = async (
     );
 
     const content = response.content[0];
-    if (content.type !== 'text') {
+    if (!content || content.type !== 'text') {
       return null;
     }
 
-    const parsed = JSON.parse(content.text) as LlmComplexResponse;
+    const parsed = JSON.parse(content.text) as Record<
+      string,
+      unknown
+    >;
 
     // 유효성 검증
+    const execution = parsed.execution as string | undefined;
     const validExecutions = ['single', 'parallel', 'sequential'];
-    if (!validExecutions.includes(parsed.execution)) {
+    if (!execution || !validExecutions.includes(execution)) {
       console.warn(
         `[router] LLM이 유효하지 않은 실행 모드 반환: ${parsed.execution}`,
       );
       return null;
     }
 
-    const rawAgents = parsed.firstStep?.agents;
+    const firstStep = parsed.firstStep as
+      | Record<string, unknown>
+      | undefined;
+    const rawAgents = firstStep?.agents;
     if (!Array.isArray(rawAgents)) {
       console.warn(
         `[router] LLM이 유효하지 않은 에이전트 형식 반환: ${content.text}`,
@@ -300,7 +298,7 @@ export const classifyComplexTask = async (
 
     return {
       agents: validAgents.map(toRoutingAgent),
-      execution: parsed.execution,
+      execution: execution as ExecutionMode,
       method: 'llm',
     };
   } catch (err) {

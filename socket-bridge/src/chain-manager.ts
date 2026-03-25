@@ -200,7 +200,7 @@ const evaluateNextStep = async (
     );
 
     const content = response.content[0];
-    if (content.type !== 'text') {
+    if (!content || content.type !== 'text') {
       return null;
     }
 

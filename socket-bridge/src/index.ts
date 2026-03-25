@@ -65,6 +65,9 @@ const ownBotIds = new Set<string>();
 
 const channelNameCache = new Map<string, string>();
 
+/** 진행 중인 채널 이름 조회 (동시 요청 중복 방지) */
+const pendingChannelLookups = new Map<string, Promise<string>>();
+
 /** 첫 번째 유효한 Bolt App으로 채널 이름 조회 */
 const getChannelName = async (
   apps: App[],
@@ -75,21 +78,36 @@ const getChannelName = async (
     return cached;
   }
 
-  for (const app of apps) {
-    try {
-      const result = await app.client.conversations.info({
-        channel: channelId,
-      });
-      const name =
-        (result.channel as { name?: string })?.name ?? channelId;
-      channelNameCache.set(channelId, name);
-      return name;
-    } catch {
-      continue;
-    }
+  // 동일 채널에 대한 동시 조회 중복 방지
+  const pending = pendingChannelLookups.get(channelId);
+  if (pending) {
+    return pending;
   }
 
-  return channelId;
+  const lookup = (async () => {
+    for (const app of apps) {
+      try {
+        const result = await app.client.conversations.info({
+          channel: channelId,
+        });
+        const name =
+          (result.channel as { name?: string })?.name ??
+          channelId;
+        channelNameCache.set(channelId, name);
+        return name;
+      } catch {
+        continue;
+      }
+    }
+    return channelId;
+  })();
+
+  pendingChannelLookups.set(channelId, lookup);
+  try {
+    return await lookup;
+  } finally {
+    pendingChannelLookups.delete(channelId);
+  }
 };
 
 // ─── 처리 중인 메시지 중복 방지 ─────────────────────────
@@ -448,11 +466,15 @@ const main = async () => {
 
   // 시작 시 만료된 claim 정리 + 1시간마다 주기적 정리
   cleanupExpiredClaims();
-  setInterval(cleanupExpiredClaims, 60 * 60 * 1000);
+  const cleanupInterval = setInterval(
+    cleanupExpiredClaims,
+    60 * 60 * 1000,
+  );
 
   // 종료 시그널 처리
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
+    clearInterval(cleanupInterval);
     await Promise.all(apps.map((app) => app.stop()));
     console.log('[shutdown] 완료');
     process.exit(0);
