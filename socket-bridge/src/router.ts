@@ -228,6 +228,7 @@ export const classifyComplexTask = async (
     '- sequential: 에이전트 간 의존성이 있는 순차 작업 (예: 디자인 후 구현)',
     '',
     '## 표준 패턴',
+    '- 인사/공지/전체 메시지 (예: "좋은 아침", "공지합니다") → parallel: 모든 에이전트 (pm, designer, frontend, backend, researcher, secops)',
     '- 코드 리뷰 → parallel: frontend + backend',
     '- 디자인 후 구현 → sequential: designer 먼저 (이후 동적 결정)',
     '- API + UI 동시 → parallel: backend + frontend',
