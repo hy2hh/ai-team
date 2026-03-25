@@ -13,6 +13,11 @@ import {
   completeStepAndEvaluateNext,
   failChain,
 } from './chain-manager.js';
+import {
+  tryClaim,
+  updateClaim,
+  cleanupExpiredClaims,
+} from './claim.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -310,16 +315,25 @@ const main = async () => {
       const threadTs =
         (msg.thread_ts as string) ?? null;
 
-      // 중복 처리 방지 (같은 메시지가 여러 앱에서 수신될 수 있음)
+      // 1차 필터: 인메모리 중복 방지 (빠른 체크)
       if (processingMessages.has(ts)) {
         return;
       }
       processingMessages.add(ts);
-      // 5분 후 자동 삭제 (메모리 누수 방지)
       setTimeout(
         () => processingMessages.delete(ts),
         5 * 60 * 1000,
       );
+
+      // 2차 필터: 파일 기반 claim lock (프로세스 재시작에도 안전)
+      const primaryAgentName =
+        'triage'; // claim 단계에서는 아직 라우팅 전
+      if (!tryClaim(ts, primaryAgentName)) {
+        console.log(
+          `[claim] 이미 claim된 메시지: ${ts} — skip`,
+        );
+        return;
+      }
 
       const channelName = await getChannelName(apps, channel);
 
@@ -387,12 +401,17 @@ const main = async () => {
         }
       };
 
-      executeTask().catch((err) => {
-        console.error(
-          `[error] ${agentNames} 실행 실패:`,
-          err,
-        );
-      });
+      executeTask()
+        .then(() => {
+          updateClaim(ts, 'completed');
+        })
+        .catch((err) => {
+          updateClaim(ts, 'failed');
+          console.error(
+            `[error] ${agentNames} 실행 실패:`,
+            err,
+          );
+        });
     });
 
     appToAgent.set(app, agent);
@@ -411,6 +430,10 @@ const main = async () => {
   console.log(
     '[start] Agent SDK 런타임 활성 — 복합 태스크 병렬/순차 실행 지원',
   );
+
+  // 시작 시 만료된 claim 정리 + 1시간마다 주기적 정리
+  cleanupExpiredClaims();
+  setInterval(cleanupExpiredClaims, 60 * 60 * 1000);
 
   // 종료 시그널 처리
   const shutdown = async () => {
