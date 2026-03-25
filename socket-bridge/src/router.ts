@@ -5,6 +5,20 @@ import type {
   RoutingResult,
 } from './types.js';
 
+/** 전체 에이전트 브로드캐스트 패턴 (인사, 공지, 전체 호출) */
+const BROADCAST_PATTERN =
+  /친구들|여러분|모두들|다들|전원|공지합니다|공지사항|좋은 아침|좋은 저녁|안녕하세요|수고하셨|수고했|다같이|팀[  ]?전체/i;
+
+/** 모든 에이전트 이름 목록 */
+const ALL_AGENT_NAMES = [
+  'pm',
+  'designer',
+  'frontend',
+  'backend',
+  'researcher',
+  'secops',
+];
+
 /** 키워드 기반 라우팅 규칙 */
 const ROUTING_RULES: Record<string, RegExp> = {
   backend: /API|서버|DB|데이터베이스|엔드포인트|배포|인프라/i,
@@ -326,7 +340,17 @@ export const routeMessage = async (
     };
   }
 
-  // 2순위: 키워드 매칭
+  // 2순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)
+  if (BROADCAST_PATTERN.test(text)) {
+    console.log('[router] 브로드캐스트 감지 → 전체 에이전트');
+    return {
+      agents: ALL_AGENT_NAMES.map(toRoutingAgent),
+      execution: 'parallel',
+      method: 'keyword',
+    };
+  }
+
+  // 3순위: 키워드 매칭
   const keywordMatches = matchKeywords(text);
   if (keywordMatches.length === 1) {
     return {
