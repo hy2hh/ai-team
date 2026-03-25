@@ -168,8 +168,8 @@ const main = async () => {
         raw: msg,
       };
 
-      // 3단계 라우팅
-      const routing = routeMessage(text);
+      // 3단계 라우팅 (LLM fallback 포함)
+      const routing = await routeMessage(text);
       slackEvent.mentions = routing.method === 'mention'
         ? [routing.agentName]
         : [];

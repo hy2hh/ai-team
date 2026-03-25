@@ -37,7 +37,7 @@ export interface RoutingResult {
   /** 라우팅 대상 에이전트 이름 */
   agentName: string;
   /** 라우팅 방식 */
-  method: 'mention' | 'keyword' | 'default';
+  method: 'mention' | 'keyword' | 'llm' | 'default';
 }
 
 /** 에이전트별 세션 정보 */
