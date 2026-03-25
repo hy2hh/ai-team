@@ -159,8 +159,9 @@ export const handleMessage = async (
       timestamp: event.ts,
       name: 'hourglass_flowing_sand',
     });
-  } catch {
-    // 리액션 실패는 무시
+    console.log(`[reaction] ⏳ 추가 완료: ${event.ts}`);
+  } catch (err) {
+    console.error(`[reaction] ⏳ 추가 실패:`, err);
   }
 
   try {
@@ -177,7 +178,7 @@ export const handleMessage = async (
       options: {
         cwd: PROJECT_DIR,
         systemPrompt: session.systemPrompt,
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5-20251001',
         allowedTools: ALLOWED_TOOLS,
         permissionMode: 'bypassPermissions',
         allowDangerouslySkipPermissions: true,
