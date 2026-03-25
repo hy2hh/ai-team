@@ -22,7 +22,7 @@ const CONTEXT_RULES_PREFIX = [
   '## 응답 규칙',
   '- 반드시 한국어로 응답하세요.',
   '- Slack mrkdwn 형식만 사용하세요 (Markdown 금지).',
-  '- slack_post_message 또는 slack_reply_to_thread는 전체 응답에서 딱 1번만 호출하세요.',
+  '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답 내용을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
   '',
   '---',
   '',
@@ -40,17 +40,13 @@ const AGENT_PERSONA_FILES: Record<string, string> = {
 
 // ─── 에이전트별 도구 매핑 ─────────────────────────────
 
-/** Slack MCP 도구 (모든 에이전트 공통) */
-/** Slack MCP 쓰기 도구 (모든 에이전트 공통) */
+/** Slack MCP 읽기 도구 (모든 에이전트 공통) */
+// 쓰기 도구(post_message, reply_to_thread) 제거 — bridge가 resultText를 받아 1회만 포스팅
+// 에이전트가 직접 포스팅하면 중복 응답 발생 가능
 const SLACK_TOOLS = [
-  'mcp__slack__slack_post_message',
-  'mcp__slack__slack_reply_to_thread',
   'mcp__slack__slack_get_user_profile',
   'mcp__slack__slack_get_users',
   'mcp__slack__slack_list_channels',
-  // 읽기 도구 제거 — bridge가 히스토리를 프롬프트에 포함하므로
-  // 에이전트가 직접 읽으면 자발 응답 + 맥락 오염 발생
-  // slack_add_reaction 제거 — 리액션은 bridge가 관리
 ];
 
 /** Atlassian 읽기 도구 (모든 에이전트 공통) */
@@ -282,14 +278,14 @@ const formatSlackEventAsPrompt = (
 
   const instructions: Record<string, string> = {
     mention:
-      '당신이 멘션되었습니다. 반드시 Slack MCP 도구로 응답하세요.',
+      '당신이 멘션되었습니다. 응답 내용을 텍스트로 출력하세요.',
     keyword:
-      '당신의 전문 영역 키워드가 감지되었습니다. 반드시 Slack MCP 도구로 응답하세요.',
+      '당신의 전문 영역 키워드가 감지되었습니다. 응답 내용을 텍스트로 출력하세요.',
     broadcast:
-      '팀 전체 브로드캐스트 메시지입니다. 반드시 Slack MCP 도구로 응답하세요.',
-    llm: 'LLM 라우터가 당신을 선택했습니다. 반드시 Slack MCP 도구로 응답하세요.',
+      '팀 전체 브로드캐스트 메시지입니다. 응답 내용을 텍스트로 출력하세요.',
+    llm: 'LLM 라우터가 당신을 선택했습니다. 응답 내용을 텍스트로 출력하세요.',
     default:
-      '기본 담당자로 할당되었습니다. 반드시 Slack MCP 도구로 응답하세요.',
+      '기본 담당자로 할당되었습니다. 응답 내용을 텍스트로 출력하세요.',
   };
   const instruction = instructions[routingMethod];
   if (instruction) {
@@ -301,7 +297,7 @@ const formatSlackEventAsPrompt = (
     '- Slack mrkdwn만 사용: *굵게* _기울임_ ~취소선~ `코드` ```코드블록``` • 목록',
     '- 절대 금지: **bold**, ## 헤더, [링크](url), 테이블(| --- | 포함 모든 형태), 코드블록 안 테이블도 금지',
     '- 구조화된 정보는 bullet list로만 표현. 예: *항목명:* 설명',
-    '- 중요: slack_post_message 또는 slack_reply_to_thread는 전체 응답에서 딱 1번만 호출. 긴 내용도 하나의 메시지로 합쳐서 보낼 것. 절대 여러 번 나눠 보내지 말 것.',
+    '- 중요: Slack 포스팅 도구를 직접 호출하지 마세요. 응답을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
   );
   if (event.threadTopic) {
     parts.push(
@@ -532,11 +528,33 @@ export const handleMessage = async (
       }
     }
 
-    // SDK가 Slack MCP를 통해 직접 포스팅하므로
-    // 여기서 추가 포스팅은 필요 없음
-    if (!resultText) {
+    // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
+    if (resultText) {
+      try {
+        const postParams: {
+          channel: string;
+          text: string;
+          thread_ts?: string;
+        } = {
+          channel: event.channel,
+          text: resultText,
+        };
+        if (event.thread_ts) {
+          postParams.thread_ts = event.thread_ts;
+        }
+        await slackApp.client.chat.postMessage(postParams);
+        console.log(
+          `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
+        );
+      } catch (postErr) {
+        console.error(
+          `[runtime] ${agentName} Slack 포스팅 실패:`,
+          postErr,
+        );
+      }
+    } else {
       console.warn(
-        `[runtime] ${agentName} 빈 결과 — 에이전트가 직접 Slack에 응답했을 수 있음`,
+        `[runtime] ${agentName} 빈 결과 — Slack 포스팅 건너뜀`,
       );
     }
   } catch (err) {
