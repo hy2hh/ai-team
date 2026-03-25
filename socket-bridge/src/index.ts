@@ -168,7 +168,15 @@ const summarizeThreadTopic = async (
   try {
     let resultText = '';
     for await (const message of query({
-      prompt: `다음 대화의 주제를 한 줄(20자 이내)로 요약하세요. 주제만 출력하고 다른 설명은 하지 마세요.\n\n대화:\n${conversationHistory}`,
+      prompt: `다음 Slack 스레드의 최초 주제를 한 줄(20자 이내)로 요약하세요.
+규칙:
+- 스레드를 시작한 첫 메시지의 주제만 추출
+- 이후 대화에서 빗나간 내용은 무시
+- "~에 대한 논의" 형식으로 출력
+- 주제만 출력하고 다른 설명은 하지 마세요
+
+대화:
+${conversationHistory}`,
       options: {
         model: 'claude-haiku-4-5-20251001',
         maxTurns: 1,
