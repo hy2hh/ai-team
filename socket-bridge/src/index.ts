@@ -561,6 +561,17 @@ const flushDebounceBuffer = async (
     `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
   );
 
+  // 🔍 → 🧠 전환: 라우팅 완료, 에이전트 실행 시작
+  try {
+    await apps[0].client.reactions.remove({
+      channel,
+      timestamp: lastMessage.ts,
+      name: 'mag',
+    });
+  } catch {
+    // 리액션 제거 실패 무시
+  }
+
   // 실행
   const executeTask = async () => {
     switch (routing.execution) {
@@ -716,7 +727,7 @@ const main = async () => {
         await apps[0].client.reactions.add({
           channel,
           timestamp: ts,
-          name: 'hourglass_flowing_sand',
+          name: 'mag',
         });
       } catch {
         // 리액션 실패 무시
