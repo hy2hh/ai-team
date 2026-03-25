@@ -52,10 +52,7 @@ export const tryClaim = (
 
   const filePath = join(CLAIMS_DIR, tsToFilename(messageTs));
 
-  if (existsSync(filePath)) {
-    return false;
-  }
-
+  // wx 플래그가 원자적으로 중복 방지하므로 existsSync 불필요
   const data: ClaimData = {
     agent: agentName,
     status: 'processing',

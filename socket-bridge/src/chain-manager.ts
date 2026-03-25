@@ -113,6 +113,7 @@ export const completeStepAndEvaluateNext = async (
     // 체인 완료
     chain.status = 'completed';
     persistChain(chain);
+    activeChains.delete(chainId);
     console.log(`[chain] 완료: ${chainId}`);
     return null;
   }
@@ -145,6 +146,7 @@ export const failChain = (chainId: string): void => {
     currentStep.status = 'completed';
   }
   persistChain(chain);
+  activeChains.delete(chainId);
   console.log(`[chain] 실패: ${chainId}`);
 };
 
@@ -215,24 +217,36 @@ const evaluateNextStep = async (
     }
 
     const parsed = JSON.parse(content.text) as {
-      done: boolean;
-      nextStep?: { agents: string[]; execution: 'single' | 'parallel' };
+      done?: unknown;
+      nextStep?: {
+        agents?: unknown;
+        execution?: string;
+      };
     };
 
-    if (parsed.done) {
+    if (parsed.done === true) {
       return null;
     }
 
-    const validAgents = parsed.nextStep?.agents?.filter(
-      (a) => a in AGENT_SCOPES,
+    const rawAgents = parsed.nextStep?.agents;
+    if (!Array.isArray(rawAgents)) {
+      return null;
+    }
+
+    const validAgents = rawAgents.filter(
+      (a): a is string =>
+        typeof a === 'string' && a in AGENT_SCOPES,
     );
-    if (!validAgents || validAgents.length === 0) {
+    if (validAgents.length === 0) {
       return null;
     }
 
     return {
       agents: validAgents,
-      execution: parsed.nextStep?.execution ?? 'single',
+      execution:
+        parsed.nextStep?.execution === 'parallel'
+          ? 'parallel'
+          : 'single',
       status: 'pending',
     };
   } catch (err) {

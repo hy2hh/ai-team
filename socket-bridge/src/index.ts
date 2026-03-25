@@ -326,9 +326,7 @@ const main = async () => {
       );
 
       // 2차 필터: 파일 기반 claim lock (프로세스 재시작에도 안전)
-      const primaryAgentName =
-        'triage'; // claim 단계에서는 아직 라우팅 전
-      if (!tryClaim(ts, primaryAgentName)) {
+      if (!tryClaim(ts, 'bridge')) {
         console.log(
           `[claim] 이미 claim된 메시지: ${ts} — skip`,
         );
