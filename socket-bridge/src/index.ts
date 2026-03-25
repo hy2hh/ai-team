@@ -7,6 +7,12 @@ config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
 import { registerBotUser, routeMessage } from './router.js';
 import { handleMessage } from './agent-runtime.js';
+import {
+  createChain,
+  markStepInProgress,
+  completeStepAndEvaluateNext,
+  failChain,
+} from './chain-manager.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -74,7 +80,8 @@ const getChannelName = async (
       const result = await app.client.conversations.info({
         channel: channelId,
       });
-      const name = (result.channel as { name?: string })?.name ?? channelId;
+      const name =
+        (result.channel as { name?: string })?.name ?? channelId;
       channelNameCache.set(channelId, name);
       return name;
     } catch {
@@ -89,6 +96,159 @@ const getChannelName = async (
 
 /** 현재 처리 중인 메시지 ts 집합 */
 const processingMessages = new Set<string>();
+
+// ─── 에이전트 Slack App 조회 헬퍼 ───────────────────────
+
+/** 에이전트 이름으로 Slack App 인스턴스 조회 */
+const findAgentApp = (
+  agentName: string,
+  apps: App[],
+): App => {
+  const idx = AGENTS.findIndex((a) => a.name === agentName);
+  return idx >= 0 ? apps[idx] : apps[0];
+};
+
+// ─── 실행 모드별 핸들러 ─────────────────────────────────
+
+/**
+ * 단일 에이전트 실행
+ * @param agentName - 에이전트 이름
+ * @param event - Slack 이벤트
+ * @param method - 라우팅 방식
+ * @param app - Slack App 인스턴스
+ */
+const executeSingle = async (
+  agentName: string,
+  event: SlackEvent,
+  method: string,
+  app: App,
+): Promise<void> => {
+  await handleMessage(agentName, event, method, app);
+};
+
+/**
+ * 병렬 에이전트 실행 — 각 에이전트가 스레드 reply로 응답
+ * @param agentNames - 에이전트 이름 목록
+ * @param event - Slack 이벤트
+ * @param method - 라우팅 방식
+ * @param apps - 전체 Slack App 목록
+ */
+const executeParallel = async (
+  agentNames: string[],
+  event: SlackEvent,
+  method: string,
+  apps: App[],
+): Promise<void> => {
+  console.log(
+    `[exec] 병렬 실행: [${agentNames.join(', ')}]`,
+  );
+
+  const tasks = agentNames.map((name) => {
+    const app = findAgentApp(name, apps);
+    return handleMessage(name, event, method, app).catch(
+      (err) => {
+        console.error(
+          `[error] ${name} 병렬 실행 실패:`,
+          err,
+        );
+      },
+    );
+  });
+
+  await Promise.all(tasks);
+};
+
+/**
+ * 순차 체인 실행 — 첫 단계 실행 후 완료 시 다음 단계 동적 결정
+ * @param event - Slack 이벤트
+ * @param routing - 라우팅 결과
+ * @param apps - 전체 Slack App 목록
+ */
+const executeSequential = async (
+  event: SlackEvent,
+  routing: { agents: Array<{ name: string }>; method: string },
+  apps: App[],
+): Promise<void> => {
+  const firstExecution =
+    routing.agents.length > 1 ? 'parallel' : 'single';
+  const chain = createChain(
+    event,
+    routing.agents.map((a) => ({
+      name: a.name,
+      role: '',
+    })),
+    firstExecution as 'single' | 'parallel',
+  );
+
+  console.log(
+    `[exec] 순차 체인 시작: ${chain.chainId}`,
+  );
+
+  // 첫 단계 실행
+  markStepInProgress(chain.chainId);
+  const firstAgentNames = routing.agents.map((a) => a.name);
+
+  try {
+    if (firstExecution === 'parallel') {
+      await executeParallel(
+        firstAgentNames,
+        event,
+        routing.method,
+        apps,
+      );
+    } else {
+      const app = findAgentApp(firstAgentNames[0], apps);
+      await executeSingle(
+        firstAgentNames[0],
+        event,
+        routing.method,
+        app,
+      );
+    }
+
+    // 다음 단계 평가 루프
+    let nextStep = await completeStepAndEvaluateNext(
+      chain.chainId,
+      `${firstAgentNames.join(', ')} 작업 완료`,
+    );
+
+    while (nextStep) {
+      markStepInProgress(chain.chainId);
+
+      if (
+        nextStep.execution === 'parallel' &&
+        nextStep.agents.length > 1
+      ) {
+        await executeParallel(
+          nextStep.agents,
+          event,
+          routing.method,
+          apps,
+        );
+      } else {
+        const app = findAgentApp(nextStep.agents[0], apps);
+        await executeSingle(
+          nextStep.agents[0],
+          event,
+          routing.method,
+          app,
+        );
+      }
+
+      nextStep = await completeStepAndEvaluateNext(
+        chain.chainId,
+        `${nextStep.agents.join(', ')} 작업 완료`,
+      );
+    }
+
+    console.log(
+      `[exec] 순차 체인 완료: ${chain.chainId}`,
+    );
+  } catch (err) {
+    failChain(chain.chainId);
+    throw err;
+  }
+};
 
 // ─── 메인 ────────────────────────────────────────────────
 
@@ -126,7 +286,10 @@ const main = async () => {
         `[init] ${agent.name}: botUserId=${agent.botUserId}, botId=${botId}`,
       );
     } catch (err) {
-      console.error(`[error] ${agent.name} auth.test 실패:`, err);
+      console.error(
+        `[error] ${agent.name} auth.test 실패:`,
+        err,
+      );
       process.exit(1);
     }
 
@@ -144,7 +307,8 @@ const main = async () => {
       const channel = (msg.channel as string) ?? '';
       const user = (msg.user as string) ?? '';
       const ts = (msg.ts as string) ?? '';
-      const threadTs = (msg.thread_ts as string) ?? null;
+      const threadTs =
+        (msg.thread_ts as string) ?? null;
 
       // 중복 처리 방지 (같은 메시지가 여러 앱에서 수신될 수 있음)
       if (processingMessages.has(ts)) {
@@ -152,7 +316,10 @@ const main = async () => {
       }
       processingMessages.add(ts);
       // 5분 후 자동 삭제 (메모리 누수 방지)
-      setTimeout(() => processingMessages.delete(ts), 5 * 60 * 1000);
+      setTimeout(
+        () => processingMessages.delete(ts),
+        5 * 60 * 1000,
+      );
 
       const channelName = await getChannelName(apps, channel);
 
@@ -168,33 +335,61 @@ const main = async () => {
         raw: msg,
       };
 
-      // 3단계 라우팅 (LLM fallback 포함)
+      // 4단계 라우팅 (LLM 복합 태스크 감지 포함)
       const routing = await routeMessage(text);
-      slackEvent.mentions = routing.method === 'mention'
-        ? [routing.agentName]
-        : [];
+      slackEvent.mentions =
+        routing.method === 'mention'
+          ? routing.agents.map((a) => a.name)
+          : [];
 
+      const agentNames = routing.agents
+        .map((a) => a.name)
+        .join(', ');
       console.log(
-        `[route] "${text.slice(0, 50)}..." → ${routing.agentName} (${routing.method})`,
+        `[route] "${text.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
       );
 
-      // 대상 에이전트의 Slack App 인스턴스 찾기
-      const targetAgent = AGENTS.find(
-        (a) => a.name === routing.agentName,
-      );
-      const targetApp = targetAgent
-        ? apps[AGENTS.indexOf(targetAgent)]
-        : apps[0]; // 폴백: PM의 앱
+      // 실행 모드별 분기 (비동기 — 블로킹하지 않음)
+      const executeTask = async () => {
+        switch (routing.execution) {
+          case 'parallel': {
+            await executeParallel(
+              routing.agents.map((a) => a.name),
+              slackEvent,
+              routing.method,
+              apps,
+            );
+            break;
+          }
+          case 'sequential': {
+            await executeSequential(
+              slackEvent,
+              routing,
+              apps,
+            );
+            break;
+          }
+          case 'single':
+          default: {
+            const primaryAgent = routing.agents[0];
+            const app = findAgentApp(
+              primaryAgent.name,
+              apps,
+            );
+            await executeSingle(
+              primaryAgent.name,
+              slackEvent,
+              routing.method,
+              app,
+            );
+            break;
+          }
+        }
+      };
 
-      // Agent SDK로 직접 처리 (비동기 — 블로킹하지 않음)
-      handleMessage(
-        routing.agentName,
-        slackEvent,
-        routing.method,
-        targetApp,
-      ).catch((err) => {
+      executeTask().catch((err) => {
         console.error(
-          `[error] ${routing.agentName} handleMessage 실패:`,
+          `[error] ${agentNames} 실행 실패:`,
           err,
         );
       });
@@ -214,7 +409,7 @@ const main = async () => {
   }
   console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
   console.log(
-    '[start] Agent SDK 런타임 활성 — .events/ 파일 중간 단계 제거됨',
+    '[start] Agent SDK 런타임 활성 — 복합 태스크 병렬/순차 실행 지원',
   );
 
   // 종료 시그널 처리

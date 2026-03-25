@@ -32,12 +32,58 @@ export interface AgentConfig {
   botUserId?: string;
 }
 
-/** 라우팅 결과 */
+/** 실행 모드 */
+export type ExecutionMode = 'single' | 'parallel' | 'sequential';
+
+/** 라우팅 방식 */
+export type RoutingMethod =
+  | 'mention'
+  | 'keyword'
+  | 'llm'
+  | 'default';
+
+/** 라우팅 대상 에이전트 */
+export interface RoutingAgent {
+  /** 에이전트 이름 */
+  name: string;
+  /** 에이전트 역할 설명 */
+  role: string;
+}
+
+/** 라우팅 결과 (확장) */
 export interface RoutingResult {
-  /** 라우팅 대상 에이전트 이름 */
-  agentName: string;
+  /** 라우팅 대상 에이전트 목록 */
+  agents: RoutingAgent[];
+  /** 실행 모드 */
+  execution: ExecutionMode;
   /** 라우팅 방식 */
-  method: 'mention' | 'keyword' | 'llm' | 'default';
+  method: RoutingMethod;
+}
+
+/** 순차 체인의 개별 단계 */
+export interface ChainStep {
+  /** 이 단계에 참여하는 에이전트 */
+  agents: string[];
+  /** 단계 내 실행 모드 (single 또는 parallel) */
+  execution: 'single' | 'parallel';
+  /** 단계 상태 */
+  status: 'pending' | 'in_progress' | 'completed';
+  /** 에이전트 작업 결과 요약 */
+  result?: string;
+}
+
+/** 순차 체인 전체 상태 */
+export interface ChainState {
+  /** 체인 고유 ID */
+  chainId: string;
+  /** 원본 사용자 요청 */
+  originalRequest: string;
+  /** 체인 단계 목록 */
+  steps: ChainStep[];
+  /** 현재 실행 중인 단계 인덱스 */
+  currentStep: number;
+  /** 체인 전체 상태 */
+  status: 'in_progress' | 'completed' | 'failed';
 }
 
 /** 에이전트별 세션 정보 */
