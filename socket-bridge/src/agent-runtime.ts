@@ -20,14 +20,15 @@ const AGENT_PERSONA_FILES: Record<string, string> = {
 // ─── 에이전트별 도구 매핑 ─────────────────────────────
 
 /** Slack MCP 도구 (모든 에이전트 공통) */
+/** Slack MCP 쓰기 도구 (모든 에이전트 공통) */
 const SLACK_TOOLS = [
   'mcp__slack__slack_post_message',
   'mcp__slack__slack_reply_to_thread',
-  'mcp__slack__slack_get_channel_history',
-  'mcp__slack__slack_get_thread_replies',
   'mcp__slack__slack_get_user_profile',
   'mcp__slack__slack_get_users',
   'mcp__slack__slack_list_channels',
+  // 읽기 도구 제거 — bridge가 히스토리를 프롬프트에 포함하므로
+  // 에이전트가 직접 읽으면 자발 응답 + 맥락 오염 발생
   // slack_add_reaction 제거 — 리액션은 bridge가 관리
 ];
 
@@ -285,10 +286,6 @@ const formatSlackEventAsPrompt = (
       '',
       `[스레드 주제] ${event.threadTopic}`,
       '맥락 규칙: 위 스레드 주제에 맞게 응답하세요. 새 메시지를 단독으로 해석하지 말고, 반드시 스레드 주제의 맥락 안에서 이해하세요. 당신의 전문 분석은 주제가 해당 영역일 때만 적용하세요.',
-    );
-  } else {
-    parts.push(
-      '맥락 파악: 메시지의 맥락이 부족하거나 이전 대화 참조가 필요하면, 응답 전에 slack_get_channel_history로 채널 최근 대화를 확인하세요. 스레드 대화는 slack_get_thread_replies로 확인하세요.',
     );
   }
 
