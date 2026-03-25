@@ -1,7 +1,8 @@
 import { config } from 'dotenv';
 import { join } from 'path';
 import { App } from '@slack/bolt';
-import Anthropic from '@anthropic-ai/sdk';
+import { query } from '@anthropic-ai/claude-agent-sdk';
+import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 
 // .env는 프로젝트 루트에 위치
 config({ path: join(import.meta.dirname, '..', '..', '.env') });
@@ -156,10 +157,8 @@ const getChannelName = async (
 
 // ─── 스레드 주제 요약 ─────────────────────────────────────
 
-const anthropic = new Anthropic();
-
 /**
- * 스레드 히스토리를 Haiku로 1줄 요약
+ * 스레드 히스토리를 Haiku로 1줄 요약 (Agent SDK 사용)
  * @param conversationHistory - 스레드 이전 대화 텍스트
  * @returns 주제 요약 (실패 시 빈 문자열)
  */
@@ -167,27 +166,32 @@ const summarizeThreadTopic = async (
   conversationHistory: string,
 ): Promise<string> => {
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
-      messages: [
-        {
-          role: 'user',
-          content: `다음 대화의 주제를 한 줄(20자 이내)로 요약하세요. 주제만 출력하고 다른 설명은 하지 마세요.
-
-대화:
-${conversationHistory}`,
-        },
-      ],
-    });
-    const text =
-      response.content[0].type === 'text'
-        ? response.content[0].text.trim()
-        : '';
-    console.log(`[topic] 스레드 주제 요약: "${text}"`);
-    return text;
+    let resultText = '';
+    for await (const message of query({
+      prompt: `다음 대화의 주제를 한 줄(20자 이내)로 요약하세요. 주제만 출력하고 다른 설명은 하지 마세요.\n\n대화:\n${conversationHistory}`,
+      options: {
+        model: 'claude-haiku-4-5-20251001',
+        maxTurns: 1,
+        permissionMode: 'bypassPermissions',
+        allowDangerouslySkipPermissions: true,
+      },
+    })) {
+      if (message.type === 'result') {
+        const result = message as SDKResultMessage;
+        if (result.subtype === 'success') {
+          resultText = result.result.trim();
+        }
+      }
+    }
+    console.log(
+      `[topic] 스레드 주제 요약: "${resultText}"`,
+    );
+    return resultText;
   } catch (err) {
-    console.error('[topic] 스레드 주제 요약 실패:', err);
+    console.error(
+      '[topic] 스레드 주제 요약 실패:',
+      err,
+    );
     return '';
   }
 };
