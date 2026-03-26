@@ -449,6 +449,10 @@ const flushDebounceBuffer = async (
   const newMessagesText = messages
     .map((m) => `<@${m.user}>: ${m.text}`)
     .join('\n');
+  // 라우팅용 텍스트: sender prefix 제외 (parseMentions 오인식 + 패턴 매칭 방해 방지)
+  const rawTextsForRouting = messages
+    .map((m) => m.text)
+    .join('\n');
   const lastMessage = messages[messages.length - 1];
   const firstMessage = messages[0];
 
@@ -547,8 +551,8 @@ const flushDebounceBuffer = async (
     raw: entry.raw,
   };
 
-  // 라우팅 (새 메시지만 기준 — 히스토리 멘션이 라우팅을 오염하지 않도록)
-  const routing = await routeMessage(newMessagesText);
+  // 라우팅 (raw 텍스트 기준 — sender prefix가 멘션/패턴 매칭을 오염하지 않도록)
+  const routing = await routeMessage(rawTextsForRouting);
   slackEvent.mentions =
     routing.method === 'mention'
       ? routing.agents.map((a) => a.name)
