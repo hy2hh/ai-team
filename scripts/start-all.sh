@@ -32,8 +32,9 @@ else
     echo "  📦 socket-bridge 의존성 설치 중..."
     (cd "$BRIDGE_DIR" && npm install)
   fi
+  LOGFILE="$BRIDGE_DIR/bridge.log"
   tmux new-session -d -s "$BRIDGE_SESSION" -c "$BRIDGE_DIR" \
-    "set -a && source $ENV_FILE && set +a && npm start"
+    "set -a && source $ENV_FILE && set +a && npm start 2>&1 | tee $LOGFILE"
   echo "  🌉 bridge + agent-runtime 시작 (세션: $BRIDGE_SESSION)"
 fi
 

@@ -293,6 +293,9 @@ const executeSingle = async (
  * @param method - 라우팅 방식
  * @param apps - 전체 Slack App 목록
  */
+/** 병렬 동시성 제한 — MCP 서버 과다 spawn 방지 (에이전트당 3개 MCP) */
+const MAX_PARALLEL_AGENTS = 3;
+
 const executeParallel = async (
   agentNames: string[],
   event: SlackEvent,
@@ -300,22 +303,51 @@ const executeParallel = async (
   apps: App[],
 ): Promise<void> => {
   console.log(
-    `[exec] 병렬 실행: [${agentNames.join(', ')}]`,
+    `[exec] 병렬 실행: [${agentNames.join(', ')}] (동시성 제한: ${MAX_PARALLEL_AGENTS})`,
   );
 
-  const results = await Promise.allSettled(
-    agentNames.map((name) => {
-      const app = findAgentApp(name, apps);
-      return handleMessage(name, event, method, app);
-    }),
-  );
+  // 동시성 제한: MAX_PARALLEL_AGENTS씩 배치 처리
+  const allResults: Array<{
+    name: string;
+    result: PromiseSettledResult<void>;
+  }> = [];
 
-  const failed = results
-    .map((r, i) => ({ result: r, name: agentNames[i] }))
-    .filter((r) => r.result.status === 'rejected');
+  for (
+    let i = 0;
+    i < agentNames.length;
+    i += MAX_PARALLEL_AGENTS
+  ) {
+    const batch = agentNames.slice(
+      i,
+      i + MAX_PARALLEL_AGENTS,
+    );
+    console.log(
+      `[exec] 배치 ${Math.floor(i / MAX_PARALLEL_AGENTS) + 1}: [${batch.join(', ')}]`,
+    );
+
+    const batchResults = await Promise.allSettled(
+      batch.map((name) => {
+        const app = findAgentApp(name, apps);
+        return handleMessage(name, event, method, app);
+      }),
+    );
+
+    for (let j = 0; j < batch.length; j++) {
+      allResults.push({
+        name: batch[j],
+        result: batchResults[j],
+      });
+    }
+  }
+
+  const failed = allResults.filter(
+    (r) => r.result.status === 'rejected',
+  );
 
   if (failed.length > 0) {
-    const failedNames = failed.map((f) => f.name).join(', ');
+    const failedNames = failed
+      .map((f) => f.name)
+      .join(', ');
     console.error(
       `[exec] 병렬 실행 실패: [${failedNames}] (${failed.length}/${agentNames.length})`,
     );
@@ -329,7 +361,7 @@ const executeParallel = async (
   }
 
   console.log(
-    `[exec] 병렬 실행 완료: ${results.length - failed.length}/${agentNames.length} 성공`,
+    `[exec] 병렬 실행 완료: ${allResults.length - failed.length}/${agentNames.length} 성공`,
   );
 };
 
@@ -688,6 +720,13 @@ const main = async () => {
 
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
+
+      // subtype 필터: message_changed, message_deleted 등 무시
+      const subtype = msg.subtype as string | undefined;
+      if (subtype) {
+        return;
+      }
+
       const text = (msg.text as string) ?? '';
       const ts = (msg.ts as string) ?? '';
 

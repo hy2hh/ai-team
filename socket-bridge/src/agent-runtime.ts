@@ -1,4 +1,8 @@
-import { readFileSync } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+} from 'fs';
 import { join } from 'path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -6,6 +10,132 @@ import type { App } from '@slack/bolt';
 import type { AgentSession, SlackEvent } from './types.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
+
+// ─── Thread Session 영구화 (JSON 파일) ───────────────────
+// bridge 재시작 후에도 thread_ts → session_id 매핑 유지
+
+const SESSION_STORE_PATH = join(
+  import.meta.dirname,
+  '..',
+  'thread-sessions.json',
+);
+
+/** TTL: 30일 (밀리초) */
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** 영구화 저장소 타입 */
+interface SessionStore {
+  [agentName: string]: {
+    [threadKey: string]: {
+      sessionId: string;
+      updatedAt: number;
+    };
+  };
+}
+
+/** 인메모리 캐시 (파일에서 로드) */
+let sessionStore: SessionStore = {};
+
+/** 파일에서 세션 저장소 로드 */
+const loadSessionStore = (): void => {
+  try {
+    if (existsSync(SESSION_STORE_PATH)) {
+      const data = readFileSync(
+        SESSION_STORE_PATH,
+        'utf-8',
+      );
+      sessionStore = JSON.parse(data) as SessionStore;
+
+      // TTL 만료된 엔트리 정리
+      const now = Date.now();
+      let cleaned = 0;
+      for (const agent of Object.keys(sessionStore)) {
+        for (const key of Object.keys(
+          sessionStore[agent],
+        )) {
+          if (
+            now - sessionStore[agent][key].updatedAt >
+            SESSION_TTL_MS
+          ) {
+            delete sessionStore[agent][key];
+            cleaned++;
+          }
+        }
+        if (
+          Object.keys(sessionStore[agent]).length === 0
+        ) {
+          delete sessionStore[agent];
+        }
+      }
+
+      const totalEntries = Object.values(sessionStore)
+        .reduce(
+          (sum, agent) => sum + Object.keys(agent).length,
+          0,
+        );
+      console.log(
+        `[session] 세션 저장소 로드: ${totalEntries}개 엔트리 (${cleaned}개 만료 정리)`,
+      );
+    }
+  } catch (err) {
+    console.error(
+      '[session] 세션 저장소 로드 실패:',
+      err,
+    );
+    sessionStore = {};
+  }
+};
+
+/** 세션 저장소를 파일에 기록 (debounced) */
+let saveTimer: ReturnType<typeof setTimeout> | null =
+  null;
+
+const saveSessionStore = (): void => {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+  }
+  // 1초 디바운스 — 연속 업데이트 시 파일 쓰기 최소화
+  saveTimer = setTimeout(() => {
+    try {
+      writeFileSync(
+        SESSION_STORE_PATH,
+        JSON.stringify(sessionStore, null, 2),
+        'utf-8',
+      );
+    } catch (err) {
+      console.error(
+        '[session] 세션 저장소 저장 실패:',
+        err,
+      );
+    }
+  }, 1000);
+};
+
+/** 세션 ID 저장 (인메모리 + 파일) */
+const persistSessionId = (
+  agentName: string,
+  threadKey: string,
+  sessionId: string,
+): void => {
+  if (!sessionStore[agentName]) {
+    sessionStore[agentName] = {};
+  }
+  sessionStore[agentName][threadKey] = {
+    sessionId,
+    updatedAt: Date.now(),
+  };
+  saveSessionStore();
+};
+
+/** 저장된 세션 ID 조회 */
+const getPersistedSessionId = (
+  agentName: string,
+  threadKey: string,
+): string | undefined =>
+  sessionStore[agentName]?.[threadKey]?.sessionId;
+
+// 시작 시 로드
+loadSessionStore();
 
 /**
  * 공통 맥락 규칙 prefix — 페르소나보다 앞에 삽입하여 우선순위 확보
@@ -465,9 +595,11 @@ export const handleMessage = async (
     // threadTopic이 있으면 bridge가 맥락을 프리프로세싱했으므로 새 세션 강제
     // (이전 세션의 잘못된 히스토리가 맥락 지시를 압도하는 것 방지)
     const threadKey = event.thread_ts ?? event.ts;
+    // 인메모리 캐시 → 영구화 저장소 순서로 조회
     const existingSessionId = event.threadTopic
       ? undefined
-      : session.threadSessions.get(threadKey);
+      : session.threadSessions.get(threadKey) ??
+        getPersistedSessionId(agentName, threadKey);
 
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       cwd: PROJECT_DIR,
@@ -496,6 +628,7 @@ export const handleMessage = async (
       if (message.type === 'result') {
         const resultMsg = message as SDKResultMessage;
         session.threadSessions.set(threadKey, resultMsg.session_id);
+        persistSessionId(agentName, threadKey, resultMsg.session_id);
         if (resultMsg.subtype === 'success') {
           resultText = resultMsg.result;
           // 캐시 통계 로깅
@@ -509,6 +642,14 @@ export const handleMessage = async (
               `[cache] ${agentName} (${model}): input=${input} output=${output} cacheRead=${cacheRead} cacheCreate=${cacheCreate} cost=$${resultMsg.total_cost_usd.toFixed(4)}`,
             );
           }
+        } else {
+          const errorText =
+            'error' in resultMsg
+              ? String(resultMsg.error)
+              : JSON.stringify(resultMsg).slice(0, 200);
+          console.error(
+            `[runtime] ${agentName} SDK 비성공 결과: subtype=${resultMsg.subtype} — ${errorText}`,
+          );
         }
       }
     }
