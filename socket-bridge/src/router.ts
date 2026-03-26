@@ -208,6 +208,18 @@ export const parseMentions = (text: string): string[] => {
     }
   }
 
+  // 3단계: @ 없는 display name 폴백 (LLM 생성 텍스트용)
+  if (mentions.size === 0) {
+    const lowerText = text.toLowerCase();
+    for (const [displayName, agentName] of Object.entries(
+      DISPLAY_NAME_TO_AGENT,
+    )) {
+      if (lowerText.includes(displayName)) {
+        mentions.add(agentName);
+      }
+    }
+  }
+
   return Array.from(mentions);
 };
 
