@@ -197,6 +197,31 @@ const AGENT_PERSONA_FILES: Record<string, string> = {
   secops: '.claude/agents/secops.md',
 };
 
+/**
+ * 모든 에이전트 persona 파일 존재 여부 검증 (시작 시 호출)
+ * 누락된 파일이 있으면 에러 로그 출력 후 프로세스 종료
+ */
+export const validatePersonaFiles = (): void => {
+  const missing: string[] = [];
+  for (const [name, relativePath] of Object.entries(
+    AGENT_PERSONA_FILES,
+  )) {
+    const fullPath = join(PROJECT_DIR, relativePath);
+    if (!existsSync(fullPath)) {
+      missing.push(`${name}: ${fullPath}`);
+    }
+  }
+  if (missing.length > 0) {
+    console.error(
+      `[error] 누락된 persona 파일:\n  ${missing.join('\n  ')}`,
+    );
+    process.exit(1);
+  }
+  console.log(
+    `[init] persona 파일 검증 완료 (${Object.keys(AGENT_PERSONA_FILES).length}개)`,
+  );
+};
+
 // ─── 에이전트별 도구 매핑 ─────────────────────────────
 
 /** Slack MCP 읽기 도구 (모든 에이전트 공통) */

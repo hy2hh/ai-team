@@ -147,23 +147,52 @@ export const registerBotUser = (
   botUserIdToAgent.set(botUserId, agentName);
 };
 
+/** 에이전트 display name → role name 매핑 (대소문자 무관 매칭용) */
+const DISPLAY_NAME_TO_AGENT: Record<string, string> = {
+  'pm donald': 'pm',
+  'designer donald': 'designer',
+  'frontend donald': 'frontend',
+  'backend donald': 'backend',
+  'researcher donald': 'researcher',
+  'secops donald': 'secops',
+};
+
 /**
  * 메시지 텍스트에서 멘션된 에이전트 목록 추출
+ *
+ * 2단계 감지:
+ * 1. Slack 형식 <@USER_ID> 패턴
+ * 2. Display name 폴백 (@Designer Donald 등)
  * @param text - Slack 메시지 텍스트
- * @returns 멘션된 에이전트 이름 배열
+ * @returns 멘션된 에이전트 이름 배열 (중복 제거)
  */
 export const parseMentions = (text: string): string[] => {
-  const mentions: string[] = [];
+  const mentions = new Set<string>();
+
+  // 1단계: Slack <@USER_ID> 형식
   const mentionPattern = /<@(U[A-Z0-9]+)>/g;
   let match: RegExpExecArray | null;
   while ((match = mentionPattern.exec(text)) !== null) {
     const userId = match[1];
     const agentName = botUserIdToAgent.get(userId);
     if (agentName) {
-      mentions.push(agentName);
+      mentions.add(agentName);
     }
   }
-  return mentions;
+
+  // 2단계: Display name 폴백 (@Designer Donald 등)
+  if (mentions.size === 0) {
+    const lowerText = text.toLowerCase();
+    for (const [displayName, agentName] of Object.entries(
+      DISPLAY_NAME_TO_AGENT,
+    )) {
+      if (lowerText.includes(`@${displayName}`)) {
+        mentions.add(agentName);
+      }
+    }
+  }
+
+  return Array.from(mentions);
 };
 
 /**

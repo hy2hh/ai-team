@@ -15,6 +15,7 @@ import {
 import {
   handleMessage,
   registerAgentBotUserId,
+  validatePersonaFiles,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -429,6 +430,18 @@ const executeParallel = async (
           : '';
       console.error(`[exec]   ${f.name}:`, reason);
     }
+
+    // 실패한 에이전트 Slack 알림
+    try {
+      const threadTs = event.thread_ts ?? event.ts;
+      await apps[0].client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: threadTs,
+        text: `⚠️ [${failedNames}] 에이전트가 응답하지 못했습니다. (${allResults.length - failed.length}/${agentNames.length} 성공)`,
+      });
+    } catch {
+      // 알림 실패는 무시
+    }
   }
 
   console.log(
@@ -639,6 +652,9 @@ const flushDebounceBuffer = async (
 // ─── 메인 ────────────────────────────────────────────────
 
 const main = async () => {
+  // 페르소나 파일 존재 검증
+  validatePersonaFiles();
+
   // 환경변수 검증
   const missingAgents = AGENTS.filter(
     (a) => !a.botToken || !a.appToken,
