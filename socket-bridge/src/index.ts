@@ -1146,14 +1146,34 @@ const main = async () => {
       const ts = (msg.ts as string) ?? '';
 
       // 첨부 파일 정보 추출 및 이미지 다운로드 (file_share 이벤트)
-      const files = (msg.files as Array<Record<string, unknown>> | undefined) ?? [];
+      // msg.file (singular) 도 처리 (Slack API에 따라 단수/복수 혼용)
+      const rawFiles = (msg.files as Array<Record<string, unknown>> | undefined)
+        ?? (msg.file ? [msg.file as Record<string, unknown>] : []);
       const pmBotToken = process.env.SLACK_BOT_TOKEN_PM ?? '';
       const imageFilePaths: string[] = [];
 
-      for (const f of files) {
-        const mimetype = (f.mimetype ?? f.filetype ?? '') as string;
-        const urlPrivate = f.url_private as string | undefined;
-        const fileId = (f.id ?? ts) as string;
+      for (const f of rawFiles) {
+        let mimetype = (f.mimetype ?? f.filetype ?? '') as string;
+        let urlPrivate = f.url_private as string | undefined;
+        const fileId = (f.id as string | undefined) ?? '';
+
+        // url_private 없으면 files.info API로 획득
+        if (!urlPrivate && fileId) {
+          try {
+            const fileInfo = await apps[0].client.files.info({ file: fileId });
+            const fullFile = fileInfo.file as Record<string, unknown> | undefined;
+            urlPrivate = fullFile?.url_private as string | undefined;
+            if (!mimetype && fullFile?.mimetype) {
+              mimetype = fullFile.mimetype as string;
+            }
+            console.log(`[file] files.info 조회: ${fileId} url=${urlPrivate ? '획득' : '없음'} mimetype=${mimetype}`);
+          } catch (err) {
+            console.error(`[file] files.info 호출 실패 (${fileId}):`, err);
+          }
+        } else {
+          console.log(`[file] 이벤트 페이로드 URL: ${fileId} url=${urlPrivate ? '있음' : '없음'} mimetype=${mimetype}`);
+        }
+
         if (urlPrivate && mimetype.startsWith('image/')) {
           const ext = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
           const filename = `${ts}-${fileId}.${ext}`;
@@ -1163,6 +1183,7 @@ const main = async () => {
           }
         }
       }
+      const files = rawFiles; // fileContext 빌드에 재사용
 
       const fileContext = files.length > 0
         ? '\n[첨부 파일: ' + files.map((f) => `${f.name ?? '파일'} (${f.mimetype ?? f.filetype ?? 'unknown'})`).join(', ') + ']'
