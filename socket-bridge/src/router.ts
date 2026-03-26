@@ -10,6 +10,10 @@ import type {
 const BROADCAST_PATTERN =
   /친구들|여러분|모두들|다들|전원|공지합니다|공지사항|좋은 아침|좋은 저녁|안녕하세요|수고하셨|수고했|다같이|팀[  ]?전체/i;
 
+/** 간단한 대화 패턴 — LLM 분류 없이 PM 직행 (0ms 라우팅) */
+const CONVERSATIONAL_PATTERN =
+  /^[\s]*(하이[염요]?|ㅎㅇ|안녕[하세요]*|헬로|hello|hi|hey|넵|네|ㅇㅇ|ㅋㅋ+|ㄱㅅ|감사[합니다]*|고마워[요]?|오[키케이]+|확인[했어요]*|알겠[습니다어]*|응|음+|흠+|좋[아습니다]*|됐[어습니다]*|괜찮[아습니다]*|ㅎ+|수고|어떻게\s*생각|뭐라고\s*생각|의견|조언|추천|도움|알려|설명|요약|정리|분석|검토|리뷰|피드백|어때|뭐해|상태|현황|진행|보고)[\s!?.~]*$/i;
+
 /** 모든 에이전트 이름 목록 */
 const ALL_AGENT_NAMES = [
   'pm',
@@ -346,7 +350,17 @@ export const routeMessage = async (
     };
   }
 
-  // 2순위: 키워드 매칭 (브로드캐스트 판정보다 먼저 수행)
+  // 2순위: 간단한 대화 메시지 → PM 직행 (LLM 분류 건너뜀, 0ms)
+  if (CONVERSATIONAL_PATTERN.test(text)) {
+    console.log('[router] 대화 메시지 감지 → PM 직행');
+    return {
+      agents: [toRoutingAgent('pm')],
+      execution: 'single',
+      method: 'conversational',
+    };
+  }
+
+  // 3순위: 키워드 매칭 (브로드캐스트 판정보다 먼저 수행)
   const keywordMatches = matchKeywords(text);
 
   // 3순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)

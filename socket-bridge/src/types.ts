@@ -42,6 +42,7 @@ export type RoutingMethod =
   | 'mention'
   | 'keyword'
   | 'broadcast'
+  | 'conversational'
   | 'llm'
   | 'default';
 

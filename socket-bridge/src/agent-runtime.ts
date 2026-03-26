@@ -140,6 +140,10 @@ const getToolsForAgent = (agentName: string): string[] => {
         ...BASE_TOOLS,
         'Write',
         'Edit',
+        'Glob',
+        'Grep',
+        ...BASH_LIMITED_TOOLS,
+        'Bash(git:*)',
         'WebSearch',
         'WebFetch',
         ...ATLASSIAN_PM_WRITE_TOOLS,
@@ -186,6 +190,7 @@ const getToolsForAgent = (agentName: string): string[] => {
         ...BASE_TOOLS,
         'Write',
         'Edit',
+        'Glob',
         'WebSearch',
         'WebFetch',
         ...CONFLUENCE_COMMENT_TOOLS,
@@ -209,6 +214,9 @@ const getToolsForAgent = (agentName: string): string[] => {
         ...BASE_TOOLS,
         'Write',
         'Edit',
+        'Glob',
+        'Grep',
+        ...BASH_LIMITED_TOOLS,
         'WebSearch',
         'WebFetch',
       ];
@@ -283,6 +291,8 @@ const formatSlackEventAsPrompt = (
       '당신의 전문 영역 키워드가 감지되었습니다. 응답 내용을 텍스트로 출력하세요.',
     broadcast:
       '팀 전체 브로드캐스트 메시지입니다. 응답 내용을 텍스트로 출력하세요.',
+    conversational:
+      '일상 대화 메시지입니다. 자연스럽게 응답하세요.',
     llm: 'LLM 라우터가 당신을 선택했습니다. 응답 내용을 텍스트로 출력하세요.',
     default:
       '기본 담당자로 할당되었습니다. 응답 내용을 텍스트로 출력하세요.',
@@ -323,6 +333,11 @@ interface McpServerConfig {
   env: Record<string, string>;
 }
 
+// ─── MCP 서버 바이너리 경로 (npx -y 오버헤드 제거) ─────
+// 로컬 node_modules/.bin/ 직접 참조 → npm resolution 200-500ms 절감
+const BRIDGE_DIR = join(import.meta.dirname, '..');
+const MCP_BIN = join(BRIDGE_DIR, 'node_modules', '.bin');
+
 /**
  * Slack MCP 서버 설정 생성
  * @param botToken - 에이전트별 Slack Bot Token
@@ -331,11 +346,8 @@ interface McpServerConfig {
 const createSlackMcpConfig = (
   botToken: string,
 ): McpServerConfig => ({
-  command: 'npx',
-  args: [
-    '-y',
-    '@modelcontextprotocol/server-slack',
-  ],
+  command: join(MCP_BIN, 'mcp-server-slack'),
+  args: [],
   env: {
     SLACK_BOT_TOKEN: botToken,
     SLACK_TEAM_ID: process.env.SLACK_TEAM_ID ?? '',
@@ -344,19 +356,15 @@ const createSlackMcpConfig = (
 
 /** Atlassian MCP 서버 설정 (mcp-remote 경유 SSE) */
 const ATLASSIAN_MCP_CONFIG: McpServerConfig = {
-  command: 'npx',
-  args: [
-    '-y',
-    'mcp-remote',
-    'https://mcp.atlassian.com/v1/sse',
-  ],
+  command: join(MCP_BIN, 'mcp-remote'),
+  args: ['https://mcp.atlassian.com/v1/sse'],
   env: {},
 };
 
 /** context7 MCP 서버 설정 */
 const CONTEXT7_MCP_CONFIG: McpServerConfig = {
-  command: 'npx',
-  args: ['-y', '@upstash/context7-mcp@latest'],
+  command: join(MCP_BIN, 'context7-mcp'),
+  args: [],
   env: {},
 };
 
