@@ -590,6 +590,9 @@ const loadPersona = (agentName: string): string => {
     const persona = readFileSync(fullPath, 'utf-8');
     const sharedMemory = loadSharedMemory();
     const agentMemory = loadAgentMemory(agentName);
+    console.log(
+      `[memory] ${agentName}: shared=${sharedMemory.length}c agent=${agentMemory.length}c persona=${persona.length}c`,
+    );
     return [
       buildContextRulesPrefix(),
       sharedMemory,

@@ -102,6 +102,11 @@ Full rules: `.claude/agents/shared/routing-rules.md`, `shared/collision-preventi
 - After completing: move from active to done with date
 - If blocked: note blocker in `active-{role}.md` and escalate
 
+## Work Completion Rules
+- **테스트 필수**: 모든 작업은 런타임 테스트(코드 실행, bridge 로그 확인 등)를 거친 후 마무리. 타입 체크(tsc)만으로 완료 선언 금지.
+- **자율 실행**: 도구로 직접 할 수 있는 작업(메시지 전송, API 호출, 파일 생성 등)은 사용자에게 요청하지 말고 직접 수행. 진짜 사람만 가능한 작업만 부탁.
+- **Ralph Loop 검증**: 작업 완료 시 Ralph Loop 플러그인으로 요청 처리 → 검증을 이슈가 나오지 않을 때까지 반복한 후 마무리.
+
 ## Code Quality
 - Follow existing project conventions
 - All code changes require review mention to relevant agent
