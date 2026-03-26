@@ -303,7 +303,7 @@ const executeParallel = async (
   // 동시성 제한: MAX_PARALLEL_AGENTS씩 배치 처리
   const allResults: Array<{
     name: string;
-    result: PromiseSettledResult<void>;
+    result: PromiseSettledResult<string>;
   }> = [];
 
   for (

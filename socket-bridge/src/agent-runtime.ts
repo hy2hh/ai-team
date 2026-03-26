@@ -551,6 +551,7 @@ const getOrCreateSession = (agentName: string): AgentSession => {
  * @param routingMethod - 라우팅 방식
  * @param slackApp - Slack Bolt App (응답 포스팅용)
  * @param skipReaction - 리액션 관리 건너뛰기 (병렬 실행 시 첫 에이전트만 관리)
+ * @returns 에이전트 응답 텍스트 (C+D 위임 체인에서 활용)
  */
 export const handleMessage = async (
   agentName: string,
@@ -558,7 +559,7 @@ export const handleMessage = async (
   routingMethod: string,
   slackApp: App,
   skipReaction = false,
-): Promise<void> => {
+): Promise<string> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
 
@@ -706,6 +707,8 @@ export const handleMessage = async (
         `[runtime] ${agentName} 빈 결과 — Slack 포스팅 건너뜀`,
       );
     }
+
+    return resultText;
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
@@ -738,5 +741,7 @@ export const handleMessage = async (
     } catch (postErr) {
       console.error('[runtime] 오류 알림 포스팅 실패:', postErr);
     }
+
+    return '';
   }
 };
