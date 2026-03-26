@@ -10,12 +10,6 @@ import type { AgentConfig, SlackEvent } from './types.js';
 import { registerBotUser, routeMessage } from './router.js';
 import { handleMessage } from './agent-runtime.js';
 import {
-  createChain,
-  markStepInProgress,
-  completeStepAndEvaluateNext,
-  failChain,
-} from './chain-manager.js';
-import {
   tryClaim,
   updateClaim,
   cleanupExpiredClaims,
@@ -365,98 +359,6 @@ const executeParallel = async (
   );
 };
 
-/**
- * 순차 체인 실행 — 첫 단계 실행 후 완료 시 다음 단계 동적 결정
- * @param event - Slack 이벤트
- * @param routing - 라우팅 결과
- * @param apps - 전체 Slack App 목록
- */
-const executeSequential = async (
-  event: SlackEvent,
-  routing: { agents: Array<{ name: string }>; method: string },
-  apps: App[],
-): Promise<void> => {
-  const firstExecution: 'single' | 'parallel' =
-    routing.agents.length > 1 ? 'parallel' : 'single';
-  const chain = createChain(
-    event,
-    routing.agents.map((a) => ({
-      name: a.name,
-      role: '',
-    })),
-    firstExecution,
-  );
-
-  console.log(
-    `[exec] 순차 체인 시작: ${chain.chainId}`,
-  );
-
-  // 첫 단계 실행
-  markStepInProgress(chain.chainId);
-  const firstAgentNames = routing.agents.map((a) => a.name);
-
-  try {
-    if (firstExecution === 'parallel') {
-      await executeParallel(
-        firstAgentNames,
-        event,
-        routing.method,
-        apps,
-      );
-    } else {
-      const app = findAgentApp(firstAgentNames[0], apps);
-      await executeSingle(
-        firstAgentNames[0],
-        event,
-        routing.method,
-        app,
-      );
-    }
-
-    // 다음 단계 평가 루프
-    let nextStep = await completeStepAndEvaluateNext(
-      chain.chainId,
-      `${firstAgentNames.join(', ')} 작업 완료`,
-    );
-
-    while (nextStep) {
-      markStepInProgress(chain.chainId);
-
-      if (
-        nextStep.execution === 'parallel' &&
-        nextStep.agents.length > 1
-      ) {
-        await executeParallel(
-          nextStep.agents,
-          event,
-          routing.method,
-          apps,
-        );
-      } else {
-        const app = findAgentApp(nextStep.agents[0], apps);
-        await executeSingle(
-          nextStep.agents[0],
-          event,
-          routing.method,
-          app,
-        );
-      }
-
-      nextStep = await completeStepAndEvaluateNext(
-        chain.chainId,
-        `${nextStep.agents.join(', ')} 작업 완료`,
-      );
-    }
-
-    console.log(
-      `[exec] 순차 체인 완료: ${chain.chainId}`,
-    );
-  } catch (err) {
-    failChain(chain.chainId);
-    throw err;
-  }
-};
-
 // ─── 디바운스 플러시 ─────────────────────────────────────
 
 /**
@@ -616,14 +518,6 @@ const flushDebounceBuffer = async (
           routing.agents.map((a) => a.name),
           slackEvent,
           routing.method,
-          apps,
-        );
-        break;
-      }
-      case 'sequential': {
-        await executeSequential(
-          slackEvent,
-          routing,
           apps,
         );
         break;
@@ -836,7 +730,7 @@ const main = async () => {
   }
   console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
   console.log(
-    '[start] Agent SDK 런타임 활성 — 복합 태스크 병렬/순차 실행 지원',
+    '[start] Agent SDK 런타임 활성 — 병렬 실행 + mention 기반 에이전트 간 위임 지원',
   );
 
   // 시작 시 만료된 claim 정리 + 1시간마다 주기적 정리
