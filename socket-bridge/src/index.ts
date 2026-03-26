@@ -1,5 +1,6 @@
 import { config } from 'dotenv';
 import { join } from 'path';
+import { mkdir, writeFile } from 'fs/promises';
 import { App } from '@slack/bolt';
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
@@ -28,6 +29,41 @@ import {
 // ─── 설정 ───────────────────────────────────────────────
 
 const TEST_MODE = process.env.BRIDGE_TEST_MODE === '1';
+
+/** Slack 첨부 이미지 임시 저장 디렉토리 */
+const SLACK_FILES_TMP_DIR = '/tmp/slack-files';
+
+/**
+ * Slack url_private에서 이미지 파일 다운로드 후 임시 파일로 저장
+ * @param urlPrivate - Slack url_private 경로
+ * @param botToken - 다운로드 인증용 Slack Bot Token
+ * @param filename - 저장 파일명
+ * @returns 저장된 파일 경로 (실패 시 null)
+ */
+const downloadSlackImage = async (
+  urlPrivate: string,
+  botToken: string,
+  filename: string,
+): Promise<string | null> => {
+  try {
+    const resp = await fetch(urlPrivate, {
+      headers: { Authorization: `Bearer ${botToken}` },
+    });
+    if (!resp.ok) {
+      console.error(`[file] 이미지 다운로드 실패 (${resp.status}): ${urlPrivate}`);
+      return null;
+    }
+    const buffer = await resp.arrayBuffer();
+    await mkdir(SLACK_FILES_TMP_DIR, { recursive: true });
+    const tmpPath = join(SLACK_FILES_TMP_DIR, filename);
+    await writeFile(tmpPath, Buffer.from(buffer));
+    console.log(`[file] 이미지 저장 완료: ${tmpPath}`);
+    return tmpPath;
+  } catch (err) {
+    console.error(`[file] 이미지 다운로드 오류:`, err);
+    return null;
+  }
+};
 
 /** 환경변수 검증 함수 */
 const validateEnvVars = (): void => {
@@ -1109,10 +1145,30 @@ const main = async () => {
       const text = (msg.text as string) ?? '';
       const ts = (msg.ts as string) ?? '';
 
-      // 첨부 파일 정보 추출 (file_share 이벤트)
+      // 첨부 파일 정보 추출 및 이미지 다운로드 (file_share 이벤트)
       const files = (msg.files as Array<Record<string, unknown>> | undefined) ?? [];
+      const pmBotToken = process.env.SLACK_BOT_TOKEN_PM ?? '';
+      const imageFilePaths: string[] = [];
+
+      for (const f of files) {
+        const mimetype = (f.mimetype ?? f.filetype ?? '') as string;
+        const urlPrivate = f.url_private as string | undefined;
+        const fileId = (f.id ?? ts) as string;
+        if (urlPrivate && mimetype.startsWith('image/')) {
+          const ext = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+          const filename = `${ts}-${fileId}.${ext}`;
+          const savedPath = await downloadSlackImage(urlPrivate, pmBotToken, filename);
+          if (savedPath) {
+            imageFilePaths.push(savedPath);
+          }
+        }
+      }
+
       const fileContext = files.length > 0
         ? '\n[첨부 파일: ' + files.map((f) => `${f.name ?? '파일'} (${f.mimetype ?? f.filetype ?? 'unknown'})`).join(', ') + ']'
+          + (imageFilePaths.length > 0
+            ? '\n[첨부 이미지 — Read 도구로 내용 확인 가능:\n' + imageFilePaths.join('\n') + ']'
+            : '')
         : '';
 
       console.log(
