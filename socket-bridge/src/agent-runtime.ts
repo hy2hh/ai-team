@@ -1,5 +1,6 @@
 import {
   readFileSync,
+  readdirSync,
   writeFileSync,
   existsSync,
 } from 'fs';
@@ -235,6 +236,98 @@ const buildContextRulesPrefix = (): string => {
     '---',
     '',
   ].join('\n');
+};
+
+// ─── 공유 메모리 로더 ──────────────────────────────────
+// 에이전트 실행 시 .memory/ 파일을 코드가 직접 읽어 프롬프트에 주입
+// LLM에게 "읽어라" 지시하는 대신, 구조적으로 동일한 사실 기반 보장
+
+/** decisions/ 디렉토리에서 로드할 최대 파일 수 */
+const MAX_DECISION_FILES = 5;
+
+/**
+ * 프로젝트 공유 메모리 로드 — 모든 에이전트에 동일하게 주입
+ * @returns 공유 메모리 문자열 (project-context + 최근 decisions)
+ */
+const loadSharedMemory = (): string => {
+  const parts: string[] = ['# 프로젝트 공유 메모리 (자동 주입)', ''];
+
+  // 1. project-context.md
+  const contextPath = join(
+    PROJECT_DIR,
+    '.memory',
+    'facts',
+    'project-context.md',
+  );
+  if (existsSync(contextPath)) {
+    try {
+      const content = readFileSync(contextPath, 'utf-8');
+      parts.push('## 프로젝트 상태', '', content, '');
+    } catch {
+      // 읽기 실패 시 건너뜀
+    }
+  }
+
+  // 2. decisions/ 최근 파일 (최대 5개, 파일명 역순 = 최신순)
+  const decisionsDir = join(
+    PROJECT_DIR,
+    '.memory',
+    'decisions',
+  );
+  if (existsSync(decisionsDir)) {
+    try {
+      const files = readdirSync(decisionsDir)
+        .filter((f) => f.endsWith('.md'))
+        .sort()
+        .reverse()
+        .slice(0, MAX_DECISION_FILES);
+
+      if (files.length > 0) {
+        parts.push('## 최근 결정사항', '');
+        for (const file of files) {
+          const filePath = join(decisionsDir, file);
+          const content = readFileSync(
+            filePath,
+            'utf-8',
+          );
+          parts.push(`### ${file}`, '', content, '');
+        }
+      }
+    } catch {
+      // 읽기 실패 시 건너뜀
+    }
+  }
+
+  return parts.join('\n');
+};
+
+/**
+ * 에이전트별 개인 메모리 로드 — 자기 파트 작업 현황
+ * @param agentName - 에이전트 이름
+ * @returns 개인 메모리 문자열
+ */
+const loadAgentMemory = (agentName: string): string => {
+  const parts: string[] = [
+    '# 내 작업 현황 (자동 주입)',
+    '',
+  ];
+
+  const taskPath = join(
+    PROJECT_DIR,
+    '.memory',
+    'tasks',
+    `active-${agentName}.md`,
+  );
+  if (existsSync(taskPath)) {
+    try {
+      const content = readFileSync(taskPath, 'utf-8');
+      parts.push(content, '');
+    } catch {
+      // 읽기 실패 시 건너뜀
+    }
+  }
+
+  return parts.join('\n');
 };
 
 /** 에이전트 persona 파일 경로 매핑 */
