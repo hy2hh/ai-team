@@ -603,6 +603,27 @@ const executeSingle = async (
     }
   }
 
+  // depth 한도 도달 시 PM 최종 요약 (리뷰는 depth에 미포함)
+  if (
+    agentExecutionCount >= MAX_DELEGATION_DEPTH &&
+    accumulatedResults.length > 0
+  ) {
+    const finalReviewEvent = buildPmReviewEvent(
+      event,
+      accumulatedResults,
+    );
+    console.log(
+      '[hub] PM 최종 요약 요청 (depth 한도 도달)',
+    );
+    await handleMessage(
+      'pm',
+      finalReviewEvent,
+      'hub-review',
+      pmApp,
+      true,
+    );
+  }
+
   // Hub 완료: 🧠 → ✅ 전환
   if (result.postedTs) {
     await safeSwapReaction(
