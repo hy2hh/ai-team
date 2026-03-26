@@ -588,9 +588,19 @@ const loadPersona = (agentName: string): string => {
   const fullPath = join(PROJECT_DIR, relativePath);
   try {
     const persona = readFileSync(fullPath, 'utf-8');
-    return buildContextRulesPrefix() + persona;
+    const sharedMemory = loadSharedMemory();
+    const agentMemory = loadAgentMemory(agentName);
+    return [
+      buildContextRulesPrefix(),
+      sharedMemory,
+      agentMemory,
+      persona,
+    ].join('\n');
   } catch (err) {
-    console.error(`[runtime] persona 파일 로드 실패: ${fullPath}`, err);
+    console.error(
+      `[runtime] persona 파일 로드 실패: ${fullPath}`,
+      err,
+    );
     return '';
   }
 };
