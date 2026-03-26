@@ -7,7 +7,11 @@ import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 // .env는 프로젝트 루트에 위치
 config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
-import { registerBotUser, routeMessage } from './router.js';
+import {
+  parseMentions,
+  registerBotUser,
+  routeMessage,
+} from './router.js';
 import { handleMessage } from './agent-runtime.js';
 import {
   tryClaim,
@@ -264,20 +268,90 @@ const findAgentApp = (
 
 // ─── 실행 모드별 핸들러 ─────────────────────────────────
 
+/** 위임 체인 최대 깊이 — 무한 루프 방지 */
+const MAX_DELEGATION_DEPTH = 3;
+
 /**
- * 단일 에이전트 실행
+ * 단일 에이전트 실행 + mention 기반 위임 체인 (C+D)
+ *
+ * 에이전트 응답에 @mention이 포함되면, 이전 결과를 컨텍스트로 주입하여
+ * 멘션된 에이전트를 자동 실행합니다.
  * @param agentName - 에이전트 이름
  * @param event - Slack 이벤트
  * @param method - 라우팅 방식
  * @param app - Slack App 인스턴스
+ * @param apps - 전체 Slack App 목록 (위임 시 필요)
+ * @param depth - 현재 위임 깊이 (무한 루프 방지)
  */
 const executeSingle = async (
   agentName: string,
   event: SlackEvent,
   method: string,
   app: App,
+  apps?: App[],
+  depth = 0,
 ): Promise<void> => {
-  await handleMessage(agentName, event, method, app);
+  const resultText = await handleMessage(
+    agentName,
+    event,
+    method,
+    app,
+  );
+
+  // C: 응답에서 @mention 감지 → 위임 체인
+  if (!resultText || !apps || depth >= MAX_DELEGATION_DEPTH) {
+    return;
+  }
+
+  const mentionedAgents = parseMentions(resultText);
+  // 자기 자신 멘션 제외, 원래 발신자(사용자) 멘션 제외
+  const delegationTargets = mentionedAgents.filter(
+    (name) => name !== agentName,
+  );
+
+  if (delegationTargets.length === 0) {
+    return;
+  }
+
+  console.log(
+    `[delegation] ${agentName} → [${delegationTargets.join(', ')}] (depth=${depth + 1})`,
+  );
+
+  // D: 이전 에이전트 결과를 컨텍스트로 주입한 새 이벤트 생성
+  const delegationEvent: SlackEvent = {
+    ...event,
+    text: [
+      `[이전 에이전트 ${agentName}의 작업 결과]`,
+      resultText.slice(0, 2000),
+      '',
+      '[원본 요청]',
+      event.text,
+    ].join('\n'),
+  };
+
+  // 멘션된 에이전트들 실행 (병렬 가능)
+  if (delegationTargets.length === 1) {
+    const targetApp = findAgentApp(
+      delegationTargets[0],
+      apps,
+    );
+    await executeSingle(
+      delegationTargets[0],
+      delegationEvent,
+      'delegation',
+      targetApp,
+      apps,
+      depth + 1,
+    );
+  } else {
+    // 복수 위임은 병렬 실행 (재귀 위임 없음)
+    await executeParallel(
+      delegationTargets,
+      delegationEvent,
+      'delegation',
+      apps,
+    );
+  }
 };
 
 /**
@@ -534,6 +608,7 @@ const flushDebounceBuffer = async (
           slackEvent,
           routing.method,
           agentApp,
+          apps,
         );
         break;
       }
