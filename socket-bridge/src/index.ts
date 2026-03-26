@@ -1096,14 +1096,20 @@ const main = async () => {
     app.event('message', async ({ event }) => {
       const msg = event as unknown as Record<string, unknown>;
 
-      // subtype 필터: message_changed, message_deleted 등 무시
+      // subtype 필터: message_changed, message_deleted 등 무시 (file_share는 허용)
       const subtype = msg.subtype as string | undefined;
-      if (subtype) {
+      if (subtype && subtype !== 'file_share') {
         return;
       }
 
       const text = (msg.text as string) ?? '';
       const ts = (msg.ts as string) ?? '';
+
+      // 첨부 파일 정보 추출 (file_share 이벤트)
+      const files = (msg.files as Array<Record<string, unknown>> | undefined) ?? [];
+      const fileContext = files.length > 0
+        ? '\n[첨부 파일: ' + files.map((f) => `${f.name ?? '파일'} (${f.mimetype ?? f.filetype ?? 'unknown'})`).join(', ') + ']'
+        : '';
 
       console.log(
         `[event] 수신: "${text.slice(0, 40)}..." ts=${ts} bot_id=${msg.bot_id ?? 'none'} thread_ts=${msg.thread_ts ?? 'none'}`,
@@ -1166,7 +1172,7 @@ const main = async () => {
       if (existing) {
         // 기존 타이머 리셋, 메시지 추가
         clearTimeout(existing.timer);
-        existing.messages.push({ ts, text, user });
+        existing.messages.push({ ts, text: text + fileContext, user });
         existing.raw = msg;
         console.log(
           `[debounce] 메시지 추가 (${existing.messages.length}개): "${text.slice(0, 30)}..."`,
@@ -1180,7 +1186,7 @@ const main = async () => {
       } else {
         // 새 디바운스 엔트리 생성
         const entry: DebounceEntry = {
-          messages: [{ ts, text, user }],
+          messages: [{ ts, text: text + fileContext, user }],
           channel,
           channelName,
           threadTs,
@@ -1205,6 +1211,14 @@ const main = async () => {
   console.log('[start] Socket Mode 연결 중...');
   for (let i = 0; i < apps.length; i++) {
     await apps[i].start();
+    // 봇 온라인 상태(초록 불) 설정
+    try {
+      await apps[i].client.users.setPresence({
+        presence: 'auto',
+      });
+    } catch {
+      // setPresence 실패 무시 (앱 설정에서 수동 활성화 필요할 수 있음)
+    }
     console.log(
       `[start] ${AGENTS[i].name} 연결 완료 (${i + 1}/${apps.length})`,
     );
