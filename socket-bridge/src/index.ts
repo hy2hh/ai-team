@@ -335,20 +335,106 @@ const findAgentApp = (
 
 // ─── 실행 모드별 핸들러 ─────────────────────────────────
 
-/** 위임 체인 최대 깊이 — 무한 루프 방지 */
+/** PM Hub 최대 에이전트 실행 횟수 — 무한 루프 방지 */
 const MAX_DELEGATION_DEPTH = 3;
 
+// ─── 리액션 유틸리티 ─────────────────────────────────────
+
+/** 리액션 추가 (실패 무시) */
+const safeAddReaction = async (
+  app: App,
+  channel: string,
+  ts: string,
+  name: string,
+): Promise<void> => {
+  try {
+    await app.client.reactions.add({
+      channel,
+      timestamp: ts,
+      name,
+    });
+  } catch {
+    // 리액션 실패 무시
+  }
+};
+
+/** 리액션 교체: from → to (실패 무시) */
+const safeSwapReaction = async (
+  app: App,
+  channel: string,
+  ts: string,
+  from: string,
+  to: string,
+): Promise<void> => {
+  try {
+    await app.client.reactions.remove({
+      channel,
+      timestamp: ts,
+      name: from,
+    });
+  } catch {
+    // 제거 실패 무시
+  }
+  await safeAddReaction(app, channel, ts, to);
+};
+
+// ─── 이벤트 빌더 ─────────────────────────────────────────
+
+/** 위임받는 에이전트용 이벤트 생성 */
+const buildDelegationEvent = (
+  originalEvent: SlackEvent,
+  accumulatedResults: Array<{
+    agent: string;
+    text: string;
+  }>,
+): SlackEvent => {
+  const parts: string[] = [];
+
+  if (accumulatedResults.length > 0) {
+    parts.push('[이전 작업 결과]');
+    for (const r of accumulatedResults) {
+      parts.push(`— ${r.agent}: ${r.text.slice(0, 1500)}`);
+    }
+    parts.push('');
+  }
+
+  parts.push('[원본 요청]', originalEvent.text);
+
+  return { ...originalEvent, text: parts.join('\n') };
+};
+
+/** PM 리뷰용 이벤트 생성 */
+const buildPmReviewEvent = (
+  originalEvent: SlackEvent,
+  accumulatedResults: Array<{
+    agent: string;
+    text: string;
+  }>,
+): SlackEvent => {
+  const parts = ['[에이전트 실행 결과 보고]'];
+
+  for (const r of accumulatedResults) {
+    parts.push(`— ${r.agent}: ${r.text.slice(0, 1500)}`);
+  }
+
+  parts.push('', '[원본 요청]', originalEvent.text);
+
+  return { ...originalEvent, text: parts.join('\n') };
+};
+
+// ─── 실행 핸들러 ─────────────────────────────────────────
+
 /**
- * 단일 에이전트 실행 + mention 기반 위임 체인 (C+D)
+ * 단일 에이전트 실행 + PM Hub 위임 패턴
  *
- * 에이전트 응답에 @mention이 포함되면, 이전 결과를 컨텍스트로 주입하여
- * 멘션된 에이전트를 자동 실행합니다.
+ * PM 응답에 @mention이 포함되면 Hub 루프 진입:
+ * PM → Agent(s) → PM 리뷰 → Agent(s) → PM 리뷰 → ... → 완료
+ * 비PM 에이전트는 hub 미적용 (기존 동작 유지).
  * @param agentName - 에이전트 이름
  * @param event - Slack 이벤트
  * @param method - 라우팅 방식
  * @param app - Slack App 인스턴스
  * @param apps - 전체 Slack App 목록 (위임 시 필요)
- * @param depth - 현재 위임 깊이 (무한 루프 방지)
  */
 const executeSingle = async (
   agentName: string,
@@ -356,7 +442,6 @@ const executeSingle = async (
   method: string,
   app: App,
   apps?: App[],
-  depth = 0,
 ): Promise<void> => {
   const result = await handleMessage(
     agentName,
@@ -365,100 +450,168 @@ const executeSingle = async (
     app,
   );
 
-  // C: 응답에서 @mention 감지 → 위임 체인
+  // 비PM이거나 텍스트 없으면 hub 미적용
   if (
+    agentName !== 'pm' ||
     !result.text ||
-    !apps ||
-    depth >= MAX_DELEGATION_DEPTH
+    !apps
   ) {
     return;
   }
 
-  const mentionedAgents = parseMentions(result.text);
-  // 자기 자신 멘션 제외, 원래 발신자(사용자) 멘션 제외
-  const delegationTargets = mentionedAgents.filter(
-    (name) => name !== agentName,
+  // PM 응답에서 멘션 파싱
+  let targets = parseMentions(result.text).filter(
+    (name) => name !== 'pm',
   );
 
-  if (delegationTargets.length === 0) {
+  if (targets.length === 0) {
     return;
   }
 
+  // ─── PM Hub 루프 시작 ───────────────────────────────
   console.log(
-    `[delegation] ${agentName} → [${delegationTargets.join(', ')}] (depth=${depth + 1})`,
+    `[hub] PM Hub 시작: targets=[${targets.join(', ')}]`,
   );
 
-  // 위임 시작: 포스팅된 메시지에 🧠 리액션 추가
+  const pmApp = findAgentApp('pm', apps);
+
+  // PM 메시지에 🧠 리액션
   if (result.postedTs) {
-    try {
-      await app.client.reactions.add({
-        channel: event.channel,
-        timestamp: result.postedTs,
-        name: 'brain',
-      });
-      console.log(
-        `[reaction] 🧠 위임 표시: ${result.postedTs}`,
-      );
-    } catch {
-      // 리액션 실패 무시
-    }
-  }
-
-  // D: 이전 에이전트 결과를 컨텍스트로 주입한 새 이벤트 생성
-  const delegationEvent: SlackEvent = {
-    ...event,
-    text: [
-      `[이전 에이전트 ${agentName}의 작업 결과]`,
-      result.text.slice(0, 2000),
-      '',
-      '[원본 요청]',
-      event.text,
-    ].join('\n'),
-  };
-
-  // 멘션된 에이전트들 실행 (병렬 가능)
-  if (delegationTargets.length === 1) {
-    const targetApp = findAgentApp(
-      delegationTargets[0],
-      apps,
+    await safeAddReaction(
+      pmApp,
+      event.channel,
+      result.postedTs,
+      'brain',
     );
-    await executeSingle(
-      delegationTargets[0],
-      delegationEvent,
-      'delegation',
-      targetApp,
-      apps,
-      depth + 1,
-    );
-  } else {
-    // 복수 위임은 병렬 실행 (재귀 위임 없음)
-    await executeParallel(
-      delegationTargets,
-      delegationEvent,
-      'delegation',
-      apps,
+    console.log(
+      `[reaction] 🧠 Hub 시작: ${result.postedTs}`,
     );
   }
 
-  // 위임 완료: 🧠 → ✅ 전환
-  if (result.postedTs) {
-    try {
-      await app.client.reactions.remove({
-        channel: event.channel,
-        timestamp: result.postedTs,
-        name: 'brain',
-      });
-      await app.client.reactions.add({
-        channel: event.channel,
-        timestamp: result.postedTs,
-        name: 'white_check_mark',
-      });
-      console.log(
-        `[reaction] ✅ 위임 완료: ${result.postedTs}`,
+  const accumulatedResults: Array<{
+    agent: string;
+    text: string;
+  }> = [];
+  let agentExecutionCount = 0;
+
+  while (
+    targets.length > 0 &&
+    agentExecutionCount < MAX_DELEGATION_DEPTH
+  ) {
+    // (a) 위임 에이전트 실행
+    if (targets.length === 1) {
+      const target = targets[0];
+      const targetApp = findAgentApp(target, apps);
+      const delegationEvent = buildDelegationEvent(
+        event,
+        accumulatedResults,
       );
-    } catch {
-      // 리액션 실패 무시
+
+      console.log(
+        `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
+      );
+
+      const delegationResult = await handleMessage(
+        target,
+        delegationEvent,
+        'delegation',
+        targetApp,
+      );
+
+      accumulatedResults.push({
+        agent: target,
+        text: delegationResult.text,
+      });
+      agentExecutionCount += 1;
+    } else {
+      // 복수 위임: 병렬 실행
+      const remaining =
+        MAX_DELEGATION_DEPTH - agentExecutionCount;
+      const batch = targets.slice(0, remaining);
+
+      console.log(
+        `[hub] 병렬 위임: [${batch.join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
+      );
+
+      const parallelResults = await Promise.allSettled(
+        batch.map((target) => {
+          const targetApp = findAgentApp(target, apps);
+          const delegationEvent =
+            buildDelegationEvent(
+              event,
+              accumulatedResults,
+            );
+          return handleMessage(
+            target,
+            delegationEvent,
+            'delegation',
+            targetApp,
+          );
+        }),
+      );
+
+      for (let i = 0; i < batch.length; i++) {
+        const r = parallelResults[i];
+        accumulatedResults.push({
+          agent: batch[i],
+          text:
+            r.status === 'fulfilled'
+              ? r.value.text
+              : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+        });
+      }
+      agentExecutionCount += batch.length;
     }
+
+    // (b) depth 초과 시 종료
+    if (agentExecutionCount >= MAX_DELEGATION_DEPTH) {
+      console.log(
+        `[hub] depth 한도 도달 (${agentExecutionCount}/${MAX_DELEGATION_DEPTH})`,
+      );
+      break;
+    }
+
+    // (c) PM에게 결과 전달 → 리뷰
+    const reviewEvent = buildPmReviewEvent(
+      event,
+      accumulatedResults,
+    );
+
+    console.log('[hub] PM 리뷰 요청');
+
+    const pmReview = await handleMessage(
+      'pm',
+      reviewEvent,
+      'hub-review',
+      pmApp,
+    );
+
+    // (d) PM 리뷰 응답에서 새 타겟 파싱
+    targets = parseMentions(pmReview.text).filter(
+      (name) => name !== 'pm',
+    );
+
+    if (targets.length === 0) {
+      console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
+    } else {
+      console.log(
+        `[hub] PM 추가 위임: [${targets.join(', ')}]`,
+      );
+    }
+  }
+
+  // Hub 완료: 🧠 → ✅ 전환
+  if (result.postedTs) {
+    await safeSwapReaction(
+      pmApp,
+      event.channel,
+      result.postedTs,
+      'brain',
+      'white_check_mark',
+    );
+    console.log(
+      `[reaction] ✅ Hub 완료: ${result.postedTs}`,
+    );
   }
 };
 

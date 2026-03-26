@@ -44,7 +44,9 @@ export type RoutingMethod =
   | 'broadcast'
   | 'conversational'
   | 'llm'
-  | 'default';
+  | 'default'
+  | 'delegation'
+  | 'hub-review';
 
 /** 라우팅 대상 에이전트 */
 export interface RoutingAgent {
