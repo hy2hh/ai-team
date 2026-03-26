@@ -481,7 +481,8 @@ const executeSingle = async (
 
   const pmApp = findAgentApp('pm', apps);
 
-  // PM 메시지에 🧠 리액션
+  // PM 메시지에 🧠 리액션 + 추적 목록
+  const trackedMessages: string[] = [];
   if (result.postedTs) {
     await safeAddReaction(
       pmApp,
@@ -489,6 +490,7 @@ const executeSingle = async (
       result.postedTs,
       'brain',
     );
+    trackedMessages.push(result.postedTs);
     console.log(
       `[reaction] 🧠 Hub 시작: ${result.postedTs}`,
     );
@@ -603,6 +605,19 @@ const executeSingle = async (
     if (targets.length === 0) {
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
     } else {
+      // PM 리뷰 메시지에 🧠 리액션 (추가 위임 진행 중 표시)
+      if (pmReview.postedTs) {
+        await safeAddReaction(
+          pmApp,
+          event.channel,
+          pmReview.postedTs,
+          'brain',
+        );
+        trackedMessages.push(pmReview.postedTs);
+        console.log(
+          `[reaction] 🧠 추가 위임: ${pmReview.postedTs}`,
+        );
+      }
       console.log(
         `[hub] PM 추가 위임: [${targets.join(', ')}]`,
       );
@@ -630,18 +645,16 @@ const executeSingle = async (
     );
   }
 
-  // Hub 완료: 🧠 → ✅ 전환
-  if (result.postedTs) {
+  // Hub 완료: 모든 tracked 메시지 🧠 → ✅ 전환
+  for (const ts of trackedMessages) {
     await safeSwapReaction(
       pmApp,
       event.channel,
-      result.postedTs,
+      ts,
       'brain',
       'white_check_mark',
     );
-    console.log(
-      `[reaction] ✅ Hub 완료: ${result.postedTs}`,
-    );
+    console.log(`[reaction] ✅ Hub 완료: ${ts}`);
   }
 };
 
