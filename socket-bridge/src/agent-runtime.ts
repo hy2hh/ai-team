@@ -90,25 +90,41 @@ const loadSessionStore = (): void => {
 let saveTimer: ReturnType<typeof setTimeout> | null =
   null;
 
+/** 세션 저장소를 파일에 즉시 기록 (내부용) */
+const writeSessionStoreToDisk = (): void => {
+  try {
+    writeFileSync(
+      SESSION_STORE_PATH,
+      JSON.stringify(sessionStore, null, 2),
+      'utf-8',
+    );
+  } catch (err) {
+    console.error(
+      '[session] 세션 저장소 저장 실패:',
+      err,
+    );
+  }
+};
+
 const saveSessionStore = (): void => {
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   // 1초 디바운스 — 연속 업데이트 시 파일 쓰기 최소화
-  saveTimer = setTimeout(() => {
-    try {
-      writeFileSync(
-        SESSION_STORE_PATH,
-        JSON.stringify(sessionStore, null, 2),
-        'utf-8',
-      );
-    } catch (err) {
-      console.error(
-        '[session] 세션 저장소 저장 실패:',
-        err,
-      );
-    }
-  }, 1000);
+  saveTimer = setTimeout(writeSessionStoreToDisk, 1000);
+};
+
+/**
+ * 세션 저장소 즉시 flush (shutdown 시 호출)
+ * debounce 타이머를 취소하고 즉시 파일에 기록
+ */
+export const flushSessionStore = (): void => {
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  writeSessionStoreToDisk();
+  console.log('[session] 세션 저장소 flush 완료');
 };
 
 /** 세션 ID 저장 (인메모리 + 파일) */
@@ -136,6 +152,35 @@ const getPersistedSessionId = (
 
 // 시작 시 로드
 loadSessionStore();
+
+// 1시간마다 TTL 만료 엔트리 정리 (시작 시 1회만이 아닌 주기적 정리)
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const agent of Object.keys(sessionStore)) {
+    for (const key of Object.keys(sessionStore[agent])) {
+      if (
+        now - sessionStore[agent][key].updatedAt >
+        SESSION_TTL_MS
+      ) {
+        delete sessionStore[agent][key];
+        cleaned++;
+      }
+    }
+    if (Object.keys(sessionStore[agent]).length === 0) {
+      delete sessionStore[agent];
+    }
+  }
+  if (cleaned > 0) {
+    console.log(
+      `[session] 주기적 TTL 정리: ${cleaned}개 만료 엔트리 제거`,
+    );
+    saveSessionStore();
+  }
+}, 60 * 60 * 1000);
+
+/** threadSessions Map 최대 크기 (에이전트당) */
+const THREAD_SESSIONS_MAX = 200;
 
 /**
  * 에이전트 bot user ID 매핑 (런타임에 index.ts에서 등록)
@@ -684,7 +729,17 @@ export const handleMessage = async (
       // ResultMessage (success/error 모두) → result 추출 + session_id 캡처
       if (message.type === 'result') {
         const resultMsg = message as SDKResultMessage;
+        // threadSessions LRU: 크기 초과 시 가장 오래된 엔트리 제거
+        if (session.threadSessions.has(threadKey)) {
+          session.threadSessions.delete(threadKey);
+        }
         session.threadSessions.set(threadKey, resultMsg.session_id);
+        if (session.threadSessions.size > THREAD_SESSIONS_MAX) {
+          const oldest = session.threadSessions.keys().next().value;
+          if (oldest) {
+            session.threadSessions.delete(oldest);
+          }
+        }
         persistSessionId(agentName, threadKey, resultMsg.session_id);
         if (resultMsg.subtype === 'success') {
           resultText = resultMsg.result;

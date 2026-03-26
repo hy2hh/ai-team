@@ -16,6 +16,7 @@ import {
   handleMessage,
   registerAgentBotUserId,
   validatePersonaFiles,
+  flushSessionStore,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -108,9 +109,34 @@ const resolveSenderName = (
   return 'unknown';
 };
 
-// ─── 채널 이름 캐시 ──────────────────────────────────────
+// ─── 채널 이름 캐시 (LRU — MAX 100개) ───────────────────
+
+/** 채널 캐시 최대 크기 */
+const CHANNEL_CACHE_MAX = 100;
 
 const channelNameCache = new Map<string, string>();
+
+/**
+ * LRU 방식 채널 캐시 삽입 — 최대 크기 초과 시 가장 오래된 엔트리 제거
+ * @param channelId - 채널 ID
+ * @param name - 채널 이름
+ */
+const setChannelCache = (
+  channelId: string,
+  name: string,
+): void => {
+  // Map은 삽입 순서 보장 — delete 후 재삽입으로 LRU 위치 갱신
+  if (channelNameCache.has(channelId)) {
+    channelNameCache.delete(channelId);
+  }
+  channelNameCache.set(channelId, name);
+  if (channelNameCache.size > CHANNEL_CACHE_MAX) {
+    const oldest = channelNameCache.keys().next().value;
+    if (oldest) {
+      channelNameCache.delete(oldest);
+    }
+  }
+};
 
 /** 진행 중인 채널 이름 조회 (동시 요청 중복 방지) */
 const pendingChannelLookups = new Map<string, Promise<string>>();
@@ -122,6 +148,9 @@ const getChannelName = async (
 ): Promise<string> => {
   const cached = channelNameCache.get(channelId);
   if (cached) {
+    // LRU 순서 갱신: delete → re-insert
+    channelNameCache.delete(channelId);
+    channelNameCache.set(channelId, cached);
     return cached;
   }
 
@@ -140,7 +169,7 @@ const getChannelName = async (
         const name =
           (result.channel as { name?: string })?.name ??
           channelId;
-        channelNameCache.set(channelId, name);
+        setChannelCache(channelId, name);
         return name;
       } catch {
         continue;
@@ -416,37 +445,59 @@ const executeParallel = async (
     (r) => r.result.status === 'rejected',
   );
 
+  // 실패한 에이전트 1회 재시도
   if (failed.length > 0) {
     const failedNames = failed
       .map((f) => f.name)
       .join(', ');
-    console.error(
-      `[exec] 병렬 실행 실패: [${failedNames}] (${failed.length}/${agentNames.length})`,
+    console.warn(
+      `[exec] 병렬 실행 실패: [${failedNames}] — 1회 재시도`,
     );
-    for (const f of failed) {
-      const reason =
-        f.result.status === 'rejected'
-          ? f.result.reason
-          : '';
-      console.error(`[exec]   ${f.name}:`, reason);
+
+    const retryResults = await Promise.allSettled(
+      failed.map((f) => {
+        const app = findAgentApp(f.name, apps);
+        return handleMessage(f.name, event, method, app);
+      }),
+    );
+
+    const stillFailed: string[] = [];
+    for (let j = 0; j < failed.length; j++) {
+      if (retryResults[j].status === 'rejected') {
+        stillFailed.push(failed[j].name);
+        console.error(
+          `[exec]   ${failed[j].name} 재시도 실패:`,
+          (retryResults[j] as PromiseRejectedResult).reason,
+        );
+      } else {
+        console.log(
+          `[exec]   ${failed[j].name} 재시도 성공`,
+        );
+      }
     }
 
-    // 실패한 에이전트 Slack 알림
-    try {
-      const threadTs = event.thread_ts ?? event.ts;
-      await apps[0].client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: threadTs,
-        text: `⚠️ [${failedNames}] 에이전트가 응답하지 못했습니다. (${allResults.length - failed.length}/${agentNames.length} 성공)`,
-      });
-    } catch {
-      // 알림 실패는 무시
+    if (stillFailed.length > 0) {
+      // 재시도 후에도 실패한 에이전트 Slack 알림
+      try {
+        const threadTs = event.thread_ts ?? event.ts;
+        await apps[0].client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: threadTs,
+          text: `⚠️ [${stillFailed.join(', ')}] 에이전트가 응답하지 못했습니다. (재시도 포함 ${agentNames.length - stillFailed.length}/${agentNames.length} 성공)`,
+        });
+      } catch {
+        // 알림 실패는 무시
+      }
     }
+
+    console.log(
+      `[exec] 병렬 실행 완료: ${agentNames.length - stillFailed.length}/${agentNames.length} 성공 (재시도 ${failed.length - stillFailed.length}건 복구)`,
+    );
+  } else {
+    console.log(
+      `[exec] 병렬 실행 완료: ${allResults.length}/${agentNames.length} 성공`,
+    );
   }
-
-  console.log(
-    `[exec] 병렬 실행 완료: ${allResults.length - failed.length}/${agentNames.length} 성공`,
-  );
 };
 
 // ─── 디바운스 플러시 ─────────────────────────────────────
@@ -575,6 +626,9 @@ const flushDebounceBuffer = async (
     raw: entry.raw,
   };
 
+  // end-to-end 타이밍 시작
+  const e2eStart = Date.now();
+
   // 라우팅 (raw 텍스트 기준 — sender prefix가 멘션/패턴 매칭을 오염하지 않도록)
   const routing = await routeMessage(rawTextsForRouting);
   slackEvent.mentions =
@@ -633,12 +687,26 @@ const flushDebounceBuffer = async (
 
   executeTask()
     .then(() => {
+      const e2eElapsed = (
+        (Date.now() - e2eStart) /
+        1000
+      ).toFixed(1);
+      console.log(
+        `[perf] e2e complete: [${agentNames}] ${e2eElapsed}s (${routing.method})`,
+      );
       // 모든 메시지의 claim을 completed로
       for (const m of messages) {
         updateClaim(m.ts, 'completed');
       }
     })
     .catch((err) => {
+      const e2eElapsed = (
+        (Date.now() - e2eStart) /
+        1000
+      ).toFixed(1);
+      console.error(
+        `[perf] e2e failed: [${agentNames}] ${e2eElapsed}s`,
+      );
       for (const m of messages) {
         updateClaim(m.ts, 'failed');
       }
@@ -839,6 +907,8 @@ const main = async () => {
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
     clearInterval(cleanupInterval);
+    // 세션 저장소 즉시 flush (debounce 타이머 누락 방지)
+    flushSessionStore();
     await Promise.all(apps.map((app) => app.stop()));
     console.log('[shutdown] 완료');
     process.exit(0);

@@ -380,9 +380,14 @@ export const classifyComplexTask = async (
 export const routeMessage = async (
   text: string,
 ): Promise<RoutingResult> => {
+  const routeStart = Date.now();
+
   // 1순위: @mention
   const mentions = parseMentions(text);
   if (mentions.length > 0) {
+    console.log(
+      `[perf] stage=mention elapsed=${Date.now() - routeStart}ms`,
+    );
     return {
       agents: mentions.map(toRoutingAgent),
       execution: mentions.length > 1 ? 'parallel' : 'single',
@@ -392,7 +397,9 @@ export const routeMessage = async (
 
   // 2순위: 간단한 대화 메시지 → PM 직행 (LLM 분류 건너뜀, 0ms)
   if (CONVERSATIONAL_PATTERN.test(text)) {
-    console.log('[router] 대화 메시지 감지 → PM 직행');
+    console.log(
+      `[perf] stage=conversational elapsed=${Date.now() - routeStart}ms`,
+    );
     return {
       agents: [toRoutingAgent('pm')],
       execution: 'single',
@@ -406,7 +413,9 @@ export const routeMessage = async (
   // 3순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)
   // 단, 업무 키워드가 포함되면 LLM 복합 분류로 위임
   if (BROADCAST_PATTERN.test(text) && keywordMatches.length === 0) {
-    console.log('[router] 브로드캐스트 감지 → 전체 에이전트');
+    console.log(
+      `[perf] stage=broadcast elapsed=${Date.now() - routeStart}ms`,
+    );
     return {
       agents: ALL_AGENT_NAMES.map(toRoutingAgent),
       execution: 'parallel',
@@ -414,6 +423,9 @@ export const routeMessage = async (
     };
   }
   if (keywordMatches.length === 1) {
+    console.log(
+      `[perf] stage=keyword agent=${keywordMatches[0]} elapsed=${Date.now() - routeStart}ms`,
+    );
     return {
       agents: [toRoutingAgent(keywordMatches[0])],
       execution: 'single',
@@ -426,9 +438,13 @@ export const routeMessage = async (
     console.log(
       `[router] 복수 키워드 매칭: [${keywordMatches.join(', ')}] → LLM 분류`,
     );
+    const llmStart = Date.now();
     const llmDisambiguated = await classifyWithLlm(
       text,
       keywordMatches,
+    );
+    console.log(
+      `[perf] stage=keyword+llm elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
     );
     if (llmDisambiguated) {
       return {
@@ -445,12 +461,19 @@ export const routeMessage = async (
   }
 
   // 3순위: LLM 복합 태스크 감지 (실행 모드 + 에이전트 결정)
+  const llmStart = Date.now();
   const complexResult = await classifyComplexTask(text);
+  console.log(
+    `[perf] stage=llm-complex elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
+  );
   if (complexResult) {
     return complexResult;
   }
 
   // 4순위: PM 기본값
+  console.log(
+    `[perf] stage=default elapsed=${Date.now() - routeStart}ms`,
+  );
   return {
     agents: [toRoutingAgent('pm')],
     execution: 'single',
