@@ -9,6 +9,7 @@ config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
 import {
   parseMentions,
+  parseExplicitMentions,
   registerBotUser,
   routeMessage,
 } from './router.js';
@@ -663,7 +664,10 @@ const executeSingle = async (
     );
 
     // (d) PM 리뷰 응답에서 새 타겟 파싱
-    targets = parseMentions(pmReview.text).filter(
+    // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
+    // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
+    // "Backend Donald가 완료했습니다" 같은 요약 문장에서 루프가 재발한다.
+    targets = parseExplicitMentions(pmReview.text).filter(
       (name) => name !== 'pm' && isValidAgent(name),
     );
 

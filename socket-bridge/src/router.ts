@@ -174,6 +174,30 @@ const DISPLAY_NAME_TO_AGENT: Record<string, string> = {
 };
 
 /**
+ * 메시지 텍스트에서 명시적 <@USER_ID> 멘션만 추출 (hub-review 루프용)
+ *
+ * hub-review 루프에서 PM 응답 파싱 시 사용 — 일반 텍스트 display name은
+ * 오감지(false positive)를 유발하므로 Slack 공식 <@USER_ID> 형식만 인정.
+ * @param text - Slack 메시지 텍스트
+ * @returns 멘션된 에이전트 이름 배열 (중복 제거)
+ */
+export const parseExplicitMentions = (
+  text: string,
+): string[] => {
+  const mentions = new Set<string>();
+  const mentionPattern = /<@(U[A-Z0-9]+)>/g;
+  let match: RegExpExecArray | null;
+  while ((match = mentionPattern.exec(text)) !== null) {
+    const userId = match[1];
+    const agentName = botUserIdToAgent.get(userId);
+    if (agentName) {
+      mentions.add(agentName);
+    }
+  }
+  return Array.from(mentions);
+};
+
+/**
  * 메시지 텍스트에서 멘션된 에이전트 목록 추출
  *
  * 2단계 감지:
