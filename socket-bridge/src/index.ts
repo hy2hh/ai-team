@@ -516,11 +516,12 @@ const executeSingle = async (
         delegationEvent,
         'delegation',
         targetApp,
+        true,
       );
 
       accumulatedResults.push({
         agent: target,
-        text: delegationResult.text,
+        text: delegationResult.text || '[응답 없음]',
       });
       agentExecutionCount += 1;
     } else {
@@ -546,6 +547,7 @@ const executeSingle = async (
             delegationEvent,
             'delegation',
             targetApp,
+            true,
           );
         }),
       );
@@ -584,6 +586,7 @@ const executeSingle = async (
       reviewEvent,
       'hub-review',
       pmApp,
+      true,
     );
 
     // (d) PM 리뷰 응답에서 새 타겟 파싱
