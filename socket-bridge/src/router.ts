@@ -260,22 +260,18 @@ export const classifyComplexTask = async (
     '',
     '## 실행 모드',
     '- single: 한 에이전트만 필요한 단순 작업',
-    '- parallel: 여러 에이전트가 독립적으로 동시 작업 (예: 코드 리뷰)',
-    '- sequential: 에이전트 간 의존성이 있는 순차 작업 (예: 디자인 후 구현)',
+    '- parallel: 여러 에이전트가 독립적으로 동시 작업',
     '',
     '## 표준 패턴',
     '- 인사/공지/전체 메시지 (예: "좋은 아침", "공지합니다") → parallel: 모든 에이전트 (pm, designer, frontend, backend, researcher, secops)',
     '- 코드 리뷰 → parallel: frontend + backend',
-    '- 디자인 후 구현 → sequential: designer 먼저 (이후 동적 결정)',
     '- API + UI 동시 → parallel: backend + frontend',
-    '- 풀 사이클 기능 → sequential: pm 먼저 (이후 동적 결정)',
+    '- 의존성 있는 작업 (예: 디자인 후 구현) → single: 가장 먼저 할 에이전트 (에이전트가 응답에서 @mention으로 다음 에이전트에 위임)',
     '',
     '## 규칙',
     '- JSON으로만 응답',
     '- single이면: {"execution":"single","firstStep":{"agents":["에이전트"],"execution":"single"},"intent":"설명"}',
     '- parallel이면: {"execution":"parallel","firstStep":{"agents":["에이전트1","에이전트2"],"execution":"parallel"},"intent":"설명"}',
-    '- sequential이면: {"execution":"sequential","firstStep":{"agents":["첫에이전트"],"execution":"single"},"intent":"전체 의도 설명"}',
-    '- sequential의 firstStep에는 첫 단계 에이전트만 포함 (나머지는 동적 결정)',
   ].join('\n');
 
   try {
@@ -291,7 +287,7 @@ export const classifyComplexTask = async (
 
     // 유효성 검증
     const execution = parsed.execution as string | undefined;
-    const validExecutions = ['single', 'parallel', 'sequential'];
+    const validExecutions = ['single', 'parallel'];
     if (!execution || !validExecutions.includes(execution)) {
       console.warn(
         `[router] LLM이 유효하지 않은 실행 모드 반환: ${parsed.execution}`,
