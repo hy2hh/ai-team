@@ -329,9 +329,15 @@ const findAgentApp = (
   agentName: string,
   apps: App[],
 ): App => {
-  const idx = AGENTS.findIndex((a) => a.name === agentName);
+  const idx = AGENTS.findIndex(
+    (a) => a.name === agentName,
+  );
   return idx >= 0 ? apps[idx] : apps[0];
 };
+
+/** 유효한 에이전트 이름인지 확인 */
+const isValidAgent = (name: string): boolean =>
+  AGENTS.some((a) => a.name === name);
 
 // ─── 실행 모드별 핸들러 ─────────────────────────────────
 
@@ -459,9 +465,9 @@ const executeSingle = async (
     return;
   }
 
-  // PM 응답에서 멘션 파싱
+  // PM 응답에서 멘션 파싱 (자기 멘션 + 미등록 에이전트 제외)
   let targets = parseMentions(result.text).filter(
-    (name) => name !== 'pm',
+    (name) => name !== 'pm' && isValidAgent(name),
   );
 
   if (targets.length === 0) {
@@ -591,7 +597,7 @@ const executeSingle = async (
 
     // (d) PM 리뷰 응답에서 새 타겟 파싱
     targets = parseMentions(pmReview.text).filter(
-      (name) => name !== 'pm',
+      (name) => name !== 'pm' && isValidAgent(name),
     );
 
     if (targets.length === 0) {
