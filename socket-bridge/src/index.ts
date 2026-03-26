@@ -457,7 +457,14 @@ const executeParallel = async (
     const retryResults = await Promise.allSettled(
       failed.map((f) => {
         const app = findAgentApp(f.name, apps);
-        return handleMessage(f.name, event, method, app);
+        // 재시도 시 리액션 관리 건너뛰기 (이미 첫 시도에서 처리됨)
+        return handleMessage(
+          f.name,
+          event,
+          method,
+          app,
+          true,
+        );
       }),
     );
 
