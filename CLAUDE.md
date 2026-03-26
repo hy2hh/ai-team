@@ -107,6 +107,13 @@ Full rules: `.claude/agents/shared/routing-rules.md`, `shared/collision-preventi
 - **자율 실행**: 도구로 직접 할 수 있는 작업(메시지 전송, API 호출, 파일 생성 등)은 사용자에게 요청하지 말고 직접 수행. 진짜 사람만 가능한 작업만 부탁.
 - **Ralph Loop 검증**: 작업 완료 시 Ralph Loop 플러그인으로 요청 처리 → 검증을 이슈가 나오지 않을 때까지 반복한 후 마무리.
 
+## Workflow Defaults (반복 위반 방지)
+
+### 파일 저장 위치
+- **프로젝트 전용 스킬/규칙**: `.claude/skills/` 또는 `.claude/agents/shared/` (프로젝트 내)
+- **전역 경로 (`~/.claude/skills/`)에 프로젝트 스킬 저장 금지**
+- 행동 규칙은 별도 스킬/규칙 파일에 분리 — CLAUDE.md에 직접 삽입 금지 (이 섹션은 예외적 고정 규칙)
+
 ## Code Quality
 - Follow existing project conventions
 - All code changes require review mention to relevant agent

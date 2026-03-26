@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
 import type {
   ExecutionMode,
   RoutingAgent,
@@ -47,6 +48,21 @@ export const AGENT_SCOPES: Record<string, string> = {
     '시장 조사, 경쟁사 분석, 트렌드, 기회 평가, 기술 스카우팅',
   secops: '보안 리뷰, 위협 모델링, 취약점 평가, 인증/인가, 암호화',
 };
+
+/** JSON 스키마 검증 — classifyWithLlm 응답 */
+const ClassifyWithLlmSchema = z.object({
+  agentName: z.string(),
+});
+
+/** JSON 스키마 검증 — classifyComplexTask 응답 */
+const ClassifyComplexTaskSchema = z.object({
+  execution: z.enum(['single', 'parallel']),
+  firstStep: z.object({
+    agents: z.array(z.string()),
+    execution: z.enum(['single', 'parallel']),
+  }),
+  intent: z.string().optional(),
+});
 
 /** LLM 라우팅 타임아웃 (ms) */
 const LLM_ROUTING_TIMEOUT = 10000;
@@ -258,25 +274,30 @@ const classifyWithLlm = async (
       return null;
     }
 
-    const parsed = JSON.parse(extractJson(responseText)) as Record<
-      string,
-      unknown
-    >;
-    const agentName = parsed.agentName;
+    const jsonText = extractJson(responseText);
+    const parsed = JSON.parse(jsonText);
 
-    if (
-      typeof agentName === 'string' &&
-      agentName in AGENT_SCOPES
-    ) {
+    // 스키마 검증
+    const validated = ClassifyWithLlmSchema.parse(parsed);
+    const agentName = validated.agentName;
+
+    // agentName이 유효한 에이전트인지 확인
+    if (agentName in AGENT_SCOPES) {
       return agentName;
     }
 
     console.warn(
-      `[router] LLM이 유효하지 않은 에이전트 반환: ${responseText}`,
+      `[router] LLM이 유효하지 않은 에이전트 반환: agentName=${agentName}`,
     );
     return null;
   } catch (err) {
-    console.warn('[router] LLM 라우팅 실패:', err);
+    if (err instanceof z.ZodError) {
+      console.warn('[router] LLM 응답이 스키마와 맞지 않음');
+    } else if (err instanceof SyntaxError) {
+      console.warn('[router] LLM 응답이 유효하지 않은 JSON');
+    } else {
+      console.warn('[router] LLM 라우팅 실패');
+    }
     return null;
   }
 };
@@ -324,50 +345,37 @@ export const classifyComplexTask = async (
       return null;
     }
 
-    const parsed = JSON.parse(extractJson(responseText)) as Record<
-      string,
-      unknown
-    >;
+    const jsonText = extractJson(responseText);
+    const parsed = JSON.parse(jsonText);
 
-    // 유효성 검증
-    const execution = parsed.execution as string | undefined;
-    const validExecutions = ['single', 'parallel'];
-    if (!execution || !validExecutions.includes(execution)) {
-      console.warn(
-        `[router] LLM이 유효하지 않은 실행 모드 반환: ${parsed.execution}`,
-      );
-      return null;
-    }
+    // 스키마 검증
+    const validated = ClassifyComplexTaskSchema.parse(parsed);
 
-    const firstStep = parsed.firstStep as
-      | Record<string, unknown>
-      | undefined;
-    const rawAgents = firstStep?.agents;
-    if (!Array.isArray(rawAgents)) {
-      console.warn(
-        `[router] LLM이 유효하지 않은 에이전트 형식 반환: ${responseText}`,
-      );
-      return null;
-    }
-
-    const validAgents = rawAgents.filter(
-      (a): a is string =>
-        typeof a === 'string' && a in AGENT_SCOPES,
+    // 에이전트 필터링 (유효한 이름만 사용)
+    const validAgents = validated.firstStep.agents.filter(
+      (a): a is string => typeof a === 'string' && a in AGENT_SCOPES,
     );
+
     if (validAgents.length === 0) {
       console.warn(
-        `[router] LLM이 유효하지 않은 에이전트 반환: ${responseText}`,
+        `[router] LLM이 유효한 에이전트를 반환하지 않음: ${responseText}`,
       );
       return null;
     }
 
     return {
       agents: validAgents.map(toRoutingAgent),
-      execution: execution as ExecutionMode,
+      execution: validated.execution as ExecutionMode,
       method: 'llm',
     };
   } catch (err) {
-    console.warn('[router] LLM 복합 라우팅 실패:', err);
+    if (err instanceof z.ZodError) {
+      console.warn('[router] LLM 응답이 스키마와 맞지 않음');
+    } else if (err instanceof SyntaxError) {
+      console.warn('[router] LLM 응답이 유효하지 않은 JSON');
+    } else {
+      console.warn('[router] LLM 복합 라우팅 실패');
+    }
     return null;
   }
 };

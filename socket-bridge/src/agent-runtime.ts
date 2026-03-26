@@ -3,6 +3,7 @@ import {
   readdirSync,
   writeFileSync,
   existsSync,
+  renameSync,
 } from 'fs';
 import { join } from 'path';
 import { query } from '@anthropic-ai/claude-agent-sdk';
@@ -45,7 +46,21 @@ const loadSessionStore = (): void => {
         SESSION_STORE_PATH,
         'utf-8',
       );
-      sessionStore = JSON.parse(data) as SessionStore;
+
+      try {
+        sessionStore = JSON.parse(data) as SessionStore;
+      } catch (jsonErr) {
+        // Corrupted JSON 파일 — 백업 후 초기화
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupPath = `${SESSION_STORE_PATH}.backup.${timestamp}`;
+        console.warn(
+          `[session] Corrupted JSON 파일 감지. 백업: ${backupPath}`,
+        );
+        renameSync(SESSION_STORE_PATH, backupPath);
+        sessionStore = {};
+        console.warn('[session] 세션 저장소 초기화됨');
+        return;
+      }
 
       // TTL 만료된 엔트리 정리
       const now = Date.now();

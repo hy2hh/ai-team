@@ -28,36 +28,70 @@ import {
 
 const TEST_MODE = process.env.BRIDGE_TEST_MODE === '1';
 
+/** 환경변수 검증 함수 */
+const validateEnvVars = (): void => {
+  const agentNames = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops'];
+  const missingTokens: string[] = [];
+
+  for (const agent of agentNames) {
+    const botTokenKey = `SLACK_BOT_TOKEN_${agent.toUpperCase()}`;
+    const appTokenKey = `SLACK_APP_TOKEN_${agent.toUpperCase()}`;
+
+    const botToken = process.env[botTokenKey];
+    const appToken = process.env[appTokenKey];
+
+    if (!botToken || botToken.trim() === '') {
+      missingTokens.push(botTokenKey);
+    }
+    if (!appToken || appToken.trim() === '') {
+      missingTokens.push(appTokenKey);
+    }
+  }
+
+  if (missingTokens.length > 0) {
+    console.error('[startup] CRITICAL: 필수 환경변수 누락');
+    console.error(`[startup] 다음 토큰이 설정되지 않았거나 비어있습니다:`);
+    missingTokens.forEach((token) => {
+      console.error(`  - ${token}`);
+    });
+    console.error('[startup] .env 파일을 확인하고 모든 Slack 토큰을 설정해주세요.');
+    process.exit(1);
+  }
+};
+
+// 애플리케이션 시작 전 환경변수 검증
+validateEnvVars();
+
 const AGENTS: AgentConfig[] = [
   {
     name: 'pm',
-    botToken: process.env.SLACK_BOT_TOKEN_PM ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_PM ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_PM!,
+    appToken: process.env.SLACK_APP_TOKEN_PM!,
   },
   {
     name: 'designer',
-    botToken: process.env.SLACK_BOT_TOKEN_DESIGNER ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_DESIGNER ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_DESIGNER!,
+    appToken: process.env.SLACK_APP_TOKEN_DESIGNER!,
   },
   {
     name: 'frontend',
-    botToken: process.env.SLACK_BOT_TOKEN_FRONTEND ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_FRONTEND ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_FRONTEND!,
+    appToken: process.env.SLACK_APP_TOKEN_FRONTEND!,
   },
   {
     name: 'backend',
-    botToken: process.env.SLACK_BOT_TOKEN_BACKEND ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_BACKEND ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_BACKEND!,
+    appToken: process.env.SLACK_APP_TOKEN_BACKEND!,
   },
   {
     name: 'researcher',
-    botToken: process.env.SLACK_BOT_TOKEN_RESEARCHER ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_RESEARCHER ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_RESEARCHER!,
+    appToken: process.env.SLACK_APP_TOKEN_RESEARCHER!,
   },
   {
     name: 'secops',
-    botToken: process.env.SLACK_BOT_TOKEN_SECOPS ?? '',
-    appToken: process.env.SLACK_APP_TOKEN_SECOPS ?? '',
+    botToken: process.env.SLACK_BOT_TOKEN_SECOPS!,
+    appToken: process.env.SLACK_APP_TOKEN_SECOPS!,
   },
 ];
 
@@ -730,17 +764,7 @@ const main = async () => {
   // 페르소나 파일 존재 검증
   validatePersonaFiles();
 
-  // 환경변수 검증
-  const missingAgents = AGENTS.filter(
-    (a) => !a.botToken || !a.appToken,
-  );
-  if (missingAgents.length > 0) {
-    console.error(
-      `[error] 누락된 토큰: ${missingAgents.map((a) => a.name).join(', ')}`,
-    );
-    console.error('[error] .env 파일을 확인하세요');
-    process.exit(1);
-  }
+  // 주의: 환경변수 검증은 애플리케이션 시작 시 validateEnvVars()에서 수행됨
 
   // 6개 Bolt App 인스턴스 생성
   const apps: App[] = [];
@@ -916,7 +940,15 @@ const main = async () => {
     clearInterval(cleanupInterval);
     // 세션 저장소 즉시 flush (debounce 타이머 누락 방지)
     flushSessionStore();
-    await Promise.all(apps.map((app) => app.stop()));
+    // Promise.allSettled()로 부분 실패 시에도 shutdown 계속 진행
+    const results = await Promise.allSettled(apps.map((app) => app.stop()));
+    // 개별 실패 로깅
+    results.forEach((result, idx) => {
+      if (result.status === 'rejected') {
+        const agentName = AGENTS[idx]?.name || `agent[${idx}]`;
+        console.warn(`[shutdown] 에이전트 '${agentName}' 정지 실패:`, result.reason);
+      }
+    });
     console.log('[shutdown] 완료');
     process.exit(0);
   };
