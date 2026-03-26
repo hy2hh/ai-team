@@ -832,7 +832,7 @@ export const handleMessage = async (
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       cwd: PROJECT_DIR,
       systemPrompt: session.systemPrompt,
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-4-6',
       allowedTools: getToolsForAgent(agentName),
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
