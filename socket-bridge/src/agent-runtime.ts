@@ -138,25 +138,54 @@ const getPersistedSessionId = (
 loadSessionStore();
 
 /**
- * 공통 맥락 규칙 prefix — 페르소나보다 앞에 삽입하여 우선순위 확보
- * 강한 페르소나가 맥락 해석 규칙을 압도하는 것을 방지
+ * 에이전트 bot user ID 매핑 (런타임에 index.ts에서 등록)
+ * 위임 시 @mention에 실제 Slack user ID를 사용하기 위함
  */
-const CONTEXT_RULES_PREFIX = [
-  '# 최우선 규칙 (페르소나보다 상위)',
-  '',
-  '## 맥락 해석',
-  '- 스레드 주제가 제공되면, 새 메시지를 반드시 해당 주제의 맥락 안에서 해석하세요.',
-  '- 당신의 전문 분석은 스레드 주제가 당신의 전문 영역일 때만 적용하세요.',
-  '- 주제와 무관한 전문 분석을 강제로 끼워넣지 마세요.',
-  '',
-  '## 응답 규칙',
-  '- 반드시 한국어로 응답하세요.',
-  '- Slack mrkdwn 형식만 사용하세요 (Markdown 금지).',
-  '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답 내용을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
-  '',
-  '---',
-  '',
-].join('\n');
+const agentBotUserIds = new Map<string, string>();
+
+/** 에이전트 bot user ID 등록 (index.ts에서 호출) */
+export const registerAgentBotUserId = (
+  agentName: string,
+  botUserId: string,
+): void => {
+  agentBotUserIds.set(agentName, botUserId);
+};
+
+/**
+ * 공통 맥락 규칙 prefix 생성 — 페르소나보다 앞에 삽입하여 우선순위 확보
+ * 강한 페르소나가 맥락 해석 규칙을 압도하는 것을 방지
+ * @returns 맥락 규칙 prefix 문자열
+ */
+const buildContextRulesPrefix = (): string => {
+  const agentIdList = Array.from(agentBotUserIds.entries())
+    .map(([name, id]) => `  - ${name}: <@${id}>`)
+    .join('\n');
+
+  return [
+    '# 최우선 규칙 (페르소나보다 상위)',
+    '',
+    '## 맥락 해석',
+    '- 스레드 주제가 제공되면, 새 메시지를 반드시 해당 주제의 맥락 안에서 해석하세요.',
+    '- 당신의 전문 분석은 스레드 주제가 당신의 전문 영역일 때만 적용하세요.',
+    '- 주제와 무관한 전문 분석을 강제로 끼워넣지 마세요.',
+    '',
+    '## 응답 규칙',
+    '- 반드시 한국어로 응답하세요.',
+    '- Slack mrkdwn 형식만 사용하세요 (Markdown 금지).',
+    '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답 내용을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
+    '',
+    '## 에이전트 간 위임',
+    '- 작업이 다른 에이전트의 전문 영역에 해당하거나, 사용자가 다른 에이전트에게 넘기라고 요청하면, 응답 마지막에 해당 에이전트를 @mention하세요.',
+    '- 에이전트 목록:',
+    agentIdList,
+    '- 위임 예시: "기획안을 정리했습니다. <@DESIGNER_USER_ID> 이 기획을 바탕으로 UI 디자인을 진행해주세요."',
+    '- @mention하면 bridge가 자동으로 해당 에이전트를 실행하고, 당신의 응답을 컨텍스트로 전달합니다.',
+    '- 자신이 직접 처리할 수 있는 작업은 위임하지 마세요.',
+    '',
+    '---',
+    '',
+  ].join('\n');
+};
 
 /** 에이전트 persona 파일 경로 매핑 */
 const AGENT_PERSONA_FILES: Record<string, string> = {
@@ -391,7 +420,7 @@ const loadPersona = (agentName: string): string => {
   const fullPath = join(PROJECT_DIR, relativePath);
   try {
     const persona = readFileSync(fullPath, 'utf-8');
-    return CONTEXT_RULES_PREFIX + persona;
+    return buildContextRulesPrefix() + persona;
   } catch (err) {
     console.error(`[runtime] persona 파일 로드 실패: ${fullPath}`, err);
     return '';

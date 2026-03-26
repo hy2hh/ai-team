@@ -115,6 +115,21 @@ export const withTimeout = <T>(
   });
 };
 
+/**
+ * LLM 응답에서 JSON을 추출 (```json 래핑 제거)
+ * @param text - LLM 응답 텍스트
+ * @returns 순수 JSON 문자열
+ */
+const extractJson = (text: string): string => {
+  const codeBlockMatch = /```(?:json)?\s*([\s\S]*?)```/.exec(
+    text,
+  );
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim();
+  }
+  return text.trim();
+};
+
 /** 에이전트 이름으로 RoutingAgent 생성 */
 const toRoutingAgent = (name: string): RoutingAgent => ({
   name,
@@ -214,7 +229,7 @@ const classifyWithLlm = async (
       return null;
     }
 
-    const parsed = JSON.parse(responseText) as Record<
+    const parsed = JSON.parse(extractJson(responseText)) as Record<
       string,
       unknown
     >;
@@ -280,7 +295,7 @@ export const classifyComplexTask = async (
       return null;
     }
 
-    const parsed = JSON.parse(responseText) as Record<
+    const parsed = JSON.parse(extractJson(responseText)) as Record<
       string,
       unknown
     >;

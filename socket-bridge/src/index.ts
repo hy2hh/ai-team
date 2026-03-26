@@ -12,7 +12,10 @@ import {
   registerBotUser,
   routeMessage,
 } from './router.js';
-import { handleMessage } from './agent-runtime.js';
+import {
+  handleMessage,
+  registerAgentBotUserId,
+} from './agent-runtime.js';
 import {
   tryClaim,
   updateClaim,
@@ -664,6 +667,7 @@ const main = async () => {
       agent.botUserId = authResult.user_id as string;
       const botId = authResult.bot_id as string;
       registerBotUser(agent.botUserId, agent.name);
+      registerAgentBotUserId(agent.name, agent.botUserId);
       ownBotIds.add(botId);
       const displayName =
         AGENT_DISPLAY_NAMES[agent.name] ?? agent.name;
