@@ -786,7 +786,7 @@ export const handleMessage = async (
   routingMethod: string,
   slackApp: App,
   skipReaction = false,
-): Promise<string> => {
+): Promise<{ text: string; postedTs?: string }> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
 
@@ -916,6 +916,7 @@ export const handleMessage = async (
     }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
+    let postedTs: string | undefined;
     if (resultText) {
       try {
         const postParams: {
@@ -929,7 +930,9 @@ export const handleMessage = async (
         if (event.thread_ts) {
           postParams.thread_ts = event.thread_ts;
         }
-        await slackApp.client.chat.postMessage(postParams);
+        const postResult =
+          await slackApp.client.chat.postMessage(postParams);
+        postedTs = postResult.ts;
         console.log(
           `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
         );
@@ -945,7 +948,7 @@ export const handleMessage = async (
       );
     }
 
-    return resultText;
+    return { text: resultText, postedTs };
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
@@ -979,6 +982,6 @@ export const handleMessage = async (
       console.error('[runtime] 오류 알림 포스팅 실패:', postErr);
     }
 
-    return '';
+    return { text: '' };
   }
 };

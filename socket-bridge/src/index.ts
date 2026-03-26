@@ -358,7 +358,7 @@ const executeSingle = async (
   apps?: App[],
   depth = 0,
 ): Promise<void> => {
-  const resultText = await handleMessage(
+  const result = await handleMessage(
     agentName,
     event,
     method,
@@ -366,11 +366,15 @@ const executeSingle = async (
   );
 
   // C: 응답에서 @mention 감지 → 위임 체인
-  if (!resultText || !apps || depth >= MAX_DELEGATION_DEPTH) {
+  if (
+    !result.text ||
+    !apps ||
+    depth >= MAX_DELEGATION_DEPTH
+  ) {
     return;
   }
 
-  const mentionedAgents = parseMentions(resultText);
+  const mentionedAgents = parseMentions(result.text);
   // 자기 자신 멘션 제외, 원래 발신자(사용자) 멘션 제외
   const delegationTargets = mentionedAgents.filter(
     (name) => name !== agentName,
@@ -384,12 +388,28 @@ const executeSingle = async (
     `[delegation] ${agentName} → [${delegationTargets.join(', ')}] (depth=${depth + 1})`,
   );
 
+  // 위임 시작: 포스팅된 메시지에 🧠 리액션 추가
+  if (result.postedTs) {
+    try {
+      await app.client.reactions.add({
+        channel: event.channel,
+        timestamp: result.postedTs,
+        name: 'brain',
+      });
+      console.log(
+        `[reaction] 🧠 위임 표시: ${result.postedTs}`,
+      );
+    } catch {
+      // 리액션 실패 무시
+    }
+  }
+
   // D: 이전 에이전트 결과를 컨텍스트로 주입한 새 이벤트 생성
   const delegationEvent: SlackEvent = {
     ...event,
     text: [
       `[이전 에이전트 ${agentName}의 작업 결과]`,
-      resultText.slice(0, 2000),
+      result.text.slice(0, 2000),
       '',
       '[원본 요청]',
       event.text,
@@ -419,6 +439,27 @@ const executeSingle = async (
       apps,
     );
   }
+
+  // 위임 완료: 🧠 → ✅ 전환
+  if (result.postedTs) {
+    try {
+      await app.client.reactions.remove({
+        channel: event.channel,
+        timestamp: result.postedTs,
+        name: 'brain',
+      });
+      await app.client.reactions.add({
+        channel: event.channel,
+        timestamp: result.postedTs,
+        name: 'white_check_mark',
+      });
+      console.log(
+        `[reaction] ✅ 위임 완료: ${result.postedTs}`,
+      );
+    } catch {
+      // 리액션 실패 무시
+    }
+  }
 };
 
 /**
@@ -444,7 +485,10 @@ const executeParallel = async (
   // 동시성 제한: MAX_PARALLEL_AGENTS씩 배치 처리
   const allResults: Array<{
     name: string;
-    result: PromiseSettledResult<string>;
+    result: PromiseSettledResult<{
+      text: string;
+      postedTs?: string;
+    }>;
   }> = [];
 
   for (
