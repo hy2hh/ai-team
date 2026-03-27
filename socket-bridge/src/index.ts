@@ -19,10 +19,7 @@ import {
   registerAgentBotUserId,
   validatePersonaFiles,
   flushSessionStore,
-  cancelAgent,
-  pauseAgent,
-  resumeAgent,
-  retryAgent,
+  registerActionHandlers,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -388,46 +385,6 @@ const isValidAgent = (name: string): boolean =>
 /** PM Hub 최대 에이전트 실행 횟수 — 무한 루프 방지 */
 const MAX_DELEGATION_DEPTH = 3;
 
-// ─── 리액션 유틸리티 ─────────────────────────────────────
-
-/** 리액션 추가 (실패 무시) */
-const safeAddReaction = async (
-  app: App,
-  channel: string,
-  ts: string,
-  name: string,
-): Promise<void> => {
-  try {
-    await app.client.reactions.add({
-      channel,
-      timestamp: ts,
-      name,
-    });
-  } catch {
-    // 리액션 실패 무시
-  }
-};
-
-/** 리액션 교체: from → to (실패 무시) */
-const safeSwapReaction = async (
-  app: App,
-  channel: string,
-  ts: string,
-  from: string,
-  to: string,
-): Promise<void> => {
-  try {
-    await app.client.reactions.remove({
-      channel,
-      timestamp: ts,
-      name: from,
-    });
-  } catch {
-    // 제거 실패 무시
-  }
-  await safeAddReaction(app, channel, ts, to);
-};
-
 // ─── 이벤트 빌더 ─────────────────────────────────────────
 
 /** 위임받는 에이전트용 이벤트 생성 */
@@ -542,48 +499,14 @@ const executeSingle = async (
 
   const pmApp = findAgentApp('pm', apps);
 
-  // 위임 에이전트가 PM 메시지에 리액션 (누가 일하는지 표시)
-  // { agentApp, pmMessageTs } 쌍으로 추적 → 완료 시 ✅ 전환
-  const activeReactions: Array<{
-    app: App;
-    ts: string;
-  }> = [];
-
-  /** 위임 에이전트의 🧠 리액션 추가 */
-  const addAgentReaction = async (
-    targetApp: App,
-    pmTs: string,
-  ) => {
-    await safeAddReaction(
-      targetApp,
-      event.channel,
-      pmTs,
-      'brain',
-    );
-    activeReactions.push({ app: targetApp, ts: pmTs });
-  };
-
-  /** 위임 에이전트의 🧠 → ✅ 전환 */
-  const completeAgentReaction = async (
-    targetApp: App,
-    pmTs: string,
-  ) => {
-    await safeSwapReaction(
-      targetApp,
-      event.channel,
-      pmTs,
-      'brain',
-      'white_check_mark',
-    );
-  };
-
   const accumulatedResults: Array<{
     agent: string;
     text: string;
   }> = [];
   let agentExecutionCount = 0;
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
-  let currentPmTs = result.postedTs;
+  // PM 리뷰 메시지 추적 (추후 확장용)
+  let _lastPmTs = result.postedTs;
 
   while (
     targets.length > 0 &&
@@ -598,14 +521,6 @@ const executeSingle = async (
         accumulatedResults,
       );
 
-      // 🧠 위임 에이전트가 PM 메시지에 리액션
-      if (currentPmTs) {
-        await addAgentReaction(targetApp, currentPmTs);
-        console.log(
-          `[reaction] 🧠 ${target} → PM 메시지: ${currentPmTs}`,
-        );
-      }
-
       console.log(
         `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
       );
@@ -618,17 +533,6 @@ const executeSingle = async (
         true,
       );
 
-      // ✅ 완료 전환
-      if (currentPmTs) {
-        await completeAgentReaction(
-          targetApp,
-          currentPmTs,
-        );
-        console.log(
-          `[reaction] ✅ ${target} 완료: ${currentPmTs}`,
-        );
-      }
-
       accumulatedResults.push({
         agent: target,
         text: delegationResult.text || '[응답 없음]',
@@ -640,20 +544,9 @@ const executeSingle = async (
         MAX_DELEGATION_DEPTH - agentExecutionCount;
       const batch = targets.slice(0, remaining);
 
-      // 🧠 각 에이전트가 PM 메시지에 리액션
       const batchApps = batch.map((target) =>
         findAgentApp(target, apps),
       );
-      if (currentPmTs) {
-        await Promise.all(
-          batchApps.map((app, i) => {
-            console.log(
-              `[reaction] 🧠 ${batch[i]} → PM 메시지: ${currentPmTs}`,
-            );
-            return addAgentReaction(app, currentPmTs!);
-          }),
-        );
-      }
 
       console.log(
         `[hub] 병렬 위임: [${batch.join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
@@ -676,7 +569,6 @@ const executeSingle = async (
         }),
       );
 
-      // ✅ 각 에이전트 완료 전환
       for (let i = 0; i < batch.length; i++) {
         const r = parallelResults[i];
         accumulatedResults.push({
@@ -686,15 +578,6 @@ const executeSingle = async (
               ? r.value.text
               : `[실패: ${(r as PromiseRejectedResult).reason}]`,
         });
-        if (currentPmTs) {
-          await completeAgentReaction(
-            batchApps[i],
-            currentPmTs,
-          );
-          console.log(
-            `[reaction] ✅ ${batch[i]} 완료: ${currentPmTs}`,
-          );
-        }
       }
       agentExecutionCount += batch.length;
     }
@@ -736,7 +619,7 @@ const executeSingle = async (
     } else {
       // 다음 라운드의 PM 메시지 업데이트 (에이전트들이 여기에 리액션)
       if (pmReview.postedTs) {
-        currentPmTs = pmReview.postedTs;
+        _lastPmTs = pmReview.postedTs;
       }
       console.log(
         `[hub] PM 추가 위임: [${targets.join(', ')}]`,
@@ -1112,16 +995,7 @@ const flushDebounceBuffer = async (
     `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
   );
 
-  // 🔍 → 🧠 전환: 라우팅 완료, 에이전트 실행 시작
-  try {
-    await apps[0].client.reactions.remove({
-      channel,
-      timestamp: lastMessage.ts,
-      name: 'mag',
-    });
-  } catch {
-    // 리액션 제거 실패 무시
-  }
+  // 라우팅 완료, 에이전트 실행 시작
 
   // 실행
   const executeTask = async () => {
@@ -1203,6 +1077,9 @@ const main = async () => {
       appToken: agent.appToken,
       socketMode: true,
     });
+
+    // Block Kit 버튼 액션 핸들러 등록 (모든 앱에 등록)
+    registerActionHandlers(app);
 
     // Bot User ID 조회 및 라우터에 등록
     try {
@@ -1363,17 +1240,6 @@ const main = async () => {
         return;
       }
 
-      // ⏳ 즉시 리액션 (읽었다는 피드백)
-      try {
-        await apps[0].client.reactions.add({
-          channel,
-          timestamp: ts,
-          name: 'mag',
-        });
-      } catch {
-        // 리액션 실패 무시
-      }
-
       const channelName = await getChannelName(
         apps,
         channel,
@@ -1422,68 +1288,6 @@ const main = async () => {
     });
 
     // ─── 이모지 기반 에이전트 제어 ───────────────────────────
-    // ⛔ black_square_for_stop     → 즉시 중단
-    // ⏸️ double_vertical_bar → 일시정지
-    // ▶️ arrow_forward       → 일시정지 재개
-    // 🔄 repeat              → 재시도
-    app.event('reaction_added', async ({ event }) => {
-      const reaction = (event as unknown as Record<string, unknown>).reaction as string | undefined;
-      const item = (event as unknown as Record<string, unknown>).item as Record<string, unknown> | undefined;
-      const itemTs = item?.ts as string | undefined;
-      const itemChannel = item?.channel as string | undefined;
-
-      if (!reaction || !itemTs || !itemChannel) return;
-
-      console.log(`[control] 리액션 수신: ${reaction} on ${itemTs}`);
-
-      if (reaction === 'black_square_for_stop') {
-        // ⛔ 즉시 중단
-        const cancelled = cancelAgent(itemTs);
-        if (cancelled) {
-          console.log(`[control] ⛔ 중단 완료: ${itemTs}`);
-          try {
-            await apps[0].client.reactions.add({
-              channel: itemChannel,
-              timestamp: itemTs,
-              name: 'white_check_mark',
-            });
-          } catch { /* 리액션 실패 무시 */ }
-        }
-      } else if (reaction === 'double_vertical_bar') {
-        // ⏸️ 일시정지
-        const paused = pauseAgent(itemTs);
-        if (paused) {
-          console.log(`[control] ⏸️ 일시정지 완료: ${itemTs}`);
-          try {
-            await apps[0].client.reactions.add({
-              channel: itemChannel,
-              timestamp: itemTs,
-              name: 'double_vertical_bar',
-            });
-          } catch { /* 리액션 실패 무시 */ }
-        }
-      } else if (reaction === 'arrow_forward') {
-        // ▶️ 일시정지 재개
-        const resumed = await resumeAgent(itemTs);
-        if (resumed) {
-          console.log(`[control] ▶️ 재개 완료: ${itemTs}`);
-          try {
-            await apps[0].client.reactions.remove({
-              channel: itemChannel,
-              timestamp: itemTs,
-              name: 'double_vertical_bar',
-            });
-          } catch { /* 리액션 실패 무시 */ }
-        }
-      } else if (reaction === 'repeat') {
-        // 🔄 재시도
-        const retried = await retryAgent(itemTs);
-        if (retried) {
-          console.log(`[control] 🔄 재시도 시작: ${itemTs}`);
-        }
-      }
-    });
-
     apps.push(app);
   }
 

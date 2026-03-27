@@ -224,6 +224,8 @@ interface ActiveAgentEntry {
   event: SlackEvent;
   routingMethod: string;
   slackApp: App;
+  statusMessageTs?: string;
+  channel: string;
 }
 
 /** 현재 실행 중인 에이전트 (원본 메시지 ts → 엔트리) */
@@ -268,6 +270,7 @@ export const pauseAgent = (messageTs: string): boolean => {
     event: entry.event,
     routingMethod: entry.routingMethod,
     slackApp: entry.slackApp,
+    channel: entry.channel,
   });
   return true;
 };
@@ -333,6 +336,117 @@ export const retryAgent = async (
     return true;
   }
   return false;
+};
+
+// ─── Block Kit 상태 메시지 ──────────────────────────────────
+
+/** 처리 중 상태 메시지 포스팅 (중단 버튼 포함) */
+const postStatusMessage = async (
+  slackApp: App,
+  channel: string,
+  threadTs: string,
+  agentName: string,
+  messageTs: string,
+): Promise<string | undefined> => {
+  try {
+    const result = await slackApp.client.chat.postMessage({
+      channel,
+      thread_ts: threadTs,
+      text: `🧠 *${agentName}* 처리 중...`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `🧠 *${agentName}* 처리 중...`,
+          },
+        },
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: {
+                type: 'plain_text',
+                text: '⏹ 중단',
+              },
+              action_id: 'cancel_agent',
+              value: messageTs,
+              style: 'danger',
+            },
+          ],
+        },
+      ],
+    });
+    return result.ts;
+  } catch (err) {
+    console.error(
+      `[status] 상태 메시지 포스팅 실패:`,
+      err,
+    );
+    return undefined;
+  }
+};
+
+/** 상태 메시지 업데이트 (버튼 제거 + 상태 표시) */
+const updateStatusMessage = async (
+  slackApp: App,
+  channel: string,
+  statusTs: string,
+  text: string,
+): Promise<void> => {
+  try {
+    await slackApp.client.chat.update({
+      channel,
+      ts: statusTs,
+      text,
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text },
+        },
+      ],
+    });
+  } catch (err) {
+    console.error(
+      `[status] 상태 메시지 업데이트 실패:`,
+      err,
+    );
+  }
+};
+
+/**
+ * Slack Bolt 앱에 Block Kit 액션 핸들러 등록
+ * @param app - Slack Bolt App
+ */
+export const registerActionHandlers = (
+  app: App,
+): void => {
+  app.action('cancel_agent', async ({ action, ack }) => {
+    await ack();
+    const value = (
+      action as { value?: string }
+    ).value;
+    if (!value) {
+      return;
+    }
+    const entry = activeAgents.get(value);
+    if (entry) {
+      console.log(
+        `[control] ⏹ ${entry.agentName} 중단 (버튼): ${value}`,
+      );
+      entry.controller.abort();
+      if (entry.statusMessageTs) {
+        await updateStatusMessage(
+          entry.slackApp,
+          entry.channel,
+          entry.statusMessageTs,
+          `⏹ *${entry.agentName}* 중단됨`,
+        );
+      }
+      activeAgents.delete(value);
+    }
+  });
 };
 
 /**
@@ -939,19 +1053,27 @@ export const handleMessage = async (
     event,
     routingMethod,
     slackApp,
+    channel: event.channel,
   });
 
-  // ⏳ 리액션으로 처리 중 표시 (병렬 실행 시 첫 에이전트만 관리)
+  // 상태 메시지 포스팅 (중단 버튼 포함)
   if (!skipReaction) {
-    try {
-      await slackApp.client.reactions.add({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'brain',
-      });
-      console.log(`[reaction] 🧠 추가 완료: ${event.ts}`);
-    } catch (err) {
-      console.error(`[reaction] ⏳ 추가 실패:`, err);
+    const threadTs = event.thread_ts ?? event.ts;
+    const statusTs = await postStatusMessage(
+      slackApp,
+      event.channel,
+      threadTs,
+      agentName,
+      event.ts,
+    );
+    if (statusTs) {
+      const entry = activeAgents.get(event.ts);
+      if (entry) {
+        entry.statusMessageTs = statusTs;
+      }
+      console.log(
+        `[status] 🧠 ${agentName} 상태 메시지: ${statusTs}`,
+      );
     }
   }
 
@@ -1043,39 +1165,22 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // ⏳ → ✅ 완료 리액션 전환 (리액션 담당 에이전트만)
+    // 상태 메시지 → 완료 표시
     if (!skipReaction) {
-      try {
-        await slackApp.client.reactions.remove({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'brain',
-        });
+      const entry = activeAgents.get(event.ts);
+      if (entry?.statusMessageTs) {
+        await updateStatusMessage(
+          slackApp,
+          event.channel,
+          entry.statusMessageTs,
+          `✅ *${agentName}* 완료 (${elapsed}s)`,
+        );
         console.log(
-          `[reaction] 🧠 제거 완료: ${event.ts}`,
-        );
-      } catch (err) {
-        console.error(
-          `[reaction] 🧠 제거 실패: ${event.ts}`,
-          err,
-        );
-      }
-      try {
-        await slackApp.client.reactions.add({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'white_check_mark',
-        });
-        console.log(
-          `[reaction] ✅ 추가 완료: ${event.ts}`,
-        );
-      } catch (err) {
-        console.error(
-          `[reaction] ✅ 추가 실패: ${event.ts}`,
-          err,
+          `[status] ✅ ${agentName} 완료: ${entry.statusMessageTs}`,
         );
       }
     }
+    activeAgents.delete(event.ts);
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     let postedTs: string | undefined;
@@ -1111,7 +1216,7 @@ export const handleMessage = async (
 
     return { text: resultText, postedTs };
   } catch (err) {
-    // AbortError: 이모지로 의도적 중단 — 오류 처리/알림 건너뜀
+    // AbortError: 버튼으로 의도적 중단 — 상태 메시지는 액션 핸들러에서 업데이트됨
     const isAbort =
       err instanceof Error &&
       (err.name === 'AbortError' ||
@@ -1121,38 +1226,22 @@ export const handleMessage = async (
       console.log(
         `[control] ${agentName} 중단됨 (${elapsed}s): ${event.ts}`,
       );
-      if (!skipReaction) {
-        try {
-          await slackApp.client.reactions.remove({
-            channel: event.channel,
-            timestamp: event.ts,
-            name: 'brain',
-          });
-        } catch {
-          // 리액션 실패는 무시
-        }
-      }
       return { text: '' };
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
 
-    // ⏳ → ❌ 에러 리액션 전환 (리액션 담당 에이전트만)
+    // 상태 메시지 → 에러 표시
     if (!skipReaction) {
-      try {
-        await slackApp.client.reactions.remove({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'brain',
-        });
-        await slackApp.client.reactions.add({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'x',
-        });
-      } catch {
-        // 리액션 실패는 무시
+      const entry = activeAgents.get(event.ts);
+      if (entry?.statusMessageTs) {
+        await updateStatusMessage(
+          slackApp,
+          event.channel,
+          entry.statusMessageTs,
+          `❌ *${agentName}* 오류 발생 (${elapsed}s)`,
+        );
       }
     }
 
@@ -1169,7 +1258,6 @@ export const handleMessage = async (
 
     return { text: '' };
   } finally {
-    // 완료/오류/중단 모두 activeAgents에서 제거
     activeAgents.delete(event.ts);
   }
 };
