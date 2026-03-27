@@ -974,6 +974,7 @@ export const handleMessage = async (
   routingMethod: string,
   slackApp: App,
   skipReaction = false,
+  skipPosting = false,
 ): Promise<HandleMessageResult> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
@@ -1235,7 +1236,7 @@ export const handleMessage = async (
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     let postedTs: string | undefined;
-    if (resultText) {
+    if (resultText && !skipPosting) {
       try {
         const postResult =
           await slackApp.client.chat.postMessage({
@@ -1253,9 +1254,13 @@ export const handleMessage = async (
           postErr,
         );
       }
-    } else {
+    } else if (!resultText) {
       console.warn(
         `[runtime] ${agentName} 빈 결과 — Slack 포스팅 건너뜀`,
+      );
+    } else {
+      console.log(
+        `[runtime] ${agentName} skipPosting=true — Slack 포스팅 억제`,
       );
     }
 

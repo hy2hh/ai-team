@@ -506,11 +506,20 @@ const buildPmReviewEvent = (
     agent: string;
     text: string;
   }>,
+  executedAgents?: Set<string>,
 ): SlackEvent => {
   const parts = ['[에이전트 실행 결과 보고]'];
 
   for (const r of accumulatedResults) {
     parts.push(`— ${r.agent}: ${safeSlice(r.text, 1500)}`);
+  }
+
+  if (executedAgents && executedAgents.size > 0) {
+    parts.push(
+      '',
+      `[이미 실행된 에이전트: ${Array.from(executedAgents).join(', ')}]`,
+      '위 에이전트는 이미 실행 완료됨 — 동일 에이전트 재위임 금지',
+    );
   }
 
   parts.push('', '[원본 요청]', originalEvent.text);
@@ -609,6 +618,8 @@ const executeSingle = async (
   let currentPmTs = result.postedTs;
   // 순환 핸드오프 감지: 전체 허브 루프에서 실행된 에이전트 추적
   const allExecutedAgents = new Set<string>();
+  // 마지막 PM 리뷰 결과 (루프 자연 종료 시 Slack 포스팅용)
+  let lastPmReview: { text: string; postedTs?: string } | null = null;
 
   while (
     targets.length > 0 &&
@@ -773,10 +784,11 @@ const executeSingle = async (
       break;
     }
 
-    // (c) PM에게 결과 전달 → 리뷰
+    // (c) PM에게 결과 전달 → 리뷰 (skipPosting=true: 중간 위임 메시지 Slack 노출 억제)
     const reviewEvent = buildPmReviewEvent(
       event,
       accumulatedResults,
+      allExecutedAgents,
     );
 
     console.log('[hub] PM 리뷰 요청');
@@ -786,7 +798,8 @@ const executeSingle = async (
       reviewEvent,
       'hub-review',
       pmApp,
-      true,
+      true,  // skipReaction
+      true,  // skipPosting — 중간 허브 리뷰는 Slack에 노출 안 함
     );
 
     // (d) PM 리뷰 응답에서 delegate 도구로 지정된 새 타겟
@@ -795,26 +808,40 @@ const executeSingle = async (
     );
 
     if (targets.length === 0) {
+      // PM이 완료 판단 — 최종 요약을 Slack에 포스팅
+      if (pmReview.text) {
+        try {
+          const postResult = await pmApp.client.chat.postMessage({
+            channel: event.channel,
+            text: pmReview.text,
+            thread_ts: event.thread_ts ?? event.ts,
+          });
+          lastPmReview = { text: pmReview.text, postedTs: postResult.ts as string | undefined };
+          console.log('[hub] PM 최종 요약 포스팅 완료');
+        } catch (err) {
+          console.error('[hub] PM 최종 요약 포스팅 실패:', err);
+        }
+      }
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
     } else {
-      // 다음 라운드의 PM 메시지 업데이트 (에이전트들이 여기에 리액션)
-      if (pmReview.postedTs) {
-        currentPmTs = pmReview.postedTs;
-      }
+      // 계속 위임 — 중간 리뷰는 skipPosting이므로 currentPmTs 업데이트 없음
       console.log(
         `[hub] PM 추가 위임: [${targets.join(', ')}]`,
       );
     }
   }
 
-  // depth 한도 도달 시 PM 최종 요약 (리뷰는 depth에 미포함)
+  // depth 한도 도달 시 PM 최종 요약 (루프 내 hub-review가 실행되지 않은 경우만)
+  // lastPmReview가 없는 경우 = 루프가 depth break로 종료되어 PM 최종 리뷰 없음
   if (
     agentExecutionCount >= MAX_DELEGATION_DEPTH &&
-    accumulatedResults.length > 0
+    accumulatedResults.length > 0 &&
+    !lastPmReview
   ) {
     const finalReviewEvent = buildPmReviewEvent(
       event,
       accumulatedResults,
+      allExecutedAgents,
     );
     console.log(
       '[hub] PM 최종 요약 요청 (depth 한도 도달)',
@@ -825,6 +852,7 @@ const executeSingle = async (
       'hub-review',
       pmApp,
       true,
+      // skipPosting=false: depth 한도 도달 후 최종 요약은 Slack에 노출
     );
   }
 
