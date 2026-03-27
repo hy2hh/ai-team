@@ -212,6 +212,129 @@ export const registerAgentBotUserId = (
   agentBotUserIds.set(agentName, botUserId);
 };
 
+// ─── 이모지 기반 에이전트 제어 ───────────────────────────────
+// 지원 이모지:
+//   ⛔ black_square_for_stop     → 즉시 중단
+//   ⏸️ double_vertical_bar → 일시정지 (arrow_forward로 재개)
+//   🔄 repeat              → 재시도
+
+interface ActiveAgentEntry {
+  controller: AbortController;
+  agentName: string;
+  event: SlackEvent;
+  routingMethod: string;
+  slackApp: App;
+}
+
+/** 현재 실행 중인 에이전트 (원본 메시지 ts → 엔트리) */
+const activeAgents = new Map<string, ActiveAgentEntry>();
+
+/** 일시정지된 에이전트 (원본 메시지 ts → 재실행 정보) */
+const pausedAgents = new Map<
+  string,
+  Omit<ActiveAgentEntry, 'controller'>
+>();
+
+/**
+ * 에이전트 즉시 중단 (black_square_for_stop)
+ * @returns 중단 성공 여부 (해당 ts에 실행 중 에이전트 없으면 false)
+ */
+export const cancelAgent = (messageTs: string): boolean => {
+  const entry = activeAgents.get(messageTs);
+  if (!entry) return false;
+  console.log(
+    `[control] ⛔ ${entry.agentName} 즉시 중단: ${messageTs}`,
+  );
+  entry.controller.abort();
+  activeAgents.delete(messageTs);
+  return true;
+};
+
+/**
+ * 에이전트 일시정지 (double_vertical_bar)
+ * 실행을 중단하고 재개 정보를 보존 → arrow_forward로 재개 가능
+ * @returns 일시정지 성공 여부
+ */
+export const pauseAgent = (messageTs: string): boolean => {
+  const entry = activeAgents.get(messageTs);
+  if (!entry) return false;
+  console.log(
+    `[control] ⏸️ ${entry.agentName} 일시정지: ${messageTs}`,
+  );
+  entry.controller.abort();
+  activeAgents.delete(messageTs);
+  pausedAgents.set(messageTs, {
+    agentName: entry.agentName,
+    event: entry.event,
+    routingMethod: entry.routingMethod,
+    slackApp: entry.slackApp,
+  });
+  return true;
+};
+
+/**
+ * 일시정지된 에이전트 재개 (arrow_forward)
+ * @returns 재개 성공 여부
+ */
+export const resumeAgent = async (
+  messageTs: string,
+): Promise<boolean> => {
+  const entry = pausedAgents.get(messageTs);
+  if (!entry) return false;
+  console.log(
+    `[control] ▶️ ${entry.agentName} 재개: ${messageTs}`,
+  );
+  pausedAgents.delete(messageTs);
+  await handleMessage(
+    entry.agentName,
+    entry.event,
+    entry.routingMethod,
+    entry.slackApp,
+  );
+  return true;
+};
+
+/**
+ * 에이전트 재시도 (repeat)
+ * - 실행 중이면 중단 후 동일 이벤트 재실행
+ * - 일시정지 상태면 즉시 재실행
+ * @returns 재시도 성공 여부
+ */
+export const retryAgent = async (
+  messageTs: string,
+): Promise<boolean> => {
+  // 실행 중인 경우: 중단 후 재실행
+  const active = activeAgents.get(messageTs);
+  if (active) {
+    console.log(
+      `[control] 🔄 ${active.agentName} 재시도 (실행 중): ${messageTs}`,
+    );
+    active.controller.abort();
+    activeAgents.delete(messageTs);
+    const { agentName, event, routingMethod, slackApp } = active;
+    // abort 전파를 위한 짧은 대기
+    await new Promise<void>((resolve) => setTimeout(resolve, 300));
+    await handleMessage(agentName, event, routingMethod, slackApp);
+    return true;
+  }
+  // 일시정지 상태인 경우: 바로 재실행
+  const paused = pausedAgents.get(messageTs);
+  if (paused) {
+    console.log(
+      `[control] 🔄 ${paused.agentName} 재시도 (일시정지): ${messageTs}`,
+    );
+    pausedAgents.delete(messageTs);
+    await handleMessage(
+      paused.agentName,
+      paused.event,
+      paused.routingMethod,
+      paused.slackApp,
+    );
+    return true;
+  }
+  return false;
+};
+
 /**
  * 공통 맥락 규칙 prefix 생성 — 페르소나보다 앞에 삽입하여 우선순위 확보
  * 강한 페르소나가 맥락 해석 규칙을 압도하는 것을 방지
@@ -808,6 +931,16 @@ export const handleMessage = async (
 
   const startTime = Date.now();
 
+  // 이모지 제어용 AbortController 등록
+  const abortController = new AbortController();
+  activeAgents.set(event.ts, {
+    controller: abortController,
+    agentName,
+    event,
+    routingMethod,
+    slackApp,
+  });
+
   // ⏳ 리액션으로 처리 중 표시 (병렬 실행 시 첫 에이전트만 관리)
   if (!skipReaction) {
     try {
@@ -854,6 +987,7 @@ export const handleMessage = async (
         agentName,
         botToken,
       ),
+      abortController,
     };
 
     if (existingSessionId) {
@@ -917,13 +1051,29 @@ export const handleMessage = async (
           timestamp: event.ts,
           name: 'brain',
         });
+        console.log(
+          `[reaction] 🧠 제거 완료: ${event.ts}`,
+        );
+      } catch (err) {
+        console.error(
+          `[reaction] 🧠 제거 실패: ${event.ts}`,
+          err,
+        );
+      }
+      try {
         await slackApp.client.reactions.add({
           channel: event.channel,
           timestamp: event.ts,
           name: 'white_check_mark',
         });
-      } catch {
-        // 리액션 실패는 무시
+        console.log(
+          `[reaction] ✅ 추가 완료: ${event.ts}`,
+        );
+      } catch (err) {
+        console.error(
+          `[reaction] ✅ 추가 실패: ${event.ts}`,
+          err,
+        );
       }
     }
 
@@ -961,6 +1111,30 @@ export const handleMessage = async (
 
     return { text: resultText, postedTs };
   } catch (err) {
+    // AbortError: 이모지로 의도적 중단 — 오류 처리/알림 건너뜀
+    const isAbort =
+      err instanceof Error &&
+      (err.name === 'AbortError' ||
+        err.message?.toLowerCase().includes('abort'));
+    if (isAbort) {
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+      console.log(
+        `[control] ${agentName} 중단됨 (${elapsed}s): ${event.ts}`,
+      );
+      if (!skipReaction) {
+        try {
+          await slackApp.client.reactions.remove({
+            channel: event.channel,
+            timestamp: event.ts,
+            name: 'brain',
+          });
+        } catch {
+          // 리액션 실패는 무시
+        }
+      }
+      return { text: '' };
+    }
+
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
 
@@ -994,5 +1168,8 @@ export const handleMessage = async (
     }
 
     return { text: '' };
+  } finally {
+    // 완료/오류/중단 모두 activeAgents에서 제거
+    activeAgents.delete(event.ts);
   }
 };

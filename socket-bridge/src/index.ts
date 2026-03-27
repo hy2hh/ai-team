@@ -19,6 +19,10 @@ import {
   registerAgentBotUserId,
   validatePersonaFiles,
   flushSessionStore,
+  cancelAgent,
+  pauseAgent,
+  resumeAgent,
+  retryAgent,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -1414,6 +1418,69 @@ const main = async () => {
         console.log(
           `[debounce] 새 버퍼: "${text.slice(0, 30)}..." (${DEBOUNCE_DELAY}ms 대기)`,
         );
+      }
+    });
+
+    // ─── 이모지 기반 에이전트 제어 ───────────────────────────
+    // ⛔ black_square_for_stop     → 즉시 중단
+    // ⏸️ double_vertical_bar → 일시정지
+    // ▶️ arrow_forward       → 일시정지 재개
+    // 🔄 repeat              → 재시도
+    app.event('reaction_added', async ({ event }) => {
+      const reaction = (event as unknown as Record<string, unknown>).reaction as string | undefined;
+      const item = (event as unknown as Record<string, unknown>).item as Record<string, unknown> | undefined;
+      const itemTs = item?.ts as string | undefined;
+      const itemChannel = item?.channel as string | undefined;
+
+      if (!reaction || !itemTs || !itemChannel) return;
+
+      console.log(`[control] 리액션 수신: ${reaction} on ${itemTs}`);
+
+      if (reaction === 'black_square_for_stop') {
+        // ⛔ 즉시 중단
+        const cancelled = cancelAgent(itemTs);
+        if (cancelled) {
+          console.log(`[control] ⛔ 중단 완료: ${itemTs}`);
+          try {
+            await apps[0].client.reactions.add({
+              channel: itemChannel,
+              timestamp: itemTs,
+              name: 'white_check_mark',
+            });
+          } catch { /* 리액션 실패 무시 */ }
+        }
+      } else if (reaction === 'double_vertical_bar') {
+        // ⏸️ 일시정지
+        const paused = pauseAgent(itemTs);
+        if (paused) {
+          console.log(`[control] ⏸️ 일시정지 완료: ${itemTs}`);
+          try {
+            await apps[0].client.reactions.add({
+              channel: itemChannel,
+              timestamp: itemTs,
+              name: 'double_vertical_bar',
+            });
+          } catch { /* 리액션 실패 무시 */ }
+        }
+      } else if (reaction === 'arrow_forward') {
+        // ▶️ 일시정지 재개
+        const resumed = await resumeAgent(itemTs);
+        if (resumed) {
+          console.log(`[control] ▶️ 재개 완료: ${itemTs}`);
+          try {
+            await apps[0].client.reactions.remove({
+              channel: itemChannel,
+              timestamp: itemTs,
+              name: 'double_vertical_bar',
+            });
+          } catch { /* 리액션 실패 무시 */ }
+        }
+      } else if (reaction === 'repeat') {
+        // 🔄 재시도
+        const retried = await retryAgent(itemTs);
+        if (retried) {
+          console.log(`[control] 🔄 재시도 시작: ${itemTs}`);
+        }
       }
     });
 
