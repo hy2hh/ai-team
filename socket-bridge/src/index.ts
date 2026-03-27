@@ -9,7 +9,6 @@ import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
 import {
-  parseExplicitMentions,
   registerBotUser,
   routeMessage,
 } from './router.js';
@@ -519,11 +518,8 @@ const executeSingle = async (
     return;
   }
 
-  // PM 응답에서 멘션 파싱 (자기 멘션 + 미등록 에이전트 제외)
-  // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
-  // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
-  // "Bart가 완료했습니다" 같은 응답에서 Hub 루프가 잘못 발동한다.
-  let targets = parseExplicitMentions(result.text).filter(
+  // PM delegate 도구로 지정된 위임 대상 사용 (텍스트 파싱 제거)
+  let targets = result.delegationTargets.filter(
     (name) => name !== 'pm' && isValidAgent(name),
   );
 
@@ -701,11 +697,8 @@ const executeSingle = async (
       true,
     );
 
-    // (d) PM 리뷰 응답에서 새 타겟 파싱
-    // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
-    // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
-    // "Homer가 완료했습니다" 같은 요약 문장에서 루프가 재발한다.
-    targets = parseExplicitMentions(pmReview.text).filter(
+    // (d) PM 리뷰 응답에서 delegate 도구로 지정된 새 타겟
+    targets = pmReview.delegationTargets.filter(
       (name) => name !== 'pm' && isValidAgent(name),
     );
 

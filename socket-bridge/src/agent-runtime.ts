@@ -6,8 +6,13 @@ import {
   renameSync,
 } from 'fs';
 import { join } from 'path';
-import { query } from '@anthropic-ai/claude-agent-sdk';
+import {
+  query,
+  createSdkMcpServer,
+  tool,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { z } from 'zod';
 import type { App } from '@slack/bolt';
 import type { AgentSession, SlackEvent } from './types.js';
 
@@ -300,11 +305,13 @@ const buildContextRulesPrefix = (): string => {
     '- 사용자에게 권한을 요청하지 말고 직접 수정하세요.',
     '',
     '## 에이전트 간 위임',
-    '- 작업이 다른 에이전트의 전문 영역에 해당하거나, 사용자가 다른 에이전트에게 넘기라고 요청하면, 응답 마지막에 해당 에이전트를 @mention하세요.',
+    '- 다른 에이전트에게 작업을 맡기려면 반드시 `mcp__delegation__delegate` 도구를 사용하세요.',
+    '- delegate 도구에 에이전트 이름(pm/designer/frontend/backend/researcher/secops)과 이유를 전달하면 bridge가 해당 에이전트를 실행합니다.',
+    '- 지금 즉시 실행해야 할 에이전트만 delegate하세요. 향후 계획은 delegate하지 마세요.',
+    '- 순차 실행이 필요하면 먼저 할 에이전트만 delegate하세요. 나중 에이전트는 리뷰 시 delegate합니다.',
+    '- 텍스트에서 에이전트를 언급할 때는 이름(Krusty, Bart 등)만 사용하세요. <@USER_ID> 멘션은 위임 트리거가 아닙니다.',
     '- 에이전트 목록:',
     agentIdList,
-    '- 위임 예시: "기획안을 정리했습니다. <@DESIGNER_USER_ID> 이 기획을 바탕으로 UI 디자인을 진행해주세요."',
-    '- @mention하면 bridge가 자동으로 해당 에이전트를 실행하고, 당신의 응답을 컨텍스트로 전달합니다.',
     '- 자신이 직접 처리할 수 있는 작업은 위임하지 마세요.',
     '',
     '---',
@@ -745,11 +752,15 @@ const formatSlackEventAsPrompt = (
 };
 
 /** MCP 서버 설정 타입 */
-interface McpServerConfig {
+/** Stdio MCP 서버 설정 (Slack, Atlassian, Context7) */
+interface McpStdioConfig {
   command: string;
   args: string[];
   env: Record<string, string>;
 }
+
+/** MCP 서버 설정 — stdio 또는 인라인 SDK 서버 */
+type McpServerConfig = McpStdioConfig | ReturnType<typeof createSdkMcpServer>;
 
 // ─── MCP 서버 바이너리 경로 (npx -y 오버헤드 제거) ─────
 // 로컬 node_modules/.bin/ 직접 참조 → npm resolution 200-500ms 절감
@@ -841,13 +852,21 @@ const getOrCreateSession = (agentName: string): AgentSession => {
  * @param skipReaction - 리액션 관리 건너뛰기 (병렬 실행 시 첫 에이전트만 관리)
  * @returns 에이전트 응답 텍스트 (C+D 위임 체인에서 활용)
  */
+/** handleMessage 반환 타입 */
+export interface HandleMessageResult {
+  text: string;
+  postedTs?: string;
+  /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 */
+  delegationTargets: string[];
+}
+
 export const handleMessage = async (
   agentName: string,
   event: SlackEvent,
   routingMethod: string,
   slackApp: App,
   skipReaction = false,
-): Promise<{ text: string; postedTs?: string }> => {
+): Promise<HandleMessageResult> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
 
@@ -873,7 +892,7 @@ export const handleMessage = async (
         // 리액션 실패는 무시
       }
     }
-    return { text: '' };
+    return { text: '', delegationTargets: [] };
   }
 
   const startTime = Date.now();
@@ -922,19 +941,56 @@ export const handleMessage = async (
       : session.threadSessions.get(threadKey) ??
         getPersistedSessionId(agentName, threadKey);
 
+    // PM 전용: delegate 도구로 위임 의도를 수집하는 인라인 MCP 서버
+    const delegationQueue: string[] = [];
+    const baseMcpServers = getMcpServersForAgent(
+      agentName,
+      botToken,
+    );
+    const baseTools = getToolsForAgent(agentName);
+
+    if (agentName === 'pm') {
+      const delegationServer = createSdkMcpServer({
+        name: 'delegation',
+        tools: [
+          tool(
+            'delegate',
+            '다른 에이전트에게 작업을 즉시 위임합니다. 지금 바로 실행해야 할 에이전트만 지정하세요. 향후 계획은 이 도구를 호출하지 마세요.',
+            { agents: z.array(z.string()), reason: z.string() },
+            async ({ agents, reason }) => {
+              const valid = agents.filter((a: string) =>
+                ['designer', 'frontend', 'backend', 'researcher', 'secops'].includes(a),
+              );
+              delegationQueue.push(...valid);
+              console.log(
+                `[delegation] PM delegate 호출: [${valid.join(', ')}] — ${reason}`,
+              );
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `위임 예약됨: [${valid.join(', ')}] — ${reason}`,
+                  },
+                ],
+              };
+            },
+          ),
+        ],
+      });
+      baseMcpServers.delegation = delegationServer;
+      baseTools.push('mcp__delegation__delegate');
+    }
+
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       cwd: PROJECT_DIR,
       systemPrompt: session.systemPrompt,
       model: 'claude-sonnet-4-6',
-      allowedTools: getToolsForAgent(agentName),
+      allowedTools: baseTools,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       maxTurns: 30,
       persistSession: true,
-      mcpServers: getMcpServersForAgent(
-        agentName,
-        botToken,
-      ),
+      mcpServers: baseMcpServers,
       abortController,
     };
 
@@ -1045,7 +1101,11 @@ export const handleMessage = async (
       );
     }
 
-    return { text: resultText, postedTs };
+    return {
+      text: resultText,
+      postedTs,
+      delegationTargets: [...delegationQueue],
+    };
   } catch (err) {
     // AbortError: 이모지로 의도적 중단
     const isAbort =
@@ -1074,7 +1134,7 @@ export const handleMessage = async (
           // 리액션 실패는 무시
         }
       }
-      return { text: '' };
+      return { text: '', delegationTargets: [] };
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -1109,7 +1169,7 @@ export const handleMessage = async (
       console.error('[runtime] 오류 알림 포스팅 실패:', postErr);
     }
 
-    return { text: '' };
+    return { text: '', delegationTargets: [] };
   } finally {
     activeAgents.delete(event.ts);
   }
