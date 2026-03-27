@@ -9,7 +9,6 @@ import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 config({ path: join(import.meta.dirname, '..', '..', '.env') });
 import type { AgentConfig, SlackEvent } from './types.js';
 import {
-  parseMentions,
   parseExplicitMentions,
   registerBotUser,
   routeMessage,
@@ -19,7 +18,7 @@ import {
   registerAgentBotUserId,
   validatePersonaFiles,
   flushSessionStore,
-  registerActionHandlers,
+  cancelAgent,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -995,7 +994,16 @@ const flushDebounceBuffer = async (
     `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
   );
 
-  // 라우팅 완료, 에이전트 실행 시작
+  // 🔍 → 라우팅 완료, 에이전트 실행 시작 (🔍 제거)
+  try {
+    await apps[0].client.reactions.remove({
+      channel,
+      timestamp: lastMessage.ts,
+      name: 'mag',
+    });
+  } catch {
+    // 리액션 제거 실패 무시
+  }
 
   // 실행
   const executeTask = async () => {
@@ -1077,9 +1085,6 @@ const main = async () => {
       appToken: agent.appToken,
       socketMode: true,
     });
-
-    // Block Kit 버튼 액션 핸들러 등록 (모든 앱에 등록)
-    registerActionHandlers(app);
 
     // Bot User ID 조회 및 라우터에 등록
     try {
@@ -1240,6 +1245,17 @@ const main = async () => {
         return;
       }
 
+      // 🔍 즉시 리액션 (읽었다는 피드백)
+      try {
+        await apps[0].client.reactions.add({
+          channel,
+          timestamp: ts,
+          name: 'mag',
+        });
+      } catch {
+        // 리액션 실패 무시
+      }
+
       const channelName = await getChannelName(
         apps,
         channel,
@@ -1287,7 +1303,35 @@ const main = async () => {
       }
     });
 
-    // ─── 이모지 기반 에이전트 제어 ───────────────────────────
+    // ─── 이모지 기반 에이전트 제어 (⛔ 중단) ──────────────────
+    app.event(
+      'reaction_added',
+      async ({ event: reactionEvent }) => {
+        const re = reactionEvent as unknown as {
+          reaction: string;
+          item: { ts: string; channel: string };
+          user: string;
+        };
+        // black_square_for_stop 이모지만 처리
+        if (re.reaction !== 'black_square_for_stop') {
+          return;
+        }
+        // 봇 자신의 리액션은 무시
+        const userId = re.user;
+        if (
+          Array.from(botUserIdToName.keys()).includes(userId)
+        ) {
+          return;
+        }
+        const cancelled = cancelAgent(re.item.ts);
+        if (cancelled) {
+          console.log(
+            `[control] ⛔ 사용자 리액션으로 에이전트 중단: ${re.item.ts}`,
+          );
+        }
+      },
+    );
+
     apps.push(app);
   }
 

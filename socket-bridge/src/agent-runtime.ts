@@ -214,239 +214,33 @@ export const registerAgentBotUserId = (
 
 // ─── 이모지 기반 에이전트 제어 ───────────────────────────────
 // 지원 이모지:
-//   ⛔ black_square_for_stop     → 즉시 중단
-//   ⏸️ double_vertical_bar → 일시정지 (arrow_forward로 재개)
-//   🔄 repeat              → 재시도
+//   ⛔ black_square_for_stop → 즉시 중단
 
 interface ActiveAgentEntry {
   controller: AbortController;
   agentName: string;
-  event: SlackEvent;
-  routingMethod: string;
-  slackApp: App;
-  statusMessageTs?: string;
   channel: string;
+  slackApp: App;
 }
 
 /** 현재 실행 중인 에이전트 (원본 메시지 ts → 엔트리) */
 const activeAgents = new Map<string, ActiveAgentEntry>();
 
-/** 일시정지된 에이전트 (원본 메시지 ts → 재실행 정보) */
-const pausedAgents = new Map<
-  string,
-  Omit<ActiveAgentEntry, 'controller'>
->();
-
 /**
- * 에이전트 즉시 중단 (black_square_for_stop)
+ * 에이전트 즉시 중단 (black_square_for_stop 리액션)
  * @returns 중단 성공 여부 (해당 ts에 실행 중 에이전트 없으면 false)
  */
 export const cancelAgent = (messageTs: string): boolean => {
   const entry = activeAgents.get(messageTs);
-  if (!entry) return false;
+  if (!entry) {
+    return false;
+  }
   console.log(
     `[control] ⛔ ${entry.agentName} 즉시 중단: ${messageTs}`,
   );
   entry.controller.abort();
   activeAgents.delete(messageTs);
   return true;
-};
-
-/**
- * 에이전트 일시정지 (double_vertical_bar)
- * 실행을 중단하고 재개 정보를 보존 → arrow_forward로 재개 가능
- * @returns 일시정지 성공 여부
- */
-export const pauseAgent = (messageTs: string): boolean => {
-  const entry = activeAgents.get(messageTs);
-  if (!entry) return false;
-  console.log(
-    `[control] ⏸️ ${entry.agentName} 일시정지: ${messageTs}`,
-  );
-  entry.controller.abort();
-  activeAgents.delete(messageTs);
-  pausedAgents.set(messageTs, {
-    agentName: entry.agentName,
-    event: entry.event,
-    routingMethod: entry.routingMethod,
-    slackApp: entry.slackApp,
-    channel: entry.channel,
-  });
-  return true;
-};
-
-/**
- * 일시정지된 에이전트 재개 (arrow_forward)
- * @returns 재개 성공 여부
- */
-export const resumeAgent = async (
-  messageTs: string,
-): Promise<boolean> => {
-  const entry = pausedAgents.get(messageTs);
-  if (!entry) return false;
-  console.log(
-    `[control] ▶️ ${entry.agentName} 재개: ${messageTs}`,
-  );
-  pausedAgents.delete(messageTs);
-  await handleMessage(
-    entry.agentName,
-    entry.event,
-    entry.routingMethod,
-    entry.slackApp,
-  );
-  return true;
-};
-
-/**
- * 에이전트 재시도 (repeat)
- * - 실행 중이면 중단 후 동일 이벤트 재실행
- * - 일시정지 상태면 즉시 재실행
- * @returns 재시도 성공 여부
- */
-export const retryAgent = async (
-  messageTs: string,
-): Promise<boolean> => {
-  // 실행 중인 경우: 중단 후 재실행
-  const active = activeAgents.get(messageTs);
-  if (active) {
-    console.log(
-      `[control] 🔄 ${active.agentName} 재시도 (실행 중): ${messageTs}`,
-    );
-    active.controller.abort();
-    activeAgents.delete(messageTs);
-    const { agentName, event, routingMethod, slackApp } = active;
-    // abort 전파를 위한 짧은 대기
-    await new Promise<void>((resolve) => setTimeout(resolve, 300));
-    await handleMessage(agentName, event, routingMethod, slackApp);
-    return true;
-  }
-  // 일시정지 상태인 경우: 바로 재실행
-  const paused = pausedAgents.get(messageTs);
-  if (paused) {
-    console.log(
-      `[control] 🔄 ${paused.agentName} 재시도 (일시정지): ${messageTs}`,
-    );
-    pausedAgents.delete(messageTs);
-    await handleMessage(
-      paused.agentName,
-      paused.event,
-      paused.routingMethod,
-      paused.slackApp,
-    );
-    return true;
-  }
-  return false;
-};
-
-// ─── Block Kit 상태 메시지 ──────────────────────────────────
-
-/** 처리 중 상태 메시지 포스팅 (중단 버튼 포함) */
-const postStatusMessage = async (
-  slackApp: App,
-  channel: string,
-  threadTs: string,
-  agentName: string,
-  messageTs: string,
-): Promise<string | undefined> => {
-  try {
-    const result = await slackApp.client.chat.postMessage({
-      channel,
-      thread_ts: threadTs,
-      text: `🧠 *${agentName}* 처리 중...`,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: `🧠 *${agentName}* 처리 중...`,
-          },
-        },
-        {
-          type: 'actions',
-          elements: [
-            {
-              type: 'button',
-              text: {
-                type: 'plain_text',
-                text: '⏹ 중단',
-              },
-              action_id: 'cancel_agent',
-              value: messageTs,
-              style: 'danger',
-            },
-          ],
-        },
-      ],
-    });
-    return result.ts;
-  } catch (err) {
-    console.error(
-      `[status] 상태 메시지 포스팅 실패:`,
-      err,
-    );
-    return undefined;
-  }
-};
-
-/** 상태 메시지 업데이트 (버튼 제거 + 상태 표시) */
-const updateStatusMessage = async (
-  slackApp: App,
-  channel: string,
-  statusTs: string,
-  text: string,
-): Promise<void> => {
-  try {
-    await slackApp.client.chat.update({
-      channel,
-      ts: statusTs,
-      text,
-      blocks: [
-        {
-          type: 'section',
-          text: { type: 'mrkdwn', text },
-        },
-      ],
-    });
-  } catch (err) {
-    console.error(
-      `[status] 상태 메시지 업데이트 실패:`,
-      err,
-    );
-  }
-};
-
-/**
- * Slack Bolt 앱에 Block Kit 액션 핸들러 등록
- * @param app - Slack Bolt App
- */
-export const registerActionHandlers = (
-  app: App,
-): void => {
-  app.action('cancel_agent', async ({ action, ack }) => {
-    await ack();
-    const value = (
-      action as { value?: string }
-    ).value;
-    if (!value) {
-      return;
-    }
-    const entry = activeAgents.get(value);
-    if (entry) {
-      console.log(
-        `[control] ⏹ ${entry.agentName} 중단 (버튼): ${value}`,
-      );
-      entry.controller.abort();
-      if (entry.statusMessageTs) {
-        await updateStatusMessage(
-          entry.slackApp,
-          entry.channel,
-          entry.statusMessageTs,
-          `⏹ *${entry.agentName}* 중단됨`,
-        );
-      }
-      activeAgents.delete(value);
-    }
-  });
 };
 
 /**
@@ -1045,35 +839,26 @@ export const handleMessage = async (
 
   const startTime = Date.now();
 
-  // 이모지 제어용 AbortController 등록
+  // 중단 제어용 AbortController 등록
   const abortController = new AbortController();
   activeAgents.set(event.ts, {
     controller: abortController,
     agentName,
-    event,
-    routingMethod,
-    slackApp,
     channel: event.channel,
+    slackApp,
   });
 
-  // 상태 메시지 포스팅 (중단 버튼 포함)
+  // 🧠 리액션으로 처리 중 표시
   if (!skipReaction) {
-    const threadTs = event.thread_ts ?? event.ts;
-    const statusTs = await postStatusMessage(
-      slackApp,
-      event.channel,
-      threadTs,
-      agentName,
-      event.ts,
-    );
-    if (statusTs) {
-      const entry = activeAgents.get(event.ts);
-      if (entry) {
-        entry.statusMessageTs = statusTs;
-      }
-      console.log(
-        `[status] 🧠 ${agentName} 상태 메시지: ${statusTs}`,
-      );
+    try {
+      await slackApp.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'brain',
+      });
+      console.log(`[reaction] 🧠 추가 완료: ${event.ts}`);
+    } catch (err) {
+      console.error(`[reaction] 🧠 추가 실패:`, err);
     }
   }
 
@@ -1085,6 +870,8 @@ export const handleMessage = async (
       ] ?? '';
 
     let resultText = '';
+    let usedModel = '';
+    let costUsd = 0;
 
     // 스레드 내 연속 대화 시 이전 세션 재사용 (히스토리 + 시스템 프롬프트 캐싱)
     // threadTopic이 있으면 bridge가 맥락을 프리프로세싱했으므로 새 세션 강제
@@ -1137,15 +924,20 @@ export const handleMessage = async (
         persistSessionId(agentName, threadKey, resultMsg.session_id);
         if (resultMsg.subtype === 'success') {
           resultText = resultMsg.result;
-          // 캐시 통계 로깅
+          // 모델 정보 캡처 (메타데이터 표시용)
           const models = Object.entries(resultMsg.modelUsage);
+          if (models.length > 0) {
+            usedModel = models[0][0];
+          }
+          costUsd = resultMsg.total_cost_usd;
+          // 캐시 통계 로깅
           for (const [model, usage] of models) {
             const cacheRead = usage.cacheReadInputTokens;
             const cacheCreate = usage.cacheCreationInputTokens;
             const input = usage.inputTokens;
             const output = usage.outputTokens;
             console.log(
-              `[cache] ${agentName} (${model}): input=${input} output=${output} cacheRead=${cacheRead} cacheCreate=${cacheCreate} cost=$${resultMsg.total_cost_usd.toFixed(4)}`,
+              `[cache] ${agentName} (${model}): input=${input} output=${output} cacheRead=${cacheRead} cacheCreate=${cacheCreate} cost=$${costUsd.toFixed(4)}`,
             );
           }
         } else {
@@ -1165,39 +957,39 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // 상태 메시지 → 완료 표시
+    // 🧠 → ✅ 완료 리액션 전환
     if (!skipReaction) {
-      const entry = activeAgents.get(event.ts);
-      if (entry?.statusMessageTs) {
-        await updateStatusMessage(
-          slackApp,
-          event.channel,
-          entry.statusMessageTs,
-          `✅ *${agentName}* 완료 (${elapsed}s)`,
-        );
-        console.log(
-          `[status] ✅ ${agentName} 완료: ${entry.statusMessageTs}`,
-        );
+      try {
+        await slackApp.client.reactions.remove({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'brain',
+        });
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'white_check_mark',
+        });
+      } catch {
+        // 리액션 실패는 무시
       }
     }
     activeAgents.delete(event.ts);
+
+    // 응답 메타데이터 (소요 시간 + 모델) 추가
+    const modelLabel = usedModel || 'unknown';
+    const metaFooter = `\n\n_⏱ ${elapsed}s · ${modelLabel}_`;
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     let postedTs: string | undefined;
     if (resultText) {
       try {
-        const postParams: {
-          channel: string;
-          text: string;
-          thread_ts?: string;
-        } = {
-          channel: event.channel,
-          text: resultText,
-        };
-        // 항상 스레드로 응답 (채널 메시지도 원본의 스레드에)
-        postParams.thread_ts = event.thread_ts ?? event.ts;
         const postResult =
-          await slackApp.client.chat.postMessage(postParams);
+          await slackApp.client.chat.postMessage({
+            channel: event.channel,
+            text: resultText + metaFooter,
+            thread_ts: event.thread_ts ?? event.ts,
+          });
         postedTs = postResult.ts;
         console.log(
           `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
@@ -1216,7 +1008,7 @@ export const handleMessage = async (
 
     return { text: resultText, postedTs };
   } catch (err) {
-    // AbortError: 버튼으로 의도적 중단 — 상태 메시지는 액션 핸들러에서 업데이트됨
+    // AbortError: 이모지로 의도적 중단
     const isAbort =
       err instanceof Error &&
       (err.name === 'AbortError' ||
@@ -1226,22 +1018,44 @@ export const handleMessage = async (
       console.log(
         `[control] ${agentName} 중단됨 (${elapsed}s): ${event.ts}`,
       );
+      // 🧠 → ⛔ 중단 리액션
+      if (!skipReaction) {
+        try {
+          await slackApp.client.reactions.remove({
+            channel: event.channel,
+            timestamp: event.ts,
+            name: 'brain',
+          });
+          await slackApp.client.reactions.add({
+            channel: event.channel,
+            timestamp: event.ts,
+            name: 'black_square_for_stop',
+          });
+        } catch {
+          // 리액션 실패는 무시
+        }
+      }
       return { text: '' };
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
 
-    // 상태 메시지 → 에러 표시
+    // 🧠 → ❌ 에러 리액션 전환
     if (!skipReaction) {
-      const entry = activeAgents.get(event.ts);
-      if (entry?.statusMessageTs) {
-        await updateStatusMessage(
-          slackApp,
-          event.channel,
-          entry.statusMessageTs,
-          `❌ *${agentName}* 오류 발생 (${elapsed}s)`,
-        );
+      try {
+        await slackApp.client.reactions.remove({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'brain',
+        });
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'x',
+        });
+      } catch {
+        // 리액션 실패는 무시
       }
     }
 
