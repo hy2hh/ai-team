@@ -1,9 +1,11 @@
 import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
   readFileSync,
   readdirSync,
-  writeFileSync,
-  existsSync,
   renameSync,
+  writeFileSync,
 } from 'fs';
 import { join } from 'path';
 import {
@@ -17,6 +19,110 @@ import type { App } from '@slack/bolt';
 import type { AgentSession, SlackEvent } from './types.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
+
+// ─── 태스크 라이프사이클 이벤트 로거 ──────────────────────
+// task_dispatched / task_completed / task_failed / task_escalated 이벤트를
+// .memory/logs/task-events.jsonl 에 append-only 기록 (디버깅 + 관측성)
+
+const TASK_EVENTS_LOG_DIR = join(PROJECT_DIR, '.memory', 'logs');
+const TASK_EVENTS_LOG_PATH = join(TASK_EVENTS_LOG_DIR, 'task-events.jsonl');
+
+// ─── 에이전트별 성공/실패 통계 ──────────────────────────
+// .memory/metrics/agent-stats.json 에 에이전트별 total/failures 기록
+// 라우팅 가중치 조정 및 운영 관측성에 활용
+
+const AGENT_STATS_DIR = join(PROJECT_DIR, '.memory', 'metrics');
+const AGENT_STATS_PATH = join(AGENT_STATS_DIR, 'agent-stats.json');
+
+interface AgentStatEntry {
+  total: number;
+  failures: number;
+  lastFailure?: string;
+  lastUpdated: string;
+}
+
+interface AgentStats {
+  [agentName: string]: AgentStatEntry;
+}
+
+/**
+ * 에이전트 성공/실패 통계를 파일에 기록
+ * task_completed → success=true, task_failed → success=false
+ */
+const recordAgentStat = (agent: string, success: boolean): void => {
+  try {
+    if (!existsSync(AGENT_STATS_DIR)) {
+      mkdirSync(AGENT_STATS_DIR, { recursive: true });
+    }
+
+    let stats: AgentStats = {};
+    if (existsSync(AGENT_STATS_PATH)) {
+      try {
+        stats = JSON.parse(
+          readFileSync(AGENT_STATS_PATH, 'utf-8'),
+        ) as AgentStats;
+      } catch {
+        stats = {};
+      }
+    }
+
+    if (!stats[agent]) {
+      stats[agent] = {
+        total: 0,
+        failures: 0,
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+
+    stats[agent].total += 1;
+    if (!success) {
+      stats[agent].failures += 1;
+      stats[agent].lastFailure = new Date().toISOString();
+    }
+    stats[agent].lastUpdated = new Date().toISOString();
+
+    writeFileSync(
+      AGENT_STATS_PATH,
+      JSON.stringify(stats, null, 2),
+      'utf-8',
+    );
+  } catch {
+    // 통계 기록 실패는 에이전트 동작에 영향 없도록 무시
+  }
+};
+
+type TaskEventType =
+  | 'task_dispatched'
+  | 'task_completed'
+  | 'task_failed'
+  | 'task_aborted'
+  | 'task_escalated';
+
+interface TaskEvent {
+  event: TaskEventType;
+  agent: string;
+  messageTs: string;
+  channel: string;
+  routingMethod: string;
+  timestamp: string;
+  elapsedMs?: number;
+  error?: string;
+  escalationReason?: string;
+}
+
+/**
+ * 태스크 이벤트를 JSONL 로그 파일에 기록
+ */
+const logTaskEvent = (data: TaskEvent): void => {
+  try {
+    if (!existsSync(TASK_EVENTS_LOG_DIR)) {
+      mkdirSync(TASK_EVENTS_LOG_DIR, { recursive: true });
+    }
+    appendFileSync(TASK_EVENTS_LOG_PATH, JSON.stringify(data) + '\n', 'utf-8');
+  } catch {
+    // 로그 실패는 에이전트 동작에 영향 없도록 무시
+  }
+};
 
 // ─── Thread Session 영구화 (JSON 파일) ───────────────────
 // bridge 재시작 후에도 thread_ts → session_id 매핑 유지
@@ -858,6 +964,8 @@ export interface HandleMessageResult {
   postedTs?: string;
   /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 */
   delegationTargets: string[];
+  /** 에이전트가 escalate_to_pm 도구를 호출한 경우 이유 (PM 재라우팅 트리거) */
+  escalationReason?: string;
 }
 
 export const handleMessage = async (
@@ -896,6 +1004,16 @@ export const handleMessage = async (
   }
 
   const startTime = Date.now();
+
+  // 태스크 시작 이벤트 기록
+  logTaskEvent({
+    event: 'task_dispatched',
+    agent: agentName,
+    messageTs: event.ts,
+    channel: event.channel,
+    routingMethod,
+    timestamp: new Date().toISOString(),
+  });
 
   // 중단 제어용 AbortController 등록
   const abortController = new AbortController();
@@ -943,6 +1061,9 @@ export const handleMessage = async (
 
     // PM 전용: delegate 도구로 위임 의도를 수집하는 인라인 MCP 서버
     const delegationQueue: string[] = [];
+    // 비PM 에이전트: escalate_to_pm 도구로 PM 재라우팅 신호 수집
+    let escalationReason: string | undefined;
+
     const baseMcpServers = getMcpServersForAgent(
       agentName,
       botToken,
@@ -979,6 +1100,43 @@ export const handleMessage = async (
       });
       baseMcpServers.delegation = delegationServer;
       baseTools.push('mcp__delegation__delegate');
+    } else {
+      // 비PM 에이전트: 범위 초과 시 PM에게 에스컬레이션 신호 도구
+      const escalationServer = createSdkMcpServer({
+        name: 'escalation',
+        tools: [
+          tool(
+            'escalate_to_pm',
+            '현재 요청이 내 전문 범위를 초과하거나 PM의 조율이 필요한 경우 사용합니다. PM이 적절한 에이전트를 선택하여 재라우팅합니다.',
+            { reason: z.string() },
+            async ({ reason }) => {
+              escalationReason = reason;
+              console.log(
+                `[escalation] ${agentName} escalate_to_pm 호출: ${reason}`,
+              );
+              logTaskEvent({
+                event: 'task_escalated',
+                agent: agentName,
+                messageTs: event.ts,
+                channel: event.channel,
+                routingMethod,
+                timestamp: new Date().toISOString(),
+                escalationReason: reason,
+              });
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `에스컬레이션 등록됨: ${reason}. PM이 재라우팅합니다.`,
+                  },
+                ],
+              };
+            },
+          ),
+        ],
+      });
+      baseMcpServers.escalation = escalationServer;
+      baseTools.push('mcp__escalation__escalate_to_pm');
     }
 
     const queryOptions: Parameters<typeof query>[0]['options'] = {
@@ -1101,10 +1259,24 @@ export const handleMessage = async (
       );
     }
 
+    // 태스크 완료 이벤트 기록
+    logTaskEvent({
+      event: 'task_completed',
+      agent: agentName,
+      messageTs: event.ts,
+      channel: event.channel,
+      routingMethod,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      escalationReason,
+    });
+    recordAgentStat(agentName, true);
+
     return {
       text: resultText,
       postedTs,
       delegationTargets: [...delegationQueue],
+      escalationReason,
     };
   } catch (err) {
     // AbortError: 이모지로 의도적 중단
@@ -1117,6 +1289,15 @@ export const handleMessage = async (
       console.log(
         `[control] ${agentName} 중단됨 (${elapsed}s): ${event.ts}`,
       );
+      logTaskEvent({
+        event: 'task_aborted',
+        agent: agentName,
+        messageTs: event.ts,
+        channel: event.channel,
+        routingMethod,
+        timestamp: new Date().toISOString(),
+        elapsedMs: Date.now() - startTime,
+      });
       // 🧠 → ⛔ 중단 리액션
       if (!skipReaction) {
         try {
@@ -1139,6 +1320,17 @@ export const handleMessage = async (
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
     console.error(`[runtime] ${agentName} 오류 (${elapsed}s):`, err);
+    logTaskEvent({
+      event: 'task_failed',
+      agent: agentName,
+      messageTs: event.ts,
+      channel: event.channel,
+      routingMethod,
+      timestamp: new Date().toISOString(),
+      elapsedMs: Date.now() - startTime,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    recordAgentStat(agentName, false);
 
     // 🧠 → ❌ 에러 리액션 전환
     if (!skipReaction) {

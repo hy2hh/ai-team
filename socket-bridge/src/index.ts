@@ -23,6 +23,9 @@ import {
   tryClaim,
   updateClaim,
   cleanupExpiredClaims,
+  cleanupOrphanClaims,
+  requeueClaim,
+  MAX_REQUEUE_ATTEMPTS,
 } from './claim.js';
 
 // ─── 설정 ───────────────────────────────────────────────
@@ -423,6 +426,40 @@ const safeSwapReaction = async (
 /** PM Hub 최대 에이전트 실행 횟수 — 무한 루프 방지 */
 const MAX_DELEGATION_DEPTH = 3;
 
+/** 에이전트별 최대 실행 시간 (5분) — fan-out 타임아웃 */
+const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * 에이전트 실행에 타임아웃 적용
+ * 타임아웃 시 cancelAgent()를 호출해 AbortController를 통해 내부 쿼리도 중단
+ * @param promise - handleMessage Promise
+ * @param agentName - 에이전트 이름 (로그용)
+ * @param eventTs - 이벤트 ts (cancelAgent 호출용)
+ */
+const withAgentTimeout = <T>(
+  promise: Promise<T>,
+  agentName: string,
+  eventTs: string,
+): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      console.warn(
+        `[timeout] ${agentName} 응답 시간 초과 (${AGENT_TIMEOUT_MS / 1000}s) — 강제 중단`,
+      );
+      cancelAgent(eventTs);
+      reject(
+        new Error(
+          `[timeout] ${agentName} ${AGENT_TIMEOUT_MS / 1000}s 초과`,
+        ),
+      );
+    }, AGENT_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(
+    () => clearTimeout(timer),
+  ) as Promise<T>;
+};
+
 // ─── 이벤트 빌더 ─────────────────────────────────────────
 
 /** 위임받는 에이전트용 이벤트 생성 */
@@ -509,6 +546,35 @@ const executeSingle = async (
     app,
   );
 
+  // 비PM 에이전트가 escalate_to_pm을 호출한 경우 → PM으로 재라우팅
+  if (
+    agentName !== 'pm' &&
+    result.escalationReason &&
+    apps
+  ) {
+    const pmApp = findAgentApp('pm', apps);
+    const escalationText = [
+      `[에스컬레이션 — ${agentName}에서 PM으로]`,
+      `사유: ${result.escalationReason}`,
+      '',
+      result.text ? `${agentName} 부분 응답:\n${result.text}` : '',
+      '',
+      '[원본 요청]',
+      event.text,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const escalationEvent: SlackEvent = {
+      ...event,
+      text: escalationText,
+    };
+    console.log(
+      `[escalation] ${agentName} → PM 재라우팅: ${result.escalationReason}`,
+    );
+    await executeSingle('pm', escalationEvent, 'delegation', pmApp, apps);
+    return;
+  }
+
   // 비PM이거나 텍스트 없으면 hub 미적용
   if (
     agentName !== 'pm' ||
@@ -541,11 +607,28 @@ const executeSingle = async (
   let agentExecutionCount = 0;
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
   let currentPmTs = result.postedTs;
+  // 순환 핸드오프 감지: 전체 허브 루프에서 실행된 에이전트 추적
+  const allExecutedAgents = new Set<string>();
 
   while (
     targets.length > 0 &&
     agentExecutionCount < MAX_DELEGATION_DEPTH
   ) {
+    // 순환 핸드오프 감지: 모든 타겟이 이미 실행된 경우 경고
+    const repeatedAgents = targets.filter((t) => allExecutedAgents.has(t));
+    if (repeatedAgents.length > 0) {
+      console.warn(
+        `[hub] 순환 핸드오프 감지: [${repeatedAgents.join(', ')}] 이미 이번 허브 루프에서 실행됨 — PM이 재위임 요청`,
+      );
+    }
+    // 모든 타겟이 재실행 요청이면 경고 후 종료 (순수 무한루프)
+    if (repeatedAgents.length === targets.length) {
+      console.warn(
+        `[hub] 순환 루프 중단: 모든 타겟 [${targets.join(', ')}]이 이미 실행됨`,
+      );
+      break;
+    }
+
     // (a) 위임 에이전트 실행
     if (targets.length === 1) {
       const target = targets[0];
@@ -572,12 +655,16 @@ const executeSingle = async (
         `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
       );
 
-      const delegationResult = await handleMessage(
+      const delegationResult = await withAgentTimeout(
+        handleMessage(
+          target,
+          delegationEvent,
+          'delegation',
+          targetApp,
+          true,
+        ),
         target,
-        delegationEvent,
-        'delegation',
-        targetApp,
-        true,
+        event.ts,
       );
 
       // ✅ 완료 전환
@@ -599,6 +686,7 @@ const executeSingle = async (
         text: delegationResult.text || '[응답 없음]',
       });
       agentExecutionCount += 1;
+      allExecutedAgents.add(target);
     } else {
       // 복수 위임: 병렬 실행
       const remaining =
@@ -671,6 +759,10 @@ const executeSingle = async (
         }
       }
       agentExecutionCount += batch.length;
+      // 순환 감지: 배치 실행된 에이전트 추가
+      for (const t of batch) {
+        allExecutedAgents.add(t);
+      }
     }
 
     // (b) depth 초과 시 종료
@@ -785,7 +877,11 @@ const executeParallel = async (
     const batchResults = await Promise.allSettled(
       batch.map((name) => {
         const app = findAgentApp(name, apps);
-        return handleMessage(name, event, method, app);
+        return withAgentTimeout(
+          handleMessage(name, event, method, app),
+          name,
+          event.ts,
+        );
       }),
     );
 
@@ -814,12 +910,10 @@ const executeParallel = async (
       failed.map((f) => {
         const app = findAgentApp(f.name, apps);
         // 재시도 시 리액션 관리 건너뛰기 (이미 첫 시도에서 처리됨)
-        return handleMessage(
+        return withAgentTimeout(
+          handleMessage(f.name, event, method, app, true),
           f.name,
-          event,
-          method,
-          app,
-          true,
+          event.ts,
         );
       }),
     );
@@ -1462,10 +1556,134 @@ const main = async () => {
     60 * 60 * 1000,
   );
 
+  // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행
+  const orphanCheckInterval = setInterval(async () => {
+    const orphans = cleanupOrphanClaims();
+    if (orphans.length === 0 || apps.length === 0) {
+      return;
+    }
+
+    for (const orphan of orphans) {
+      const canRequeue =
+        orphan.version < MAX_REQUEUE_ATTEMPTS &&
+        Boolean(orphan.channel);
+
+      if (canRequeue) {
+        const newVersion = requeueClaim(
+          orphan.messageTs,
+          orphan.channel,
+        );
+
+        if (newVersion !== null) {
+          try {
+            // 원본 메시지 Slack에서 조회
+            const fetchResult =
+              await apps[0].client.conversations.history({
+                channel: orphan.channel!,
+                oldest: orphan.messageTs,
+                latest: orphan.messageTs,
+                inclusive: true,
+                limit: 1,
+              });
+
+            const originalMsg = fetchResult.messages?.[0] as
+              | Record<string, unknown>
+              | undefined;
+
+            if (originalMsg?.text) {
+              const requeuedEvent: SlackEvent = {
+                type: 'message',
+                channel: orphan.channel!,
+                channel_name: '',
+                user: (originalMsg.user as string) ?? '',
+                text: originalMsg.text as string,
+                ts: orphan.messageTs,
+                thread_ts:
+                  (originalMsg.thread_ts as string | undefined) ??
+                  null,
+                mentions: [],
+                raw: {},
+              };
+
+              // 재라우팅
+              const routing = await routeMessage(requeuedEvent.text);
+              const agentNames = routing.agents
+                .map((a) => a.name)
+                .join(', ');
+              console.log(
+                `[orphan-requeue] ${orphan.messageTs} 재라우팅: [${agentNames}] (v${newVersion}/${MAX_REQUEUE_ATTEMPTS})`,
+              );
+
+              if (routing.execution === 'parallel') {
+                await executeParallel(
+                  routing.agents.map((a) => a.name),
+                  requeuedEvent,
+                  'orphan-requeue',
+                  apps,
+                );
+              } else {
+                const primaryAgent = routing.agents[0];
+                const agentApp = findAgentApp(
+                  primaryAgent.name,
+                  apps,
+                );
+                await executeSingle(
+                  primaryAgent.name,
+                  requeuedEvent,
+                  'orphan-requeue',
+                  agentApp,
+                  apps,
+                );
+              }
+
+              updateClaim(orphan.messageTs, 'completed');
+
+              try {
+                await apps[0].client.chat.postMessage({
+                  channel: orphan.channel!,
+                  thread_ts: orphan.messageTs,
+                  text: `🔄 오펀 태스크 자동 재시작 (${newVersion}/${MAX_REQUEUE_ATTEMPTS}) — 원래 처리자: *${orphan.agent}* → 재라우팅 완료`,
+                });
+              } catch {
+                // 알림 실패 무시
+              }
+              continue;
+            }
+          } catch (requeueErr) {
+            console.error(
+              `[orphan-requeue] 재라우팅 실패: ${orphan.messageTs}`,
+              requeueErr,
+            );
+            updateClaim(orphan.messageTs, 'failed');
+          }
+        }
+      }
+
+      // 재큐잉 불가 (한도 초과 또는 메시지 조회 실패) → Slack 알림
+      const notifyChannel =
+        orphan.channel ?? (process.env.SLACK_NOTIFY_CHANNEL || '');
+      if (notifyChannel) {
+        try {
+          const isMaxReached =
+            orphan.version >= MAX_REQUEUE_ATTEMPTS;
+          await apps[0].client.chat.postMessage({
+            channel: notifyChannel,
+            text: isMaxReached
+              ? `⚠️ *오펀 Claim 복구 실패* — \`${orphan.messageTs}\` | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS} 한도 초과, 수동 조치 필요`
+              : `⚠️ *오펀 Claim 감지* — \`${orphan.messageTs}\` | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재라우팅 시도 중`,
+          });
+        } catch {
+          // 알림 실패 무시
+        }
+      }
+    }
+  }, 30 * 60 * 1000);
+
   // 종료 시그널 처리
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
     clearInterval(cleanupInterval);
+    clearInterval(orphanCheckInterval);
     // 세션 저장소 즉시 flush (debounce 타이머 누락 방지)
     flushSessionStore();
     // Promise.allSettled()로 부분 실패 시에도 shutdown 계속 진행
