@@ -227,19 +227,37 @@ interface ActiveAgentEntry {
 const activeAgents = new Map<string, ActiveAgentEntry>();
 
 /**
+ * 라우팅/디바운스 중 취소 요청된 메시지 ts 집합
+ * handleMessage 시작 시 체크하여 즉시 중단
+ */
+const pendingCancellations = new Set<string>();
+
+/**
  * 에이전트 즉시 중단 (black_square_for_stop 리액션)
- * @returns 중단 성공 여부 (해당 ts에 실행 중 에이전트 없으면 false)
+ * 실행 중이면 즉시 중단, 아직 실행 전(🔍 단계)이면 대기열에 등록
+ * @returns 중단 성공 여부
  */
 export const cancelAgent = (messageTs: string): boolean => {
   const entry = activeAgents.get(messageTs);
-  if (!entry) {
-    return false;
+  if (entry) {
+    console.log(
+      `[control] ⛔ ${entry.agentName} 즉시 중단: ${messageTs}`,
+    );
+    entry.controller.abort();
+    activeAgents.delete(messageTs);
+    return true;
   }
+  // 아직 activeAgents에 없음 (🔍 라우팅/디바운스 단계)
+  // → 대기열에 등록하여 handleMessage 시작 시 즉시 중단
+  pendingCancellations.add(messageTs);
   console.log(
-    `[control] ⛔ ${entry.agentName} 즉시 중단: ${messageTs}`,
+    `[control] ⛔ 사전 취소 등록: ${messageTs} (라우팅 단계)`,
   );
-  entry.controller.abort();
-  activeAgents.delete(messageTs);
+  // 5분 후 자동 정리 (메모리 누수 방지)
+  setTimeout(
+    () => pendingCancellations.delete(messageTs),
+    5 * 60 * 1000,
+  );
   return true;
 };
 
@@ -836,6 +854,27 @@ export const handleMessage = async (
   console.log(
     `[runtime] ${agentName} 처리 시작 (${routingMethod}): "${event.text.slice(0, 50)}..."`,
   );
+
+  // 🔍 단계에서 이미 취소된 메시지인지 확인
+  if (pendingCancellations.has(event.ts)) {
+    pendingCancellations.delete(event.ts);
+    console.log(
+      `[control] ⛔ ${agentName} 사전 취소로 실행 건너뜀: ${event.ts}`,
+    );
+    // ⛔ 리액션 추가 (취소됨 표시)
+    if (!skipReaction) {
+      try {
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: event.ts,
+          name: 'black_square_for_stop',
+        });
+      } catch {
+        // 리액션 실패는 무시
+      }
+    }
+    return { text: '' };
+  }
 
   const startTime = Date.now();
 

@@ -1419,6 +1419,16 @@ const main = async () => {
         ) {
           return;
         }
+        // 🔍 리액션 제거 (라우팅 중이었다면)
+        try {
+          await apps[0].client.reactions.remove({
+            channel: re.item.channel,
+            timestamp: re.item.ts,
+            name: 'mag',
+          });
+        } catch {
+          // 이미 제거됨 무시
+        }
         const cancelled = cancelAgent(re.item.ts);
         if (cancelled) {
           console.log(
