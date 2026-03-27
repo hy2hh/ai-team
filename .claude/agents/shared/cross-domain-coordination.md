@@ -22,9 +22,9 @@ current_step: 2
 
 | Step | Agent | Status | Started | Completed |
 |------|-------|--------|---------|-----------|
-| 1 | Designer Donald | completed | 10:00 | 10:45 |
-| 2 | Frontend Donald | in_progress | 10:46 | - |
-| 3 | SecOps Donald | pending | - | - |
+| 1 | Krusty | completed | 10:00 | 10:45 |
+| 2 | Bart | in_progress | 10:46 | - |
+| 3 | Wiggum | pending | - | - |
 
 ## 핸드오프 기록
 - Step 1→2: 디자인 스펙 전달 (handoff/designer-to-frontend_login-page.md)
@@ -43,13 +43,13 @@ current_step: 2
 ```
 예: "API 설계 + UI 디자인 후 프론트엔드 구현"
 
-Step 1a: Backend Donald — API 설계     ┐
-Step 1b: Designer Donald — UI 디자인    ┘ (병렬)
-Step 2:  Frontend Donald — 구현         (1a + 1b 모두 완료 후)
+Step 1a: Homer — API 설계     ┐
+Step 1b: Krusty — UI 디자인    ┘ (병렬)
+Step 2:  Bart — 구현         (1a + 1b 모두 완료 후)
 ```
 
 병렬 step은 같은 step 번호에 a/b 접미사를 사용한다.
-**통합 에이전트** (보통 PM Donald)가 병렬 결과를 확인하고 다음 step 트리거.
+**통합 에이전트** (보통 Marge)가 병렬 결과를 확인하고 다음 step 트리거.
 
 ## 표준 체인 패턴
 
@@ -67,9 +67,9 @@ Step 2:  Frontend Donald — 구현         (1a + 1b 모두 완료 후)
 
 | 상황 | 대응 |
 |------|------|
-| 24시간 진행 없음 | PM Donald에게 자동 에스컬레이션 |
+| 24시간 진행 없음 | Marge에게 자동 에스컬레이션 |
 | 에이전트 무응답 | Triage가 chain 파일에 `blocked` 표시 + PM 알림 |
-| 의존성 충돌 | PM Donald가 우선순위 재조정 |
+| 의존성 충돌 | Marge가 우선순위 재조정 |
 | 품질 이슈 | 이전 step 에이전트에게 피드백 + 재작업 요청 |
 
 ### 블로커 기록

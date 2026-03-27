@@ -148,12 +148,12 @@ const botUserIdToAgentName = new Map<string, string>();
 
 /** 에이전트 표시 이름 매핑 */
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
-  pm: 'PM Donald',
-  designer: 'Designer Donald',
-  frontend: 'Frontend Donald',
-  backend: 'Backend Donald',
-  researcher: 'Researcher Donald',
-  secops: 'SecOps Donald',
+  pm: 'Marge',
+  designer: 'Krusty',
+  frontend: 'Bart',
+  backend: 'Homer',
+  researcher: 'Lisa',
+  secops: 'Wiggum',
 };
 
 /**
@@ -522,7 +522,7 @@ const executeSingle = async (
   // PM 응답에서 멘션 파싱 (자기 멘션 + 미등록 에이전트 제외)
   // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
   // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
-  // "Frontend Donald가 완료했습니다" 같은 응답에서 Hub 루프가 잘못 발동한다.
+  // "Bart가 완료했습니다" 같은 응답에서 Hub 루프가 잘못 발동한다.
   let targets = parseExplicitMentions(result.text).filter(
     (name) => name !== 'pm' && isValidAgent(name),
   );
@@ -722,7 +722,7 @@ const executeSingle = async (
     // (d) PM 리뷰 응답에서 새 타겟 파싱
     // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
     // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
-    // "Backend Donald가 완료했습니다" 같은 요약 문장에서 루프가 재발한다.
+    // "Homer가 완료했습니다" 같은 요약 문장에서 루프가 재발한다.
     targets = parseExplicitMentions(pmReview.text).filter(
       (name) => name !== 'pm' && isValidAgent(name),
     );

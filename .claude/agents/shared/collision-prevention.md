@@ -20,7 +20,7 @@
 
 ```markdown
 ---
-agent: Frontend Donald
+agent: Bart
 claimed_at: 2026-03-24T10:30:00+09:00
 message_id: msg-12345
 status: in_progress

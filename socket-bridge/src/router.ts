@@ -165,12 +165,12 @@ export const registerBotUser = (
 
 /** 에이전트 display name → role name 매핑 (대소문자 무관 매칭용) */
 const DISPLAY_NAME_TO_AGENT: Record<string, string> = {
-  'pm donald': 'pm',
-  'designer donald': 'designer',
-  'frontend donald': 'frontend',
-  'backend donald': 'backend',
-  'researcher donald': 'researcher',
-  'secops donald': 'secops',
+  marge: 'pm',
+  krusty: 'designer',
+  bart: 'frontend',
+  homer: 'backend',
+  lisa: 'researcher',
+  wiggum: 'secops',
 };
 
 /**
@@ -202,7 +202,7 @@ export const parseExplicitMentions = (
  *
  * 2단계 감지:
  * 1. Slack 형식 <@USER_ID> 패턴
- * 2. Display name 폴백 (@Designer Donald 등)
+ * 2. Display name 폴백 (@Krusty 등)
  * @param text - Slack 메시지 텍스트
  * @returns 멘션된 에이전트 이름 배열 (중복 제거)
  */
@@ -220,7 +220,7 @@ export const parseMentions = (text: string): string[] => {
     }
   }
 
-  // 2단계: Display name 폴백 (@Designer Donald 등)
+  // 2단계: Display name 폴백 (@Krusty 등)
   if (mentions.size === 0) {
     const lowerText = text.toLowerCase();
     for (const [displayName, agentName] of Object.entries(

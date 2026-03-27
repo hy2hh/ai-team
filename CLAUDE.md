@@ -68,7 +68,7 @@ All agents share `.memory/`. Entry point: `.memory/index.md`.
 5. Check `.memory/handoff/` for pending handoffs addressed to you
 
 ### Memory Read/Write Rules
-- **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: PM Donald.
+- **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: Marge.
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
 - **decisions/**: Format `YYYY-MM-DD_{topic}.md`. The deciding agent writes it.
 - **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
@@ -84,7 +84,7 @@ All agents share `.memory/`. Entry point: `.memory/index.md`.
 Triage Agent monitors all #ai-team messages and routes via 3-tier system:
 1. **@mention** → direct bypass (no Triage involvement)
 2. **Keyword match** → routing table in `shared/routing-rules.md`
-3. **LLM fallback** → semantic classification; unresolvable → PM Donald
+3. **LLM fallback** → semantic classification; unresolvable → Marge
 
 Agents MUST NOT respond to messages without @mention — wait for Triage delegation.
 
@@ -117,5 +117,5 @@ Full rules: `.claude/agents/shared/routing-rules.md`, `shared/collision-preventi
 ## Code Quality
 - Follow existing project conventions
 - All code changes require review mention to relevant agent
-- Security-sensitive changes must tag @SecOps Donald
+- Security-sensitive changes must tag @Wiggum
 - Agent files: 200-line hard cap

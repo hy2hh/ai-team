@@ -8,7 +8,7 @@
 # [기능명] Implementation Plan
 
 > **담당 에이전트:** 아래 각 Task에 명시
-> **작성자:** @PM Donald
+> **작성자:** @Marge
 > **승인자:** sid
 > **작성일:** YYYY-MM-DD
 

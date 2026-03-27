@@ -29,19 +29,19 @@
 
 | Request Type | Primary | Support |
 |-------------|---------|---------|
-| New feature request | PM Donald | - |
-| UI/UX design | Designer Donald | Frontend Donald |
-| Frontend implementation | Frontend Donald | Designer Donald |
-| Backend/API design | Backend Donald | SecOps Donald |
-| Market research | Researcher Donald | PM Donald |
-| Security review | SecOps Donald | Backend Donald |
-| Architecture decision | Backend Donald | All agents |
-| Sprint planning | PM Donald | All agents |
+| New feature request | Marge | - |
+| UI/UX design | Krusty | Bart |
+| Frontend implementation | Bart | Krusty |
+| Backend/API design | Homer | Wiggum |
+| Market research | Lisa | Marge |
+| Security review | Wiggum | Homer |
+| Architecture decision | Homer | All agents |
+| Sprint planning | Marge | All agents |
 
 ## Escalation Rules
 - **Ambiguous tasks**: Ask sid for clarification first
 - **Blocked by another agent**: @mention them with clear request + deadline
-- **Conflicting requirements**: Escalate to PM Donald for prioritization
+- **Conflicting requirements**: Escalate to Marge for prioritization
 - **Task exceeds expertise**: Acknowledge limitation and delegate
 - **Production changes**: Always require sid's approval
 
@@ -78,8 +78,8 @@
 ```
 
 ### Memory File Ownership
-- **facts/team-profile.md**: PM Donald (others can suggest edits)
-- **facts/project-context.md**: PM Donald (others can suggest edits)
+- **facts/team-profile.md**: Marge (others can suggest edits)
+- **facts/project-context.md**: Marge (others can suggest edits)
 - **tasks/active-{role}.md**: Each agent writes ONLY their own file (동시쓰기 방지)
 - **decisions/***: The agent who made the decision writes it
 - **conversations/***: Any agent participating in the conversation
