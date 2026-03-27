@@ -379,6 +379,46 @@ const findAgentApp = (
 const isValidAgent = (name: string): boolean =>
   AGENTS.some((a) => a.name === name);
 
+// ─── 리액션 유틸리티 ─────────────────────────────────────
+
+/** 리액션 추가 (실패 무시) */
+const safeAddReaction = async (
+  app: App,
+  channel: string,
+  ts: string,
+  name: string,
+): Promise<void> => {
+  try {
+    await app.client.reactions.add({
+      channel,
+      timestamp: ts,
+      name,
+    });
+  } catch {
+    // 리액션 실패 무시
+  }
+};
+
+/** 리액션 교체: from → to (실패 무시) */
+const safeSwapReaction = async (
+  app: App,
+  channel: string,
+  ts: string,
+  from: string,
+  to: string,
+): Promise<void> => {
+  try {
+    await app.client.reactions.remove({
+      channel,
+      timestamp: ts,
+      name: from,
+    });
+  } catch {
+    // 제거 실패 무시
+  }
+  await safeAddReaction(app, channel, ts, to);
+};
+
 // ─── 실행 모드별 핸들러 ─────────────────────────────────
 
 /** PM Hub 최대 에이전트 실행 횟수 — 무한 루프 방지 */
@@ -504,8 +544,7 @@ const executeSingle = async (
   }> = [];
   let agentExecutionCount = 0;
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
-  // PM 리뷰 메시지 추적 (추후 확장용)
-  let _lastPmTs = result.postedTs;
+  let currentPmTs = result.postedTs;
 
   while (
     targets.length > 0 &&
@@ -520,6 +559,19 @@ const executeSingle = async (
         accumulatedResults,
       );
 
+      // 🧠 위임 에이전트가 PM 메시지에 리액션
+      if (currentPmTs) {
+        await safeAddReaction(
+          targetApp,
+          event.channel,
+          currentPmTs,
+          'brain',
+        );
+        console.log(
+          `[reaction] 🧠 ${target} → PM 메시지: ${currentPmTs}`,
+        );
+      }
+
       console.log(
         `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
       );
@@ -531,6 +583,20 @@ const executeSingle = async (
         targetApp,
         true,
       );
+
+      // ✅ 완료 전환
+      if (currentPmTs) {
+        await safeSwapReaction(
+          targetApp,
+          event.channel,
+          currentPmTs,
+          'brain',
+          'white_check_mark',
+        );
+        console.log(
+          `[reaction] ✅ ${target} 완료: ${currentPmTs}`,
+        );
+      }
 
       accumulatedResults.push({
         agent: target,
@@ -546,6 +612,23 @@ const executeSingle = async (
       const batchApps = batch.map((target) =>
         findAgentApp(target, apps),
       );
+
+      // 🧠 각 에이전트가 PM 메시지에 리액션
+      if (currentPmTs) {
+        await Promise.all(
+          batchApps.map((batchApp, i) => {
+            console.log(
+              `[reaction] 🧠 ${batch[i]} → PM 메시지: ${currentPmTs}`,
+            );
+            return safeAddReaction(
+              batchApp,
+              event.channel,
+              currentPmTs!,
+              'brain',
+            );
+          }),
+        );
+      }
 
       console.log(
         `[hub] 병렬 위임: [${batch.join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
@@ -577,6 +660,19 @@ const executeSingle = async (
               ? r.value.text
               : `[실패: ${(r as PromiseRejectedResult).reason}]`,
         });
+        // ✅ 각 에이전트 완료 전환
+        if (currentPmTs) {
+          await safeSwapReaction(
+            batchApps[i],
+            event.channel,
+            currentPmTs,
+            'brain',
+            'white_check_mark',
+          );
+          console.log(
+            `[reaction] ✅ ${batch[i]} 완료: ${currentPmTs}`,
+          );
+        }
       }
       agentExecutionCount += batch.length;
     }
@@ -618,7 +714,7 @@ const executeSingle = async (
     } else {
       // 다음 라운드의 PM 메시지 업데이트 (에이전트들이 여기에 리액션)
       if (pmReview.postedTs) {
-        _lastPmTs = pmReview.postedTs;
+        currentPmTs = pmReview.postedTs;
       }
       console.log(
         `[hub] PM 추가 위임: [${targets.join(', ')}]`,
