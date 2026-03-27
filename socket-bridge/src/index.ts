@@ -143,6 +143,9 @@ const botUserIdToName = new Map<string, string>();
 /** bot_id → 에이전트 표시 이름 (히스토리 포맷용) */
 const botIdToName = new Map<string, string>();
 
+/** botUserId → 에이전트 이름 (스레드 참여자 추적용) */
+const botUserIdToAgentName = new Map<string, string>();
+
 /** 에이전트 표시 이름 매핑 */
 const AGENT_DISPLAY_NAMES: Record<string, string> = {
   pm: 'PM Donald',
@@ -901,9 +904,8 @@ const flushDebounceBuffer = async (
 
   // 이전 대화 히스토리 가져오기 (스레드 또는 채널)
   let conversationHistory = '';
+  let historyMessages: Array<Record<string, unknown>> = [];
   try {
-    let historyMessages: Array<Record<string, unknown>> =
-      [];
 
     if (threadTs) {
       // 스레드: conversations.replies
@@ -965,6 +967,25 @@ const flushDebounceBuffer = async (
     );
   }
 
+  // 스레드 참여 에이전트 추출 (히스토리에서 봇 메시지 기준)
+  const threadParticipantAgents = new Set<string>();
+  if (threadTs) {
+    for (const m of historyMessages) {
+      const userId = m.user as string | undefined;
+      if (userId) {
+        const agentName = botUserIdToAgentName.get(userId);
+        if (agentName) {
+          threadParticipantAgents.add(agentName);
+        }
+      }
+    }
+    if (threadParticipantAgents.size > 0) {
+      console.log(
+        `[thread] 참여 에이전트: [${Array.from(threadParticipantAgents).join(', ')}]`,
+      );
+    }
+  }
+
   // 스레드 주제 프리프로세싱 (스레드 + 히스토리 있을 때만)
   let threadTopic = '';
   if (threadTs && conversationHistory) {
@@ -998,7 +1019,29 @@ const flushDebounceBuffer = async (
   const e2eStart = Date.now();
 
   // 라우팅 (raw 텍스트 기준 — sender prefix가 멘션/패턴 매칭을 오염하지 않도록)
-  const routing = await routeMessage(rawTextsForRouting);
+  let routing = await routeMessage(rawTextsForRouting);
+
+  // 스레드 브로드캐스트 방지: mention 이 아닌 경우 참여 에이전트로만 제한
+  if (
+    threadTs &&
+    threadParticipantAgents.size > 0 &&
+    routing.method !== 'mention'
+  ) {
+    const filteredAgents = routing.agents.filter((a) =>
+      threadParticipantAgents.has(a.name),
+    );
+    if (filteredAgents.length > 0) {
+      console.log(
+        `[route] 스레드 필터: [${routing.agents.map((a) => a.name).join(', ')}] → [${filteredAgents.map((a) => a.name).join(', ')}]`,
+      );
+      routing = {
+        ...routing,
+        agents: filteredAgents,
+        execution: filteredAgents.length > 1 ? 'parallel' : 'single',
+      };
+    }
+  }
+
   slackEvent.mentions =
     routing.method === 'mention'
       ? routing.agents.map((a) => a.name)
@@ -1115,6 +1158,7 @@ const main = async () => {
         AGENT_DISPLAY_NAMES[agent.name] ?? agent.name;
       botUserIdToName.set(agent.botUserId, displayName);
       botIdToName.set(botId, displayName);
+      botUserIdToAgentName.set(agent.botUserId, agent.name);
       console.log(
         `[init] ${agent.name}: botUserId=${agent.botUserId}, botId=${botId}`,
       );
@@ -1183,6 +1227,40 @@ const main = async () => {
           }
         }
       }
+      // 메시지 텍스트에서 Slack 파일 URL 파싱 (텍스트로 공유된 경우)
+      // 패턴: <https://[workspace].slack.com/files/[user]/[fileId]/[name]>
+      const slackFileUrlPattern = /https:\/\/[a-z0-9-]+\.slack\.com\/files\/[A-Z0-9]+\/([A-Z0-9]+)\/[^\s>)]+/gi;
+      const urlMatches = [...text.matchAll(slackFileUrlPattern)];
+      const urlFileIds = new Set(rawFiles.map((f) => f.id as string));
+
+      for (const match of urlMatches) {
+        const fileId = match[1];
+        if (!fileId || urlFileIds.has(fileId)) continue; // 이미 처리된 파일 스킵
+
+        try {
+          const fileInfo = await apps[0].client.files.info({ file: fileId });
+          const fullFile = fileInfo.file as Record<string, unknown> | undefined;
+          if (!fullFile) continue;
+
+          const urlPrivate = fullFile.url_private as string | undefined;
+          const mimetype = (fullFile.mimetype ?? fullFile.filetype ?? '') as string;
+          console.log(`[file] URL 텍스트 파싱: ${fileId} url=${urlPrivate ? '획득' : '없음'} mimetype=${mimetype}`);
+
+          if (urlPrivate && mimetype.startsWith('image/')) {
+            const ext = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+            const filename = `${ts}-${fileId}.${ext}`;
+            const savedPath = await downloadSlackImage(urlPrivate, pmBotToken, filename);
+            if (savedPath) {
+              imageFilePaths.push(savedPath);
+              rawFiles.push(fullFile); // fileContext 빌드에 포함
+            }
+          }
+          urlFileIds.add(fileId);
+        } catch (err) {
+          console.error(`[file] URL 파싱 files.info 실패 (${fileId}):`, err);
+        }
+      }
+
       const files = rawFiles; // fileContext 빌드에 재사용
 
       const fileContext = files.length > 0
