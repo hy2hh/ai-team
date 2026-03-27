@@ -939,9 +939,8 @@ export const handleMessage = async (
           channel: event.channel,
           text: resultText,
         };
-        if (event.thread_ts) {
-          postParams.thread_ts = event.thread_ts;
-        }
+        // 항상 스레드로 응답 (채널 메시지도 원본의 스레드에)
+        postParams.thread_ts = event.thread_ts ?? event.ts;
         const postResult =
           await slackApp.client.chat.postMessage(postParams);
         postedTs = postResult.ts;
