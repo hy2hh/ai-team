@@ -986,6 +986,30 @@ const flushDebounceBuffer = async (
     }
   }
 
+  // 스레드 언급 에이전트 추출 (메시지 텍스트의 <@USER_ID> 기준)
+  // 브로드캐스트 억제 시 "참여자" 대신 "명시적으로 언급된" 에이전트로 제한
+  const threadMentionedAgents = new Set<string>();
+  if (threadTs) {
+    const mentionPattern = /<@([A-Z0-9]+)>/g;
+    for (const m of historyMessages) {
+      const text = (m.text as string) ?? '';
+      let match: RegExpExecArray | null;
+      mentionPattern.lastIndex = 0;
+      while ((match = mentionPattern.exec(text)) !== null) {
+        const userId = match[1];
+        const agentName = botUserIdToAgentName.get(userId);
+        if (agentName) {
+          threadMentionedAgents.add(agentName);
+        }
+      }
+    }
+    if (threadMentionedAgents.size > 0) {
+      console.log(
+        `[thread] 언급 에이전트: [${Array.from(threadMentionedAgents).join(', ')}]`,
+      );
+    }
+  }
+
   // 스레드 주제 프리프로세싱 (스레드 + 히스토리 있을 때만)
   let threadTopic = '';
   if (threadTs && conversationHistory) {
@@ -1019,20 +1043,33 @@ const flushDebounceBuffer = async (
   const e2eStart = Date.now();
 
   // 라우팅 (raw 텍스트 기준 — sender prefix가 멘션/패턴 매칭을 오염하지 않도록)
-  let routing = await routeMessage(rawTextsForRouting);
+  // 스레드 컨텍스트: 언급된 에이전트 우선, 없으면 참여 에이전트로 폴백
+  const threadFilterAgents =
+    threadMentionedAgents.size > 0
+      ? threadMentionedAgents
+      : threadParticipantAgents;
+  let routing = await routeMessage(
+    rawTextsForRouting,
+    threadTs
+      ? Array.from(threadFilterAgents)
+      : undefined,
+  );
 
-  // 스레드 브로드캐스트 방지: mention 이 아닌 경우 참여 에이전트로만 제한
+  // 스레드 브로드캐스트 방지: mention 이 아닌 경우 언급된 에이전트로만 제한
+  // (언급 없으면 참여자 기준 폴백)
   if (
     threadTs &&
-    threadParticipantAgents.size > 0 &&
+    threadFilterAgents.size > 0 &&
     routing.method !== 'mention'
   ) {
     const filteredAgents = routing.agents.filter((a) =>
-      threadParticipantAgents.has(a.name),
+      threadFilterAgents.has(a.name),
     );
     if (filteredAgents.length > 0) {
+      const filterLabel =
+        threadMentionedAgents.size > 0 ? '언급' : '참여';
       console.log(
-        `[route] 스레드 필터: [${routing.agents.map((a) => a.name).join(', ')}] → [${filteredAgents.map((a) => a.name).join(', ')}]`,
+        `[route] 스레드 필터(${filterLabel}): [${routing.agents.map((a) => a.name).join(', ')}] → [${filteredAgents.map((a) => a.name).join(', ')}]`,
       );
       routing = {
         ...routing,

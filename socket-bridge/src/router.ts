@@ -426,14 +426,32 @@ export const classifyComplexTask = async (
 /**
  * 4단계 라우팅: mention -> keyword -> LLM(complex) -> PM default
  * @param text - Slack 메시지 텍스트
+ * @param threadParticipants - 스레드에 참여한 에이전트 이름 목록 (스레드 메시지일 때만 전달)
+ *   전달 시 브로드캐스트 억제 + 라우팅 결과를 참여자로 제한
  * @returns 라우팅 결과 (에이전트 목록 + 실행 모드)
  */
 export const routeMessage = async (
   text: string,
+  threadParticipants?: string[],
 ): Promise<RoutingResult> => {
   const routeStart = Date.now();
+  const isInThread =
+    threadParticipants !== undefined &&
+    threadParticipants.length > 0;
 
-  // 1순위: @mention
+  /**
+   * 스레드 컨텍스트일 때 에이전트 목록을 참여자로 제한.
+   * 매칭되는 참여자가 없으면 PM fallback.
+   */
+  const restrictToThread = (agents: string[]): string[] => {
+    if (!isInThread) return agents;
+    const filtered = agents.filter((a) =>
+      threadParticipants!.includes(a),
+    );
+    return filtered.length > 0 ? filtered : ['pm'];
+  };
+
+  // 1순위: @mention — 스레드 제한 없이 명시적 멘션은 항상 우선
   const mentions = parseMentions(text);
   if (mentions.length > 0) {
     console.log(
@@ -463,7 +481,19 @@ export const routeMessage = async (
 
   // 3순위: 브로드캐스트 (인사, 공지 → 전체 에이전트 병렬)
   // 단, 업무 키워드가 포함되면 LLM 복합 분류로 위임
+  // 스레드에서는 전체 브로드캐스트 억제 → 참여자에게만 전달
   if (BROADCAST_PATTERN.test(text) && keywordMatches.length === 0) {
+    if (isInThread) {
+      const agents = threadParticipants!;
+      console.log(
+        `[perf] stage=broadcast(thread-restricted) participants=[${agents.join(',')}] elapsed=${Date.now() - routeStart}ms`,
+      );
+      return {
+        agents: agents.map(toRoutingAgent),
+        execution: agents.length > 1 ? 'parallel' : 'single',
+        method: 'broadcast',
+      };
+    }
     console.log(
       `[perf] stage=broadcast elapsed=${Date.now() - routeStart}ms`,
     );
@@ -474,11 +504,12 @@ export const routeMessage = async (
     };
   }
   if (keywordMatches.length === 1) {
+    const candidates = restrictToThread([keywordMatches[0]]);
     console.log(
-      `[perf] stage=keyword agent=${keywordMatches[0]} elapsed=${Date.now() - routeStart}ms`,
+      `[perf] stage=keyword agent=${candidates[0]} elapsed=${Date.now() - routeStart}ms`,
     );
     return {
-      agents: [toRoutingAgent(keywordMatches[0])],
+      agents: candidates.map(toRoutingAgent),
       execution: 'single',
       method: 'keyword',
     };
@@ -486,13 +517,17 @@ export const routeMessage = async (
 
   // 복수 키워드 매칭 → LLM에 후보 목록 제공하여 분류
   if (keywordMatches.length > 1) {
+    // 스레드 컨텍스트면 참여자와 키워드 교집합으로 LLM 후보 제한
+    const candidates = isInThread
+      ? restrictToThread(keywordMatches)
+      : keywordMatches;
     console.log(
-      `[router] 복수 키워드 매칭: [${keywordMatches.join(', ')}] → LLM 분류`,
+      `[router] 복수 키워드 매칭: [${candidates.join(', ')}] → LLM 분류`,
     );
     const llmStart = Date.now();
     const llmDisambiguated = await classifyWithLlm(
       text,
-      keywordMatches,
+      candidates,
     );
     console.log(
       `[perf] stage=keyword+llm elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
@@ -505,7 +540,7 @@ export const routeMessage = async (
       };
     }
     return {
-      agents: [toRoutingAgent(keywordMatches[0])],
+      agents: [toRoutingAgent(candidates[0])],
       execution: 'single',
       method: 'keyword',
     };
@@ -518,6 +553,18 @@ export const routeMessage = async (
     `[perf] stage=llm-complex elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
   );
   if (complexResult) {
+    if (isInThread) {
+      // 스레드에서는 LLM 결과도 참여자로 제한
+      const filteredAgents = restrictToThread(
+        complexResult.agents.map((a) => a.name),
+      );
+      return {
+        agents: filteredAgents.map(toRoutingAgent),
+        execution:
+          filteredAgents.length > 1 ? 'parallel' : 'single',
+        method: complexResult.method,
+      };
+    }
     return complexResult;
   }
 
