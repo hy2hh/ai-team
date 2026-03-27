@@ -30,8 +30,8 @@ const ROUTING_RULES: Record<string, RegExp> = {
   backend: /API|서버|DB|데이터베이스|엔드포인트|배포|인프라/i,
   frontend: /UI|컴포넌트|CSS|페이지|화면|레이아웃|React/i,
   designer: /디자인|UX|피그마|목업|와이어프레임|색상/i,
-  pm: /기획|로드맵|스프린트|우선순위|PRD|일정|요구사항/i,
-  researcher: /조사|트렌드|경쟁사|시장|분석|리서치/i,
+  pm: /기획|로드맵|스프린트|우선순위|PRD|일정|요구사항|계획/i,
+  researcher: /조사|트렌드|경쟁사|시장 분석/i,
   secops: /보안|인증|권한|취약점|SSL|토큰|암호화/i,
 };
 
