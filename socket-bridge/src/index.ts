@@ -427,6 +427,20 @@ const safeSwapReaction = async (
 // ─── 이벤트 빌더 ─────────────────────────────────────────
 
 /** 위임받는 에이전트용 이벤트 생성 */
+/** UTF-8 안전 문자열 자르기 (서로게이트 페어 보호) */
+const safeSlice = (str: string, maxLen: number): string => {
+  if (str.length <= maxLen) {
+    return str;
+  }
+  // 서로게이트 페어 중간에서 자르지 않도록 조정
+  let end = maxLen;
+  const code = str.charCodeAt(end - 1);
+  if (code >= 0xd800 && code <= 0xdbff) {
+    end -= 1;
+  }
+  return str.slice(0, end);
+};
+
 const buildDelegationEvent = (
   originalEvent: SlackEvent,
   accumulatedResults: Array<{
@@ -439,7 +453,7 @@ const buildDelegationEvent = (
   if (accumulatedResults.length > 0) {
     parts.push('[이전 작업 결과]');
     for (const r of accumulatedResults) {
-      parts.push(`— ${r.agent}: ${r.text.slice(0, 1500)}`);
+      parts.push(`— ${r.agent}: ${safeSlice(r.text, 1500)}`);
     }
     parts.push('');
   }
@@ -460,7 +474,7 @@ const buildPmReviewEvent = (
   const parts = ['[에이전트 실행 결과 보고]'];
 
   for (const r of accumulatedResults) {
-    parts.push(`— ${r.agent}: ${r.text.slice(0, 1500)}`);
+    parts.push(`— ${r.agent}: ${safeSlice(r.text, 1500)}`);
   }
 
   parts.push('', '[원본 요청]', originalEvent.text);
@@ -506,7 +520,10 @@ const executeSingle = async (
   }
 
   // PM 응답에서 멘션 파싱 (자기 멘션 + 미등록 에이전트 제외)
-  let targets = parseMentions(result.text).filter(
+  // parseExplicitMentions 사용: <@USER_ID> 형식만 인정
+  // parseMentions의 3단계(display name 텍스트) 폴백은 오감지를 유발해
+  // "Frontend Donald가 완료했습니다" 같은 응답에서 Hub 루프가 잘못 발동한다.
+  let targets = parseExplicitMentions(result.text).filter(
     (name) => name !== 'pm' && isValidAgent(name),
   );
 
