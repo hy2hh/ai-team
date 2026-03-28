@@ -42,3 +42,22 @@
 **Next:**
 - Block Kit 버튼 Slack 테스트 (버튼 보이는지, 클릭 시 중단되는지)
 - Hub 위임 중 상태 표시 개선 검토
+
+### [2026-03-28] Session: 자율 에이전트 시스템 리서치 + 계획
+
+**Tried:**
+- Slack MCP로 #ai-team 메시지 50건 분석 → sid 승인 80% rubber stamp 확인
+- 4개 병렬 리서치 에이전트 (article, anthropic, openai, project analysis) → 업계 최신 패턴 수집 성공
+- Plan agent로 구현 설계 → 5 Phase 점진 구현 계획 도출
+
+**Learned:**
+- Slack 메시지 히스토리가 178K 자로 매우 큼 → 서브에이전트로 분석 위임 필수
+- Anthropic 하네스 설계: Generator/Evaluator 분리가 가장 높은 ROI
+- Addy Osmani: "검증이 병목, 생성이 아님". Hook으로 자동 강제해야 함
+- OpenAI Harness Engineering: 하네스 최적화만으로 (모델 변경 없이) 성능 52.8%→66.5%
+- Ralph Loop: 객관적 체크리스트 검증 → 실패 시 재계획 → 통과까지 루프. Auto-Proceed의 전제 조건으로 배치
+- Human-on-the-loop: 에이전트가 행동, 인간이 모니터링+veto (risk별 veto window 차등)
+
+**Next:**
+- Phase 1 구현: risk-matrix.ts, db.ts 스키마 확장, 에이전트 persona 업데이트
+- Phase 2: auto-proceed.ts + Ralph Loop + reaction 핸들러
