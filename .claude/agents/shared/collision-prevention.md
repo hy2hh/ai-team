@@ -4,47 +4,50 @@
 
 모든 인바운드 메시지는 **반드시 1개 에이전트만** 처리한다. 6개 에이전트가 동시에 같은 메시지에 반응하는 것을 방지한다.
 
-## Claim Lock 메커니즘
+## Claim Lock 메커니즘 (SQLite 기반)
+
+SQLite `memory.db`의 `claims` 테이블이 단일 소스다. `.memory/claims/*.md` 파일 방식은 폐기됨.
 
 ### 동작 흐름
 
 ```
-메시지 수신 → .memory/claims/{msg-id}.md 존재 확인
-  → 없으면: claim 파일 생성 + 작업 시작
-  → 있으면: 이미 다른 에이전트가 처리 중 → 무시
+메시지 수신 → bridge의 tryClaim(messageTs, agentName) 호출
+  → INSERT OR IGNORE 성공: 해당 에이전트가 처리권 획득
+  → 이미 존재: 다른 에이전트가 처리 중 → 무시
 ```
 
-### Claim 파일 형식
+### Claims 테이블 스키마
 
-파일명: `.memory/claims/{message-id}.md`
-
-```markdown
----
-agent: Bart
-claimed_at: 2026-03-24T10:30:00+09:00
-message_id: msg-12345
-status: in_progress
----
-메시지 요약: React 컴포넌트 성능 최적화 요청
+```sql
+CREATE TABLE claims (
+  message_ts  TEXT    PRIMARY KEY,
+  agent       TEXT    NOT NULL,
+  status      TEXT    NOT NULL DEFAULT 'processing',
+  version     INTEGER NOT NULL DEFAULT 1,
+  channel     TEXT,
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
 ```
 
 ### 상태 값
 
 | status | 설명 |
 |--------|------|
-| `in_progress` | 작업 중 |
+| `processing` | 작업 중 |
 | `completed` | 완료 |
-| `abandoned` | 포기 (timeout 또는 수동) |
+| `failed` | 실패 또는 orphan 처리됨 |
 
-## Timeout 규칙
+## Timeout / Orphan 규칙
 
-- **5분 무응답**: claim이 생성되었으나 5분 내 Slack 응답이 없으면, 다른 에이전트가 재claim 가능
-- 재claim 시 기존 claim의 status를 `abandoned`로 변경 후 새 claim 생성
+- **2시간 초과 processing**: bridge의 `cleanupOrphanClaims()`가 자동으로 `failed` 전환 + Slack 알림
+- `updated_at` 기준으로 마지막 활동 시점 판단 (created_at 기준 아님)
+- 최대 2회 재큐잉(`requeueClaim()`) 후 완전 실패 처리
 
 ## 정리 규칙
 
-- **24시간 후 만료**: `completed` 또는 `abandoned` 상태의 claim 파일은 24시간 후 삭제 가능
-- 정리 담당: Triage Agent 또는 작업 완료한 에이전트
+- **24시간 후 만료**: `completed` 또는 `failed` 상태 claim은 bridge `cleanupExpiredClaims()`가 자동 삭제
+- 에이전트가 직접 claim을 삭제하거나 `.md` 파일을 생성하지 않는다
 
 ## @mention Override
 
@@ -55,16 +58,16 @@ status: in_progress
 
 ## Race Condition 대응
 
-Triage Agent가 단일 라우팅을 수행하므로 충돌은 거의 발생하지 않는다.
-Claim은 **백업 안전장치**로, 다음 시나리오에서 작동한다:
+Bridge가 단일 라우팅을 수행하므로 충돌은 거의 발생하지 않는다.
+SQLite INSERT OR IGNORE가 **원자적 잠금**으로, 다음 시나리오에서 작동한다:
 
-1. Triage Agent 다운 시 → 에이전트가 직접 claim 후 작업
+1. Triage Agent 다운 시 → bridge가 직접 claim 후 위임
 2. 네트워크 지연으로 Triage 라우팅이 늦어질 때 → claim이 중복 작업 방지
-3. 수동 @mention과 Triage 라우팅이 동시에 발생할 때 → 먼저 claim한 쪽이 작업
+3. 수동 @mention과 Triage 라우팅이 동시에 발생할 때 → 먼저 tryClaim() 성공한 쪽이 작업
 
 ## 에이전트 행동 규칙
 
-1. **@mention 없는 일반 메시지에 직접 반응하지 않는다** — Triage Agent의 라우팅을 대기
-2. Triage로부터 위임받았을 때만 작업 시작
-3. 작업 시작 시 claim 파일 생성 (안전장치)
-4. 작업 완료 시 claim status를 `completed`로 변경
+1. **@mention 없는 일반 메시지에 직접 반응하지 않는다** — Bridge/Triage의 라우팅을 대기
+2. Bridge로부터 위임받았을 때만 작업 시작
+3. `.memory/claims/*.md` 파일 생성 절대 금지 — SQLite가 단일 소스
+4. 작업 완료 시 bridge의 `updateClaim(ts, 'completed')` 호출 (bridge가 처리)

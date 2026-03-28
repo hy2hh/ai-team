@@ -28,7 +28,7 @@ sid (human lead)
 
 ### Key Design Decisions
 - **Single-responder guarantee**: Triage Agent routes messages; other agents do NOT respond to non-@mention messages (see `shared/collision-prevention.md`)
-- **File-based claim locks**: `.memory/claims/{msg-id}.md` prevents duplicate processing
+- **SQLite claim locks**: `memory.db` claims table prevents duplicate processing (`.memory/claims/*.md` approach deprecated)
 - **Scope frontmatter**: Each agent declares `scope.handles` / `scope.does_not_handle` in their YAML frontmatter for routing
 - **Cross-domain chains**: Multi-agent tasks use sequential handoff chains in `.memory/handoff/chain-{id}.md`
 
@@ -72,7 +72,7 @@ All agents share `.memory/`. Entry point: `.memory/index.md`.
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
 - **decisions/**: Format `YYYY-MM-DD_{topic}.md`. The deciding agent writes it.
 - **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
-- **claims/**: Triage-managed claim locks. 24h expiry for completed/abandoned.
+- **claims/**: Deprecated `.md` file directory (kept for `.gitkeep` only). Actual claim state lives in `memory.db` SQLite claims table.
 
 ### What NOT to Store
 - Greetings, small talk, debug logs

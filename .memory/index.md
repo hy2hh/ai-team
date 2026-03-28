@@ -11,7 +11,16 @@
 │   ├── team-profile.md   — Team members, roles, Slack bots
 │   ├── project-context.md — Goals, tech stack, constraints
 │   ├── services.md       — External service identifiers per project
-│   └── {topic}.md        — Add as needed (e.g., api-contracts.md)
+│   ├── {topic}.md        — Add as needed (e.g., api-contracts.md)
+│   └── agents/
+│       ├── pm/           — PM agent's own facts (직접 쓰기 가능)
+│       ├── backend/      — Backend agent's own facts
+│       ├── frontend/     — Frontend agent's own facts
+│       ├── designer/     — Designer agent's own facts
+│       ├── researcher/   — Researcher agent's own facts
+│       └── secops/       — SecOps agent's own facts
+├── heartbeats/
+│   └── (SQLite memory.db에 저장됨 — bridge가 10분마다 갱신)
 ├── tasks/
 │   ├── active.md         — Index (역할별 파일 링크)
 │   ├── active-{role}.md  — 역할별 진행 중 태스크 (6개)
@@ -34,9 +43,21 @@
 
 ## Writing Rules
 
-### facts/
+### heartbeats/
+- Heartbeats are stored in `memory.db` (SQLite), NOT as `.json` files
+- Bridge calls `writeHeartbeat(role, status, currentTask?)` at task start/end
+- Bridge refreshes its own heartbeat every 5 minutes automatically
+- Heartbeats not updated in 10 minutes are considered stale (`cleanupStaleHeartbeats`)
+- The `heartbeats/` directory is kept for legacy compatibility — do NOT write `.json` files there
+
+### facts/ (root)
 - Persistent knowledge only (team changes, tech stack, API contracts)
-- Owner: PM Donald (others propose via Slack, PM updates)
+- Owner: PM only — others propose via Slack, PM updates
+- Keep files under 200 lines — split if growing
+
+### facts/agents/{role}/
+- Each agent can write their own facts directly — no PM approval needed
+- Use for role-specific knowledge: local decisions, component notes, domain-specific context
 - Keep files under 200 lines — split if growing
 
 ### tasks/

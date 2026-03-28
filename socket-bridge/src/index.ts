@@ -26,7 +26,12 @@ import {
   cleanupOrphanClaims,
   requeueClaim,
   MAX_REQUEUE_ATTEMPTS,
-} from './claim.js';
+} from './claim-db.js';
+import {
+  writeHeartbeat,
+  cleanupStaleHeartbeats,
+} from './heartbeat.js';
+import { runMaintenance } from './db.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -1584,6 +1589,14 @@ const main = async () => {
     60 * 60 * 1000,
   );
 
+  // 하트비트: 브리지 활성 상태 기록 + 만료 하트비트 정리
+  writeHeartbeat('bridge', 'active');
+  cleanupStaleHeartbeats();
+  const heartbeatInterval = setInterval(
+    () => writeHeartbeat('bridge', 'active'),
+    5 * 60 * 1000,
+  );
+
   // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행
   const orphanCheckInterval = setInterval(async () => {
     const orphans = cleanupOrphanClaims();
@@ -1707,11 +1720,19 @@ const main = async () => {
     }
   }, 30 * 60 * 1000);
 
+  // DB 유지보수: 24시간마다 VACUUM + ANALYZE
+  const maintenanceInterval = setInterval(
+    runMaintenance,
+    24 * 60 * 60 * 1000,
+  );
+
   // 종료 시그널 처리
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
     clearInterval(cleanupInterval);
     clearInterval(orphanCheckInterval);
+    clearInterval(heartbeatInterval);
+    clearInterval(maintenanceInterval);
     // 세션 저장소 즉시 flush (debounce 타이머 누락 방지)
     flushSessionStore();
     // Promise.allSettled()로 부분 실패 시에도 shutdown 계속 진행

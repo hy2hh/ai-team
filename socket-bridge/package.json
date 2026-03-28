@@ -11,7 +11,9 @@
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "@modelcontextprotocol/server-slack": "^2025.4.25",
     "@slack/bolt": "^4.1.0",
+    "@types/better-sqlite3": "^7.6.13",
     "@upstash/context7-mcp": "^2.1.4",
+    "better-sqlite3": "^12.8.0",
     "dotenv": "^16.4.7",
     "mcp-remote": "^0.1.38"
   },

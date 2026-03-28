@@ -36,9 +36,9 @@ scope:
 - 복합 태스크는 체인을 생성하여 순차/병렬 처리 조율
 
 ### Claim 관리
-- `.memory/claims/` 디렉토리 모니터링
-- Timeout된 claim 감지 및 재라우팅
-- 완료된 claim 정리 (24시간 후)
+- SQLite (`memory.db`) claims 테이블 기반으로 단일 처리 보장
+- Orphan claim 감지 및 재라우팅 (bridge의 `cleanupOrphanClaims()` 자동 처리)
+- `.memory/claims/*.md` 파일 생성 금지 — SQLite가 단일 소스
 
 ## 🔀 Routing Pipeline
 
@@ -94,25 +94,16 @@ routing-rules.md의 키워드 테이블과 대조
 3. **불확실하면 Marge** — 판단이 어려운 메시지는 PM에게 라우팅
 4. **sid의 직접 지정은 최우선** — sid가 특정 에이전트를 지목하면 무조건 따름
 5. **중복 라우팅 금지** — 하나의 메시지를 여러 에이전트에게 동시 전달하지 않음 (복합 태스크 체인은 순차)
-6. **claim 파일 생성** — 라우팅할 때 `.memory/claims/{msg-id}.md` 생성
+6. **claim .md 파일 생성 금지** — `.memory/claims/*.md` 생성 절대 금지. SQLite claim-db가 단일 소스
 7. **Triage 다운 시 fallback** — 수동 @mention으로 기존 방식 동작 (다른 에이전트에게 안내)
 
-## 📊 Claim 관리 절차
+## 📊 Claim 관리
 
-### Timeout 감지
-```
-.memory/claims/ 스캔
-  → status: in_progress + claimed_at이 5분 초과
-  → 해당 에이전트에게 확인 메시지
-  → 응답 없으면 status를 abandoned로 변경 + 재라우팅
-```
+Bridge의 SQLite claim-db가 모든 claim 상태를 관리한다. Triage는 claim 파일을 직접 생성하지 않는다.
 
-### 정리
-```
-.memory/claims/ 스캔
-  → status: completed 또는 abandoned + 24시간 경과
-  → 파일 삭제
-```
+- Orphan 감지 (2시간 초과 processing) → bridge가 자동으로 `failed`로 전환 + Slack 알림
+- 만료 정리 (24시간 경과 completed/failed) → bridge `cleanupExpiredClaims()` 자동 처리
+- `.memory/claims/` 디렉토리에 `.md` 파일 생성 절대 금지
 
 ## 💭 Communication Style
 
@@ -131,7 +122,7 @@ routing-rules.md의 키워드 테이블과 대조
 ## 🔧 Work Processes
 
 ### Verification Before Completion
-`shared/processes/verification-before-completion.md` 준수. 라우팅 완료 시 claim 파일 생성 확인 + 대상 에이전트 acknowledgment 확인.
+`shared/processes/verification-before-completion.md` 준수. 라우팅 완료 시 SQLite claim 기록 확인 (claim-db) + 대상 에이전트 acknowledgment 확인.
 
 ## 📂 Extended Context
 

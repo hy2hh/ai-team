@@ -5,9 +5,11 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
+  statSync,
   writeFileSync,
 } from 'fs';
 import { join } from 'path';
+import { getDb } from './db.js';
 import {
   query,
   createSdkMcpServer,
@@ -26,13 +28,13 @@ const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
 const TASK_EVENTS_LOG_DIR = join(PROJECT_DIR, '.memory', 'logs');
 const TASK_EVENTS_LOG_PATH = join(TASK_EVENTS_LOG_DIR, 'task-events.jsonl');
+// 로테이션 기준: 5MB 초과 시 .1 → .2 → .3 순환, 최대 3개 백업 유지
+const TASK_EVENTS_MAX_BYTES = 5 * 1024 * 1024;
+const TASK_EVENTS_MAX_BACKUPS = 3;
 
 // ─── 에이전트별 성공/실패 통계 ──────────────────────────
-// .memory/metrics/agent-stats.json 에 에이전트별 total/failures 기록
+// SQLite agent_stats 테이블에 에이전트별 total/failures 기록
 // 라우팅 가중치 조정 및 운영 관측성에 활용
-
-const AGENT_STATS_DIR = join(PROJECT_DIR, '.memory', 'metrics');
-const AGENT_STATS_PATH = join(AGENT_STATS_DIR, 'agent-stats.json');
 
 interface AgentStatEntry {
   total: number;
@@ -46,48 +48,64 @@ interface AgentStats {
 }
 
 /**
- * 에이전트 성공/실패 통계를 파일에 기록
+ * 에이전트 성공/실패 통계를 SQLite에 기록 (UPSERT)
  * task_completed → success=true, task_failed → success=false
  */
 const recordAgentStat = (agent: string, success: boolean): void => {
   try {
-    if (!existsSync(AGENT_STATS_DIR)) {
-      mkdirSync(AGENT_STATS_DIR, { recursive: true });
-    }
+    const db = getDb();
+    const now = new Date().toISOString();
 
-    let stats: AgentStats = {};
-    if (existsSync(AGENT_STATS_PATH)) {
-      try {
-        stats = JSON.parse(
-          readFileSync(AGENT_STATS_PATH, 'utf-8'),
-        ) as AgentStats;
-      } catch {
-        stats = {};
-      }
+    if (success) {
+      db.prepare(`
+        INSERT INTO agent_stats (agent, total, failures, last_failure, last_updated)
+        VALUES (?, 1, 0, NULL, ?)
+        ON CONFLICT(agent) DO UPDATE SET
+          total        = total + 1,
+          last_updated = excluded.last_updated
+      `).run(agent, now);
+    } else {
+      db.prepare(`
+        INSERT INTO agent_stats (agent, total, failures, last_failure, last_updated)
+        VALUES (?, 1, 1, ?, ?)
+        ON CONFLICT(agent) DO UPDATE SET
+          total        = total + 1,
+          failures     = failures + 1,
+          last_failure = excluded.last_failure,
+          last_updated = excluded.last_updated
+      `).run(agent, now, now);
     }
-
-    if (!stats[agent]) {
-      stats[agent] = {
-        total: 0,
-        failures: 0,
-        lastUpdated: new Date().toISOString(),
-      };
-    }
-
-    stats[agent].total += 1;
-    if (!success) {
-      stats[agent].failures += 1;
-      stats[agent].lastFailure = new Date().toISOString();
-    }
-    stats[agent].lastUpdated = new Date().toISOString();
-
-    writeFileSync(
-      AGENT_STATS_PATH,
-      JSON.stringify(stats, null, 2),
-      'utf-8',
-    );
   } catch {
     // 통계 기록 실패는 에이전트 동작에 영향 없도록 무시
+  }
+};
+
+/**
+ * 에이전트 통계를 SQLite에서 읽어 AgentStats 형태로 반환
+ */
+export const getAgentStats = (): AgentStats => {
+  try {
+    const db = getDb();
+    const rows = db.prepare('SELECT * FROM agent_stats').all() as Array<{
+      agent: string;
+      total: number;
+      failures: number;
+      last_failure: string | null;
+      last_updated: string;
+    }>;
+
+    const stats: AgentStats = {};
+    for (const row of rows) {
+      stats[row.agent] = {
+        total: row.total,
+        failures: row.failures,
+        lastUpdated: row.last_updated,
+        ...(row.last_failure !== null && { lastFailure: row.last_failure }),
+      };
+    }
+    return stats;
+  } catch {
+    return {};
   }
 };
 
@@ -111,13 +129,34 @@ interface TaskEvent {
 }
 
 /**
+ * task-events.jsonl 로테이션
+ * 현재 파일이 TASK_EVENTS_MAX_BYTES 초과 시 .1/.2/.3 순환 백업 후 새 파일 시작
+ */
+const rotateLogs = (): void => {
+  if (!existsSync(TASK_EVENTS_LOG_PATH)) return;
+  const size = statSync(TASK_EVENTS_LOG_PATH).size;
+  if (size < TASK_EVENTS_MAX_BYTES) return;
+
+  // 오래된 백업부터 제거: .3 삭제 후 .2→.3, .1→.2, 현재→.1
+  for (let i = TASK_EVENTS_MAX_BACKUPS; i >= 1; i--) {
+    const older = `${TASK_EVENTS_LOG_PATH}.${i}`;
+    const newer = i === 1 ? TASK_EVENTS_LOG_PATH : `${TASK_EVENTS_LOG_PATH}.${i - 1}`;
+    if (existsSync(newer)) {
+      renameSync(newer, older);
+    }
+  }
+};
+
+/**
  * 태스크 이벤트를 JSONL 로그 파일에 기록
+ * 5MB 초과 시 자동 로테이션 (최대 3개 백업 유지)
  */
 const logTaskEvent = (data: TaskEvent): void => {
   try {
     if (!existsSync(TASK_EVENTS_LOG_DIR)) {
       mkdirSync(TASK_EVENTS_LOG_DIR, { recursive: true });
     }
+    rotateLogs();
     appendFileSync(TASK_EVENTS_LOG_PATH, JSON.stringify(data) + '\n', 'utf-8');
   } catch {
     // 로그 실패는 에이전트 동작에 영향 없도록 무시

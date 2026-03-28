@@ -1,2 +1,27 @@
 {
+  "permissions": {
+    "allow": [
+      "Read(/Users/sid/git/ai-team/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/agents/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/agents/shared/**)",
+      "Edit(/Users/sid/git/ai-team/.memory/**)",
+      "Write(/Users/sid/git/ai-team/.memory/**)",
+      "Write(/Users/sid/git/ai-team/.claude/agents/shared/**)",
+      "Write(/Users/sid/git/ai-team/.claude/agents/**)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "STATUS=$(git status --porcelain 2>/dev/null); if [ -n \"$STATUS\" ]; then jq -n --arg s \"$STATUS\" '{\"continue\": false, \"stopReason\": (\"미커밋 변경사항이 있습니다. 커밋 후 종료하세요:\\n\\n\" + $s)}'; exit 2; fi",
+            "timeout": 10,
+            "statusMessage": "미커밋 변경사항 확인 중..."
+          }
+        ]
+      }
+    ]
+  }
 }

@@ -1,0 +1,29 @@
+export interface Board {
+  id: number;
+  name: string;
+  created_at: string;
+}
+
+export interface Column {
+  id: number;
+  board_id: number;
+  name: string;
+  position: number;
+  wip_limit: number | null;
+}
+
+export interface Card {
+  id: number;
+  column_id: number;
+  title: string;
+  description: string | null;
+  priority: 'low' | 'medium' | 'high';
+  assignee: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BoardSummary extends Board {
+  columns: (Column & { cards: Card[] })[];
+}

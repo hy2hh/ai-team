@@ -4,3 +4,15 @@ node_modules/
 logs/
 .events/
 socket-bridge/node_modules/
+
+# SQLite runtime files
+*.db
+*.db-shm
+*.db-wal
+
+# Build output
+dist/
+
+# Runtime state
+socket-bridge/bridge.log
+socket-bridge/thread-sessions.json
