@@ -614,7 +614,9 @@ const executeSingle = async (
     (name) => name !== 'pm' && isValidAgent(name),
   );
 
-  if (targets.length === 0) {
+  // 순차 위임 또는 병렬 위임이 없으면 종료
+  const hasSequential = result.delegationSteps && result.delegationSteps.length > 0;
+  if (targets.length === 0 && !hasSequential) {
     return;
   }
 
