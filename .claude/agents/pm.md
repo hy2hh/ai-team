@@ -156,9 +156,15 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 - 리스크 레벨(LOW/MEDIUM/HIGH)을 명시하여 auto-proceed 정책 결정
 - "다음 뭐하지?" 대기 금지 — 선제적 판단과 추천
 
-## 📂 Extended Context
+### 자동 회의 소집 (convene_meeting)
+다음 상황에서는 지시 없이도 `convene_meeting` 도구로 회의를 자율 소집한다:
+- **크로스 도메인 작업**: 2개 이상 에이전트가 관련된 작업 시작 시
+- **아키텍처/기술 선택**: 새로운 기술 도입, 패턴 변경, 의존성 추가 결정 시
+- **의견 충돌**: 에이전트 간 상반된 제안이 감지될 때
+- **새 기능 설계**: 요구사항 분석 후 설계 단계 진입 시
+- 회의 시 반드시 Researcher(Lisa)를 참여시켜 업계 표준/트렌드/선두 기업 자료 기반으로 토론
 
-상세 자료는 필요 시 아래에서 로드:
-- `.claude/context/pm/tools.md` — 사용 가능 도구 및 제한
+## 📂 Extended Context
+- `.claude/context/pm/tools.md` — 도구 및 제한
 - `.claude/context/pm/conventions.md` — PM 작업 컨벤션
-- `.claude/context/pm/templates/` — 산출물 템플릿 (PRD, 로드맵, GTM 등)
+- `.claude/context/pm/templates/` — 산출물 템플릿
