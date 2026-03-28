@@ -61,3 +61,28 @@
 **Next:**
 - Phase 1 구현: risk-matrix.ts, db.ts 스키마 확장, 에이전트 persona 업데이트
 - Phase 2: auto-proceed.ts + Ralph Loop + reaction 핸들러
+
+### [2026-03-29] Session: Phase 1~5 전체 구현 + delegate_sequential + 시스템 프롬프트 최적화
+
+**Tried:**
+- Phase 1~5 전체 구현 (risk-matrix, auto-proceed, cross-verify, meeting, proactive personas) → 성공
+- 테스트: PM이 delegate 도구로 frontend+backend 병렬 위임 → 동작 확인
+- 프롬프트로 "시작할까요?" 금지 → buildContextRulesPrefix에 추가 → 부분 성공 (backend는 바로 실행, 일부는 여전히 질문)
+- 프롬프트로 recommend_next_phase/convene_meeting 호출 유도 → 실패 (PM이 무시)
+- 코드로 강제: hub loop 완료 후 cross-verify 자동 실행 + recommend 미호출 시 재요청 → 성공
+- 하드코딩 DEPENDENCY_PAIRS로 순차 실행 → 오탐 문제 발견
+- delegate_sequential 도구로 교체 → 성공 (designer 188초 → frontend 166초 순차 실행 확인)
+- 버그: delegationTargets 비어있으면 early return → delegationSteps 체크 도달 못함 → 수정
+- 시스템 프롬프트 최적화: 41.9KB → 16.5KB (60.6% 절감)
+
+**Learned:**
+- 프롬프트 지시 < 코드 강제. LLM은 "해야 한다" 지시를 무시할 수 있지만 코드는 무조건 실행
+- 하드코딩 의존성은 오탐 발생 → PM이 상황 판단하는 도구가 더 유연
+- 봇 메시지는 Slack Socket Mode에서 수신 안 됨 → TEST_MODE 필요
+- Anthropic 권장: CLAUDE.md 200줄/40KB 이하, 인스트럭션 150~200개 한계
+- 테스트를 "해볼까요?"라고 묻지 말고 바로 실행해야 함 (sid 반복 피드백)
+
+**Next:**
+- 운영 환경 E2E 테스트 (sid가 Slack에 직접 메시지)
+- convene_meeting 자율 소집 테스트
+- auto-proceed veto window 실제 동작 테스트
