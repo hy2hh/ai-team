@@ -618,49 +618,114 @@ const executeSingle = async (
     return;
   }
 
-  // ─── 의존성 감지: 순차 실행 필요 여부 ──────────────────
-  // 생산자→소비자 관계가 있으면 생산자를 먼저 실행하고
-  // 소비자는 생산자 결과를 받아 다음 라운드에서 실행
-  const DEPENDENCY_PAIRS: Array<[string, string]> = [
-    ['designer', 'frontend'],   // 디자인 → 구현
-    ['backend', 'frontend'],    // API → 프론트 통합
-    ['researcher', 'pm'],       // 리서치 → 기획
-  ];
+  // ─── 순차 위임 처리 (delegate_sequential) ──────────────
+  // PM이 delegate_sequential을 사용하면 step별로 순차 실행
+  if (result.delegationSteps && result.delegationSteps.length > 0) {
+    console.log(
+      `[hub] 순차 위임 시작: ${result.delegationSteps.length} steps`,
+    );
+    const pmApp = findAgentApp('pm', apps);
+    const seqResults: Array<{ agent: string; text: string }> = [];
 
-  const hasProducer = (t: string[]): string[] => {
-    const producers: string[] = [];
-    const consumers: string[] = [];
-    for (const [producer, consumer] of DEPENDENCY_PAIRS) {
-      if (t.includes(producer) && t.includes(consumer)) {
-        if (!producers.includes(producer)) {
-          producers.push(producer);
-        }
-        if (!consumers.includes(consumer)) {
-          consumers.push(consumer);
+    for (let si = 0; si < result.delegationSteps.length; si++) {
+      const step = result.delegationSteps[si];
+      console.log(
+        `[hub] 순차 위임: step ${si + 1}/${result.delegationSteps.length} [${step.agents.join(', ')}] — ${step.task}`,
+      );
+
+      // step 내 에이전트는 병렬 실행
+      const stepResults = await Promise.allSettled(
+        step.agents.map((target) => {
+          const targetApp = findAgentApp(target, apps);
+          // 이전 step 결과 + 현재 task를 포함한 이벤트
+          const stepEvent: SlackEvent = {
+            ...event,
+            text: [
+              `[순차 위임 step ${si + 1}] ${step.task}`,
+              '',
+              seqResults.length > 0
+                ? `*이전 단계 결과:*\n${seqResults.map((r) => `[${r.agent}] ${r.text.slice(0, 1000)}`).join('\n\n')}`
+                : '',
+              '',
+              '[원본 요청]',
+              event.text,
+            ].filter(Boolean).join('\n'),
+          };
+          return handleMessage(
+            target,
+            stepEvent,
+            'delegation',
+            targetApp,
+            true,
+          );
+        }),
+      );
+
+      for (let i = 0; i < step.agents.length; i++) {
+        const r = stepResults[i];
+        seqResults.push({
+          agent: step.agents[i],
+          text: r.status === 'fulfilled'
+            ? r.value.text
+            : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+        });
+      }
+
+      // 중간 step 완료 Slack 알림
+      if (si < result.delegationSteps.length - 1) {
+        try {
+          await pmApp.client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.thread_ts ?? event.ts,
+            text: `✅ *Step ${si + 1} 완료* — [${step.agents.join(', ')}]\n다음: Step ${si + 2} [${result.delegationSteps[si + 1].agents.join(', ')}]`,
+          });
+        } catch {
+          // 포스팅 실패 무시
         }
       }
     }
-    if (producers.length > 0) {
-      // 생산자만 먼저 실행, 소비자는 다음 라운드
-      return producers;
-    }
-    return t; // 의존성 없으면 전체 병렬
-  };
 
-  /** 의존성으로 다음 라운드로 연기된 에이전트 */
-  const deferredTargets: string[] = [];
-
-  const firstBatch = hasProducer(targets);
-  if (firstBatch.length < targets.length) {
-    const deferred = targets.filter((t) => !firstBatch.includes(t));
-    deferredTargets.push(...deferred);
-    console.log(
-      `[hub] 의존성 감지: 먼저=[${firstBatch.join(', ')}] 대기=[${deferred.join(', ')}]`,
+    // 전체 순차 위임 완료 → PM 리뷰
+    const reviewEvent = buildPmReviewEvent(
+      event,
+      seqResults,
+      new Set(seqResults.map((r) => r.agent)),
     );
-    targets = firstBatch;
+    console.log('[hub] 순차 위임 전체 완료 → PM 리뷰');
+    const pmReview = await handleMessage(
+      'pm',
+      reviewEvent,
+      'hub-review',
+      pmApp,
+      true,
+      false,
+    );
+
+    // cross-verify
+    for (const agentResult of seqResults) {
+      if (shouldVerify(agentResult.agent)) {
+        console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작`);
+        try {
+          await runCrossVerification(agentResult.agent, agentResult.text, event, pmApp);
+        } catch (err) {
+          console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
+        }
+      }
+    }
+
+    // recommend nudge
+    if (!pmReview.delegationTargets.length && pmReview.text && !pmReview.text.includes('recommend_next_phase')) {
+      console.log('[hub] PM이 recommend_next_phase 미호출 — 재요청');
+      await handleMessage('pm', {
+        ...event,
+        text: '[Bridge 자동 요청] 작업 완료. 다음 단계가 있다면 recommend_next_phase로 등록하세요. 없으면 "완료, 추가 작업 없음"이라고 답하세요.',
+      }, 'hub-review', pmApp, true, true);
+    }
+
+    return;
   }
 
-  // ─── PM Hub 루프 시작 ───────────────────────────────
+  // ─── PM Hub 루프 시작 (병렬 모드) ───────────────────
   console.log(
     `[hub] PM Hub 시작: targets=[${targets.join(', ')}]`,
   );
@@ -864,35 +929,6 @@ const executeSingle = async (
     targets = pmReview.delegationTargets.filter(
       (name) => name !== 'pm' && isValidAgent(name),
     );
-
-    // 의존성 대기 에이전트 자동 주입
-    // PM이 새 타겟을 지정하지 않았지만 deferred 에이전트가 있으면 자동 추가
-    if (targets.length === 0 && deferredTargets.length > 0) {
-      const remaining = deferredTargets.filter(
-        (t) => !allExecutedAgents.has(t),
-      );
-      if (remaining.length > 0) {
-        targets = remaining;
-        // deferred에서 제거 (이번에 실행할 것이므로)
-        deferredTargets.length = 0;
-        console.log(
-          `[hub] 의존성 대기 에이전트 자동 주입: [${targets.join(', ')}]`,
-        );
-        // 중간 리뷰 결과를 Slack에 포스팅 (생산자 완료 보고)
-        if (pmReview.text) {
-          try {
-            const postResult = await pmApp.client.chat.postMessage({
-              channel: event.channel,
-              text: pmReview.text,
-              thread_ts: event.thread_ts ?? event.ts,
-            });
-            currentPmTs = postResult.ts as string | undefined;
-          } catch {
-            // 포스팅 실패 무시
-          }
-        }
-      }
-    }
 
     if (targets.length === 0) {
       // PM이 완료 판단 — 최종 요약을 Slack에 포스팅

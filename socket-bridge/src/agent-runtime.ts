@@ -1009,12 +1009,20 @@ const getOrCreateSession = (agentName: string): AgentSession => {
  * @param skipReaction - 리액션 관리 건너뛰기 (병렬 실행 시 첫 에이전트만 관리)
  * @returns 에이전트 응답 텍스트 (C+D 위임 체인에서 활용)
  */
+/** 순차 위임 step */
+export interface DelegationStep {
+  agents: string[];
+  task: string;
+}
+
 /** handleMessage 반환 타입 */
 export interface HandleMessageResult {
   text: string;
   postedTs?: string;
-  /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 */
+  /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 (병렬) */
   delegationTargets: string[];
+  /** PM delegate_sequential 도구로 지정된 순차 위임 단계 */
+  delegationSteps?: DelegationStep[];
   /** 에이전트가 escalate_to_pm 도구를 호출한 경우 이유 (PM 재라우팅 트리거) */
   escalationReason?: string;
 }
@@ -1113,6 +1121,8 @@ export const handleMessage = async (
 
     // PM 전용: delegate 도구로 위임 의도를 수집하는 인라인 MCP 서버
     const delegationQueue: string[] = [];
+    /** 순차 위임 단계 (delegate_sequential 사용 시) */
+    const sequentialSteps: DelegationStep[] = [];
     // 비PM 에이전트: escalate_to_pm 도구로 PM 재라우팅 신호 수집
     let escalationReason: string | undefined;
 
@@ -1143,6 +1153,40 @@ export const handleMessage = async (
                   {
                     type: 'text' as const,
                     text: `위임 예약됨: [${valid.join(', ')}] — ${reason}`,
+                  },
+                ],
+              };
+            },
+          ),
+          tool(
+            'delegate_sequential',
+            '순서가 중요한 작업을 순차적으로 위임합니다. 예: 디자이너가 색상 팔레트를 먼저 정의하고, 그 결과를 받아 프론트엔드가 구현해야 할 때 사용합니다. 각 step은 이전 step 완료 후 실행되며, 이전 결과가 자동으로 전달됩니다. 독립적인 작업은 delegate를 사용하세요.',
+            {
+              steps: z.array(z.object({
+                agents: z.array(z.string()).describe('이 step에서 실행할 에이전트'),
+                task: z.string().describe('이 step에서 수행할 작업 설명'),
+              })).describe('순차 실행할 step 배열 (앞에서부터 순서대로 실행)'),
+              reason: z.string().describe('순차 실행이 필요한 이유'),
+            },
+            async ({ steps, reason }) => {
+              const validSteps = steps.map((step: { agents: string[]; task: string }) => ({
+                agents: step.agents.filter((a: string) =>
+                  ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
+                ),
+                task: step.task,
+              })).filter((step: { agents: string[] }) => step.agents.length > 0);
+              sequentialSteps.push(...validSteps);
+              const summary = validSteps
+                .map((s: { agents: string[]; task: string }, i: number) => `  ${i + 1}. [${s.agents.join(', ')}] ${s.task}`)
+                .join('\n');
+              console.log(
+                `[delegation] PM delegate_sequential 호출 (${validSteps.length} steps):\n${summary}`,
+              );
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `순차 위임 예약됨 (${validSteps.length} steps):\n${summary}`,
                   },
                 ],
               };
@@ -1236,6 +1280,7 @@ export const handleMessage = async (
       baseMcpServers.delegation = delegationServer;
       baseTools.push(
         'mcp__delegation__delegate',
+        'mcp__delegation__delegate_sequential',
         'mcp__delegation__recommend_next_phase',
         'mcp__delegation__convene_meeting',
       );
@@ -1419,6 +1464,7 @@ export const handleMessage = async (
       text: resultText,
       postedTs,
       delegationTargets: [...delegationQueue],
+      delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,
       escalationReason,
     };
   } catch (err) {
