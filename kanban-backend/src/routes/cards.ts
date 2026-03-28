@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { getDb } from '../db';
 import { Card } from '../types';
+import { broadcast } from '../index';
 
 const router = Router();
 
@@ -26,18 +27,32 @@ router.post('/', (req: Request, res: Response) => {
   ).run(column_id, title, description || null, priority, assignee || null, progressVal, position);
 
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid) as Card;
+  broadcast({ type: 'card:created', boardId: 1 });
   res.status(201).json(card);
 });
 
 router.patch('/:id', (req: Request, res: Response) => {
   const db = getDb();
   const { title, description, priority, assignee, progress } = req.body;
-  const progressVal = progress !== undefined ? Math.max(0, Math.min(100, Number(progress) || 0)) : null;
-  db.prepare(
-    'UPDATE cards SET title = COALESCE(?, title), description = COALESCE(?, description), priority = COALESCE(?, priority), assignee = COALESCE(?, assignee), progress = COALESCE(?, progress), updated_at = datetime(\'now\') WHERE id = ?'
-  ).run(title || null, description || null, priority || null, assignee || null, progressVal, req.params.id);
+
+  const fields: string[] = [];
+  const values: unknown[] = [];
+
+  if (title !== undefined)       { fields.push('title = ?');       values.push(title || null); }
+  if (description !== undefined) { fields.push('description = ?'); values.push(description || null); }
+  if (priority !== undefined)    { fields.push('priority = ?');    values.push(priority); }
+  if (assignee !== undefined)    { fields.push('assignee = ?');    values.push(assignee || null); }
+  if (progress !== undefined)    { fields.push('progress = ?');    values.push(Math.max(0, Math.min(100, Number(progress) || 0))); }
+
+  if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+  fields.push("updated_at = datetime('now')");
+  values.push(req.params.id);
+
+  db.prepare(`UPDATE cards SET ${fields.join(', ')} WHERE id = ?`).run(...values as Parameters<typeof db.prepare>);
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card | undefined;
   if (!card) return res.status(404).json({ error: 'Card not found' });
+  broadcast({ type: 'card:updated', boardId: 1 });
   res.json(card);
 });
 
@@ -48,7 +63,16 @@ router.patch('/:id/move', (req: Request, res: Response) => {
 
   const moveCard = db.transaction(() => {
     const existing = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card | undefined;
-    if (!existing) return null;
+    if (!existing) return { error: 'Card not found', status: 404 };
+
+    // WIP limit 체크
+    const col = db.prepare('SELECT wip_limit FROM columns WHERE id = ?').get(column_id) as { wip_limit: number | null } | undefined;
+    if (col?.wip_limit) {
+      const { cnt } = db.prepare('SELECT COUNT(*) as cnt FROM cards WHERE column_id = ? AND id != ?').get(column_id, req.params.id) as { cnt: number };
+      if (cnt >= col.wip_limit) {
+        return { error: `WIP limit exceeded (${cnt}/${col.wip_limit})`, status: 422 };
+      }
+    }
 
     // position이 명시되지 않으면 대상 컬럼의 마지막 위치에 추가
     let newPosition = position;
@@ -58,21 +82,23 @@ router.patch('/:id/move', (req: Request, res: Response) => {
     }
 
     db.prepare(
-      'UPDATE cards SET column_id = ?, position = ?, updated_at = datetime(\'now\') WHERE id = ?'
+      "UPDATE cards SET column_id = ?, position = ?, updated_at = datetime('now') WHERE id = ?"
     ).run(column_id, newPosition, req.params.id);
 
     return db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card;
   });
 
-  const card = moveCard();
-  if (!card) return res.status(404).json({ error: 'Card not found' });
-  res.json(card);
+  const result = moveCard();
+  if ('error' in result) return res.status(result.status).json({ error: result.error });
+  broadcast({ type: 'card:moved', boardId: 1 });
+  res.json(result);
 });
 
 router.delete('/:id', (req: Request, res: Response) => {
   const db = getDb();
   const result = db.prepare('DELETE FROM cards WHERE id = ?').run(req.params.id);
   if (result.changes === 0) return res.status(404).json({ error: 'Card not found' });
+  broadcast({ type: 'card:deleted', boardId: 1 });
   res.json({ success: true });
 });
 
