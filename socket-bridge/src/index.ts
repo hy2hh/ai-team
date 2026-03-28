@@ -39,6 +39,10 @@ import {
   cleanupExpiredApprovals,
   onApproved,
 } from './auto-proceed.js';
+import {
+  shouldVerify,
+  runCrossVerification,
+} from './cross-verify.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -835,6 +839,65 @@ const executeSingle = async (
         }
       }
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
+
+      // ─── Cross-Verification 자동 실행 ──────────────────
+      // 에이전트 실행 결과 중 검증 가능한 에이전트가 있으면 자동 검증
+      for (const agentResult of accumulatedResults) {
+        if (shouldVerify(agentResult.agent)) {
+          console.log(
+            `[cross-verify] ${agentResult.agent} 자동 검증 시작`,
+          );
+          try {
+            const verifyResults = await runCrossVerification(
+              agentResult.agent,
+              agentResult.text,
+              event,
+              pmApp,
+            );
+            const hasFail = verifyResults.some(
+              (r) => r.result === 'FAIL',
+            );
+            if (hasFail) {
+              console.warn(
+                `[cross-verify] ${agentResult.agent}: FAIL 감지 — 에스컬레이션`,
+              );
+            }
+          } catch (err) {
+            console.error(
+              `[cross-verify] ${agentResult.agent} 검증 실패:`,
+              err,
+            );
+          }
+        }
+      }
+
+      // ─── recommend_next_phase 강제 요청 ──────────────────
+      // PM이 recommend_next_phase를 호출하지 않았으면 bridge가 재요청
+      if (
+        !pmReview.delegationTargets.length &&
+        pmReview.text &&
+        !pmReview.text.includes('recommend_next_phase')
+      ) {
+        console.log(
+          '[hub] PM이 recommend_next_phase 미호출 — 다음 단계 추천 재요청',
+        );
+        const nudgeEvent: SlackEvent = {
+          ...event,
+          text: [
+            '[Bridge 자동 요청] 작업이 완료되었습니다.',
+            '다음 단계가 있다면 recommend_next_phase 도구로 등록하세요.',
+            '더 이상 할 일이 없다면 "완료, 추가 작업 없음"이라고 답하세요.',
+          ].join('\n'),
+        };
+        await handleMessage(
+          'pm',
+          nudgeEvent,
+          'hub-review',
+          pmApp,
+          true,
+          true,
+        );
+      }
     } else {
       // 계속 위임 — 중간 리뷰는 skipPosting이므로 currentPmTs 업데이트 없음
       console.log(
