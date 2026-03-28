@@ -11,12 +11,14 @@
 
 ### When Delegating
 1. Analyze the request — identify which parts belong to your role
-2. For parts outside your role, @mention the relevant agent with:
+2. **스펙 확인**: 2+ 에이전트 협업 기능이면 `docs/specs/`에 Feature Spec이 있는지 확인. 없으면 PM에게 작성 요청.
+3. For parts outside your role, @mention the relevant agent with:
    - **What**: Clear description of the deliverable
    - **Why**: Context and motivation
    - **When**: Priority level (urgent / normal / low)
    - **Dependencies**: What they need from you or others
-3. Update `.memory/tasks/active-{delegatee-role}.md` with the new task
+   - **Spec**: 관련 스펙 파일 경로 (있는 경우)
+4. Update `.memory/tasks/active-{delegatee-role}.md` with the new task
 
 ### When Receiving
 1. Acknowledge receipt immediately

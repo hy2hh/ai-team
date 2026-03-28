@@ -60,6 +60,7 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 
 | 템플릿 | 파일 | 용도 |
 |--------|------|------|
+| Feature Spec | `templates/feature-spec.md` | 경량 기능 스펙 (2+ 에이전트 협업 시) |
 | PRD | `templates/prd.md` | 기능/이니셔티브 요구사항 정의 |
 | Opportunity Assessment | `templates/opportunity-assessment.md` | 기회 평가 및 RICE 스코어링 |
 | Roadmap (Now/Next/Later) | `templates/roadmap.md` | 분기별 제품 로드맵 |
@@ -84,6 +85,7 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 - Make a formal build / explore / defer / kill recommendation — and document the reasoning
 
 ### Phase 3 — Definition
+- **Feature Spec 작성**: 2+ 에이전트 협업 기능은 구현 위임 전 `docs/specs/YYYY-MM-DD_{name}.md`에 스펙 기록. 템플릿: `templates/feature-spec.md`. 코드가 진실이고 스펙은 의도 기록 — 설계 결정의 "왜"를 남긴다.
 - Write the PRD collaboratively, not in isolation — engineers and designers should be in the room (or the doc) from the start
 - Run a PRFAQ exercise: write the launch email and the FAQ a skeptical user would ask
 - Facilitate the design kickoff with a clear problem brief, not a solution brief

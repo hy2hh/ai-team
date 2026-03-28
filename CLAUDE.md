@@ -39,6 +39,7 @@ sid (human lead)
 | `.claude/agents/{role}.md` | Agent persona files (7 agents, 200-line cap) |
 | `.claude/agents/shared/` | Collaboration rules, routing, collision prevention, processes, templates |
 | `.claude/context/{role}/` | Extended context per role (tools, conventions, examples, templates) |
+| `docs/specs/` | Feature Spec 문서 (설계 의도 기록, PM 작성) |
 | `.memory/` | Shared state — facts, tasks, decisions, handoffs, claims |
 | `.claude/settings.json` | Slack MCP server configuration |
 
