@@ -19,6 +19,11 @@ import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import type { App } from '@slack/bolt';
 import type { AgentSession, SlackEvent } from './types.js';
+import {
+  registerAutoProceed,
+  type AutoProceedRequest,
+} from './auto-proceed.js';
+import { classifyRisk } from './risk-matrix.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -1136,10 +1141,51 @@ export const handleMessage = async (
               };
             },
           ),
+          tool(
+            'recommend_next_phase',
+            '다음 작업 단계를 추천합니다. bridge가 리스크를 분류하여 자동 진행 또는 sid 승인 대기를 결정합니다. 작업 완료 리뷰 후 다음 단계가 명확할 때 호출하세요.',
+            {
+              agents: z.array(z.string()).describe('다음 단계에 참여할 에이전트 목록'),
+              reason: z.string().describe('추천 이유'),
+              actionSummary: z.string().describe('다음 단계에서 수행할 작업 요약'),
+              riskLevel: z.string().optional().describe('리스크 레벨 (LOW/MEDIUM/HIGH). 생략 시 자동 분류'),
+            },
+            async ({ agents, reason, actionSummary, riskLevel }) => {
+              const valid = agents.filter((a: string) =>
+                ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
+              );
+              const risk = classifyRisk(
+                `${reason} ${actionSummary}`,
+                riskLevel,
+              );
+              const approvalId = await registerAutoProceed(
+                {
+                  messageTs: event.ts,
+                  channel: event.channel,
+                  agents: valid,
+                  reason,
+                  actionSummary,
+                  riskLevel: risk.level,
+                } as AutoProceedRequest,
+                slackApp,
+              );
+              console.log(
+                `[delegation] PM recommend_next_phase: #${approvalId} ${risk.level} [${valid.join(', ')}] — ${reason}`,
+              );
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `다음 단계 등록됨: #${approvalId} [${risk.level}] ${valid.join(', ')} — ${reason} (${risk.reason})`,
+                  },
+                ],
+              };
+            },
+          ),
         ],
       });
       baseMcpServers.delegation = delegationServer;
-      baseTools.push('mcp__delegation__delegate');
+      baseTools.push('mcp__delegation__delegate', 'mcp__delegation__recommend_next_phase');
     } else {
       // 비PM 에이전트: 범위 초과 시 PM에게 에스컬레이션 신호 도구
       const escalationServer = createSdkMcpServer({

@@ -32,6 +32,13 @@ import {
   cleanupStaleHeartbeats,
 } from './heartbeat.js';
 import { runMaintenance } from './db.js';
+import {
+  cancelAutoProceed,
+  manuallyApprove,
+  hasPendingApproval,
+  cleanupExpiredApprovals,
+  onApproved,
+} from './auto-proceed.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -1161,6 +1168,27 @@ const flushDebounceBuffer = async (
   // end-to-end 타이밍 시작
   const e2eStart = Date.now();
 
+  // ─── Auto-Proceed 텍스트 승인 체크 ──────────────────
+  // "ㅇㅇ", "ok", "진행", "ㄱ", "고" 등 승인 텍스트가
+  // pending approval이 있는 채널에서 발생하면 승인 처리 후 라우팅 건너뜀
+  const APPROVAL_TEXT_PATTERN =
+    /^[\s]*(ㅇㅇ|ok|진행|ㄱ|고|approve|승인|넵|네)[\s!.]*$/i;
+  if (
+    APPROVAL_TEXT_PATTERN.test(combinedText) &&
+    hasPendingApproval(slackEvent.channel)
+  ) {
+    const count = await manuallyApprove(
+      slackEvent.channel,
+      apps[0],
+    );
+    if (count > 0) {
+      console.log(
+        `[auto-proceed] 텍스트 승인: "${combinedText.trim()}" → ${count}개 승인`,
+      );
+      return;
+    }
+  }
+
   // 라우팅 (raw 텍스트 기준 — sender prefix가 멘션/패턴 매칭을 오염하지 않도록)
   // 스레드 컨텍스트: 언급된 에이전트 우선, 없으면 참여 에이전트로 폴백
   const threadFilterAgents =
@@ -1519,7 +1547,10 @@ const main = async () => {
       }
     });
 
-    // ─── 이모지 기반 에이전트 제어 (⛔ 중단) ──────────────────
+    // ─── 이모지 기반 에이전트 제어 ──────────────────
+    // ⛔ black_square_for_stop → 에이전트 즉시 중단
+    // ❌ x → auto-proceed 취소
+    // ✅ white_check_mark → HIGH 리스크 수동 승인
     app.event(
       'reaction_added',
       async ({ event: reactionEvent }) => {
@@ -1528,10 +1559,6 @@ const main = async () => {
           item: { ts: string; channel: string };
           user: string;
         };
-        // black_square_for_stop 이모지만 처리
-        if (re.reaction !== 'black_square_for_stop') {
-          return;
-        }
         // 봇 자신의 리액션은 무시
         const userId = re.user;
         if (
@@ -1539,21 +1566,56 @@ const main = async () => {
         ) {
           return;
         }
-        // 🔍 리액션 제거 (라우팅 중이었다면)
-        try {
-          await apps[0].client.reactions.remove({
-            channel: re.item.channel,
-            timestamp: re.item.ts,
-            name: 'mag',
-          });
-        } catch {
-          // 이미 제거됨 무시
-        }
-        const cancelled = cancelAgent(re.item.ts);
-        if (cancelled) {
-          console.log(
-            `[control] ⛔ 사용자 리액션으로 에이전트 중단: ${re.item.ts}`,
-          );
+
+        switch (re.reaction) {
+          case 'black_square_for_stop': {
+            // 🔍 리액션 제거 (라우팅 중이었다면)
+            try {
+              await apps[0].client.reactions.remove({
+                channel: re.item.channel,
+                timestamp: re.item.ts,
+                name: 'mag',
+              });
+            } catch {
+              // 이미 제거됨 무시
+            }
+            const cancelled = cancelAgent(re.item.ts);
+            if (cancelled) {
+              console.log(
+                `[control] ⛔ 사용자 리액션으로 에이전트 중단: ${re.item.ts}`,
+              );
+            }
+            break;
+          }
+          case 'x': {
+            // auto-proceed 취소
+            const count = await cancelAutoProceed(
+              re.item.channel,
+              re.item.ts,
+              apps[0],
+            );
+            if (count > 0) {
+              console.log(
+                `[auto-proceed] ❌ 사용자 리액션으로 ${count}개 자동 진행 취소`,
+              );
+            }
+            break;
+          }
+          case 'white_check_mark': {
+            // HIGH 리스크 수동 승인
+            const count = await manuallyApprove(
+              re.item.channel,
+              apps[0],
+            );
+            if (count > 0) {
+              console.log(
+                `[auto-proceed] ✅ 사용자 리액션으로 ${count}개 수동 승인`,
+              );
+            }
+            break;
+          }
+          default:
+            break;
         }
       },
     );
@@ -1581,6 +1643,40 @@ const main = async () => {
   console.log(
     '[start] Agent SDK 런타임 활성 — 병렬 실행 + mention 기반 에이전트 간 위임 지원',
   );
+
+  // Auto-Proceed: 만료된 승인 정리 + 콜백 등록
+  await cleanupExpiredApprovals(apps[0]);
+  onApproved((_approvalId, agents, reason, channel, messageTs) => {
+    // 승인된 에이전트들에게 작업 디스패치
+    console.log(
+      `[auto-proceed] 승인 콜백: [${agents.join(', ')}] — ${reason}`,
+    );
+    for (const agentName of agents) {
+      const agentEvent: SlackEvent = {
+        type: 'message',
+        channel,
+        channel_name: 'ai-team',
+        user: 'auto-proceed',
+        text: `[Auto-Proceed] ${reason}`,
+        ts: messageTs,
+        thread_ts: messageTs,
+        mentions: [],
+        raw: {},
+      };
+      handleMessage(
+        agentName,
+        agentEvent,
+        'delegation',
+        apps[0],
+        true,
+      ).catch((err) => {
+        console.error(
+          `[auto-proceed] ${agentName} 디스패치 실패:`,
+          err,
+        );
+      });
+    }
+  });
 
   // 시작 시 만료된 claim 정리 + 1시간마다 주기적 정리
   cleanupExpiredClaims();
