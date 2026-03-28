@@ -1144,6 +1144,25 @@ export const handleMessage = async (
               const valid = agents.filter((a: string) =>
                 ['designer', 'frontend', 'backend', 'researcher', 'secops'].includes(a),
               );
+
+              // 2+ 구현 에이전트 위임 시 스펙 파일 존재 검증
+              const implAgents = valid.filter((a) =>
+                ['designer', 'frontend', 'backend'].includes(a),
+              );
+              if (implAgents.length >= 2) {
+                const specsDir = join(PROJECT_DIR, 'docs', 'specs');
+                const hasSpecs = existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md') && f !== 'README.md');
+                if (!hasSpecs) {
+                  console.warn(`[enforcement] delegate 차단: 2+ 구현 에이전트(${implAgents.join(', ')}) 위임에 스펙 파일 없음`);
+                  return {
+                    content: [{
+                      type: 'text' as const,
+                      text: `⛔ 위임 차단: 구현 에이전트 ${implAgents.length}명(${implAgents.join(', ')}) 위임에는 docs/specs/에 Feature Spec 파일이 필요합니다. 먼저 스펙을 작성하세요. 템플릿: .claude/context/pm/templates/feature-spec.md`,
+                    }],
+                  };
+                }
+              }
+
               delegationQueue.push(...valid);
               console.log(
                 `[delegation] PM delegate 호출: [${valid.join(', ')}] — ${reason}`,
@@ -1168,13 +1187,34 @@ export const handleMessage = async (
               })).describe('순차 실행할 step 배열 (앞에서부터 순서대로 실행)'),
               reason: z.string().describe('순차 실행이 필요한 이유'),
             },
-            async ({ steps, reason }) => {
+            async ({ steps, reason: _reason }) => {
               const validSteps = steps.map((step: { agents: string[]; task: string }) => ({
                 agents: step.agents.filter((a: string) =>
                   ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
                 ),
                 task: step.task,
               })).filter((step: { agents: string[] }) => step.agents.length > 0);
+
+              // 전체 step에서 구현 에이전트 2+ 참여 시 스펙 파일 검증
+              const allImplAgents = new Set(
+                validSteps.flatMap((s: { agents: string[] }) =>
+                  s.agents.filter((a: string) => ['designer', 'frontend', 'backend'].includes(a)),
+                ),
+              );
+              if (allImplAgents.size >= 2) {
+                const specsDir = join(PROJECT_DIR, 'docs', 'specs');
+                const hasSpecs = existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md') && f !== 'README.md');
+                if (!hasSpecs) {
+                  console.warn(`[enforcement] delegate_sequential 차단: 구현 에이전트 ${[...allImplAgents].join(', ')} 참여에 스펙 파일 없음`);
+                  return {
+                    content: [{
+                      type: 'text' as const,
+                      text: `⛔ 순차 위임 차단: 구현 에이전트 ${allImplAgents.size}명(${[...allImplAgents].join(', ')}) 참여에는 docs/specs/에 Feature Spec 파일이 필요합니다. 먼저 스펙을 작성하세요. 템플릿: .claude/context/pm/templates/feature-spec.md`,
+                    }],
+                  };
+                }
+              }
+
               sequentialSteps.push(...validSteps);
               const summary = validSteps
                 .map((s: { agents: string[]; task: string }, i: number) => `  ${i + 1}. [${s.agents.join(', ')}] ${s.task}`)
@@ -1416,6 +1456,28 @@ export const handleMessage = async (
     // 응답 메타데이터 (소요 시간 + 모델) 추가
     const modelLabel = usedModel || 'unknown';
     const metaFooter = `\n\n_⏱ ${elapsed}s · ${modelLabel}_`;
+
+    // ── "진행할까요?" 안티패턴 감지 ──────────────────────────
+    // 프롬프트 규칙으로 금지해도 반복 위반 → 코드로 강제 차단
+    const ASK_PERMISSION_PATTERNS = [
+      /진행할까요\??/,
+      /시작할까요\??/,
+      /어떻게 할까요\??/,
+      /해볼까요\??/,
+      /괜찮을까요\??/,
+      /승인.*기다리/,
+      /확인.*부탁/,
+      /의견.*주세요/,
+    ];
+    if (resultText) {
+      const matched = ASK_PERMISSION_PATTERNS.find((p) => p.test(resultText));
+      if (matched) {
+        console.warn(
+          `[enforcement] ${agentName} "진행할까요?" 안티패턴 감지: ${matched}`,
+        );
+        resultText += '\n\n> ⚠️ _[bridge 자동 경고] 위 응답에 승인 요청 패턴이 감지되었습니다. 에이전트는 즉시 실행해야 합니다._';
+      }
+    }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     let postedTs: string | undefined;
