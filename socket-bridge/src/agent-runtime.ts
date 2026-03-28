@@ -24,6 +24,7 @@ import {
   type AutoProceedRequest,
 } from './auto-proceed.js';
 import { classifyRisk } from './risk-matrix.js';
+import { runMeeting, type MeetingType } from './meeting.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -1182,10 +1183,56 @@ export const handleMessage = async (
               };
             },
           ),
+          tool(
+            'convene_meeting',
+            '에이전트 회의를 소집합니다. 참여자들의 독립 의견을 병렬 수집한 뒤 종합하여 결정을 내립니다. 아키텍처 결정, 설계 리뷰, 기술 선택 등 다양한 관점이 필요한 주제에 사용하세요.',
+            {
+              type: z.enum(['architecture', 'planning', 'review', 'retrospective', 'ad-hoc']).describe('회의 유형'),
+              topic: z.string().describe('회의 주제'),
+              participants: z.array(z.string()).describe('참여 에이전트 목록'),
+              context: z.string().optional().describe('회의 배경/맥락'),
+            },
+            async ({ type, topic, participants, context }) => {
+              const valid = participants.filter((a: string) =>
+                ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
+              );
+              try {
+                const { meetingId, decision } = await runMeeting(
+                  type as MeetingType,
+                  topic,
+                  valid,
+                  context,
+                  event,
+                  slackApp,
+                );
+                return {
+                  content: [
+                    {
+                      type: 'text' as const,
+                      text: `회의 #${meetingId} 완료. 결정:\n${decision.slice(0, 1000)}`,
+                    },
+                  ],
+                };
+              } catch (err) {
+                return {
+                  content: [
+                    {
+                      type: 'text' as const,
+                      text: `회의 소집 실패: ${err instanceof Error ? err.message : String(err)}`,
+                    },
+                  ],
+                };
+              }
+            },
+          ),
         ],
       });
       baseMcpServers.delegation = delegationServer;
-      baseTools.push('mcp__delegation__delegate', 'mcp__delegation__recommend_next_phase');
+      baseTools.push(
+        'mcp__delegation__delegate',
+        'mcp__delegation__recommend_next_phase',
+        'mcp__delegation__convene_meeting',
+      );
     } else {
       // 비PM 에이전트: 범위 초과 시 PM에게 에스컬레이션 신호 도구
       const escalationServer = createSdkMcpServer({

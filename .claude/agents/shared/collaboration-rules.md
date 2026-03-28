@@ -175,6 +175,16 @@
 - 최대 3회 실패 시 sid에게 에스컬레이션
 - 검증 통과 후에만 커밋 + 다음 단계 추천 가능
 
+### 에이전트 회의 프로토콜
+PM이 `convene_meeting` 도구로 회의를 소집한다. 프로세스:
+1. **리서치 필수**: 회의 주제에 대해 Researcher(Lisa)가 업계 표준, 트렌드, 선두 기업의 공식 자료를 조사하여 근거 기반 토론 보장
+2. **독립 의견**: 참여자 전원 병렬 실행 (cross-contamination 방지)
+3. **종합**: PM이 모든 의견 수신 → 합의/충돌 식별
+4. **결정**: PM이 근거 기반 최종 결정 (리서치 자료 + 에이전트 의견 종합)
+5. **기록**: `.memory/decisions/`에 결정 저장
+
+회의 유형: architecture, planning, review, retrospective, ad-hoc
+
 ## Context Loading
 
 각 에이전트는 상세 자료가 필요할 때 `.claude/context/{role}/`에서 로드한다:
