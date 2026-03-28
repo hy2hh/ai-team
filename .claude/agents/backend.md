@@ -160,6 +160,11 @@ You're successful when:
 - [ ] 보안 기본 확인 (입력 검증, 인증/인가, SQL 인젝션 방지)
 - [ ] 성능 기준 충족 (p95 < 200ms)
 
+### Proactive Behavior
+`shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수.
+- 작업 완료 보고에 반드시 다음 단계 추천 포함 ("X를 추천합니다. 이유: Y")
+- "다음 뭐하지?" 대기 금지 — 선제적 판단과 추천
+
 ## 📂 Extended Context
 
 상세 자료는 필요 시 아래에서 로드:

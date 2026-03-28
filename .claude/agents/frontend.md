@@ -188,10 +188,11 @@ You're successful when:
 - [ ] 콘솔 에러 없음
 - [ ] Core Web Vitals 기준 충족
 
-## 📂 Extended Context
+### Proactive Behavior
+`shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수. 완료 보고에 다음 단계 추천 필수, 대기 금지.
 
-상세 자료는 필요 시 아래에서 로드:
-- `.claude/context/frontend/tools.md` — 사용 가능 도구 및 제한
-- `.claude/context/frontend/conventions.md` — 프론트엔드 코딩 컨벤션
+## 📂 Extended Context
+- `.claude/context/frontend/tools.md` — 도구 및 제한
+- `.claude/context/frontend/conventions.md` — 코딩 컨벤션
 - `.claude/context/frontend/examples/` — React 컴포넌트 예시
 - `.claude/context/frontend/templates/` — 구현 산출물 템플릿

@@ -56,11 +56,80 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       );
     `,
   },
-  // 예시: version 2 마이그레이션
-  // {
-  //   version: 2,
-  //   sql: `ALTER TABLE claims ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;`,
-  // },
+  {
+    version: 2,
+    sql: `
+      -- Auto-Proceed 승인 대기열
+      CREATE TABLE IF NOT EXISTS pending_approvals (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_ts   TEXT    NOT NULL,
+        channel      TEXT    NOT NULL,
+        risk_level   TEXT    NOT NULL DEFAULT 'MEDIUM',
+        reason       TEXT,
+        agents       TEXT,
+        action_summary TEXT,
+        status       TEXT    NOT NULL DEFAULT 'pending',
+        veto_expires INTEGER,
+        created_at   INTEGER NOT NULL,
+        resolved_at  INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_approvals_status
+        ON pending_approvals(status);
+
+      CREATE INDEX IF NOT EXISTS idx_approvals_veto
+        ON pending_approvals(veto_expires);
+
+      -- 에이전트 회의
+      CREATE TABLE IF NOT EXISTS meetings (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        type         TEXT    NOT NULL,
+        topic        TEXT    NOT NULL,
+        status       TEXT    NOT NULL DEFAULT 'convened',
+        initiator    TEXT    NOT NULL,
+        participants TEXT    NOT NULL,
+        context      TEXT,
+        decision     TEXT,
+        created_at   INTEGER NOT NULL,
+        resolved_at  INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_meetings_status
+        ON meetings(status);
+
+      -- 회의 참여자 의견
+      CREATE TABLE IF NOT EXISTS meeting_opinions (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id   INTEGER NOT NULL REFERENCES meetings(id),
+        agent        TEXT    NOT NULL,
+        opinion      TEXT    NOT NULL,
+        vote         TEXT,
+        round        INTEGER NOT NULL DEFAULT 1,
+        created_at   INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_opinions_meeting
+        ON meeting_opinions(meeting_id);
+
+      -- Ralph Loop 검증 결과
+      CREATE TABLE IF NOT EXISTS verification_results (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_ts   TEXT    NOT NULL,
+        agent        TEXT    NOT NULL,
+        checklist    TEXT    NOT NULL,
+        passed       INTEGER NOT NULL DEFAULT 0,
+        attempt      INTEGER NOT NULL DEFAULT 1,
+        details      TEXT,
+        created_at   INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_verification_agent
+        ON verification_results(agent);
+
+      CREATE INDEX IF NOT EXISTS idx_verification_ts
+        ON verification_results(message_ts);
+    `,
+  },
 ];
 
 /**

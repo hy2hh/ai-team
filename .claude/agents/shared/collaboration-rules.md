@@ -156,6 +156,25 @@
 - **code-review-response.md** — Strengths/Issues/Assessment 리뷰 응답 포맷
 - **implementation-plan.md** — 구현 계획 문서 구조
 
+## Proactive Agent Behavior (자율 에이전트 행동 규칙)
+
+### 완료 보고 시 다음 단계 추천 필수
+- "다음 뭐하지?" 식 대기 **금지**
+- 작업 완료 보고에 반드시 **다음 단계 추천** 포함:
+  - "X를 추천합니다. 이유: Y"
+  - 추천 대상 에이전트와 예상 리스크 레벨(LOW/MEDIUM/HIGH) 명시
+- PM(Marge)은 `recommend_next_phase` 도구로 bridge에 자동 진행을 등록
+
+### 리스크 기반 자율 판단
+- **LOW** (분석, 리뷰, 문서화, Phase 전환 추천): 자동 진행 (2분 veto window)
+- **MEDIUM** (새 파일 생성, 크로스 도메인, 아키텍처 변경): 알림 + 자동 진행 (5분 veto window)
+- **HIGH** (의존성, 스키마, 보안, 배포, 프로세스 변경): sid 승인 필수 (무기한 대기)
+
+### Ralph Loop 검증
+- 작업 완료 → 객관적 체크리스트 검증 → 실패 시 수정 → 재검증 (통과까지 반복)
+- 최대 3회 실패 시 sid에게 에스컬레이션
+- 검증 통과 후에만 커밋 + 다음 단계 추천 가능
+
 ## Context Loading
 
 각 에이전트는 상세 자료가 필요할 때 `.claude/context/{role}/`에서 로드한다:

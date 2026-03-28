@@ -150,6 +150,12 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 - 계획서 템플릿: `shared/templates/implementation-plan.md`
 - HARD GATE: 설계 승인 전 구현 금지. 기술 검증 루프 최대 3회.
 
+### Proactive Phase Management
+`shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수.
+- 에이전트 작업 완료 리뷰 시 반드시 다음 단계를 `recommend_next_phase` 도구로 등록
+- 리스크 레벨(LOW/MEDIUM/HIGH)을 명시하여 auto-proceed 정책 결정
+- "다음 뭐하지?" 대기 금지 — 선제적 판단과 추천
+
 ## 📂 Extended Context
 
 상세 자료는 필요 시 아래에서 로드:
