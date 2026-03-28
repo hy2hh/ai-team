@@ -24,6 +24,7 @@ import {
   type AutoProceedRequest,
 } from './auto-proceed.js';
 import { classifyRisk } from './risk-matrix.js';
+import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
@@ -377,6 +378,8 @@ interface ActiveAgentEntry {
   agentName: string;
   channel: string;
   slackApp: App;
+  /** 에이전트 시작 시각 (stale 엔트리 정리용) */
+  startedAt: number;
 }
 
 /** 현재 실행 중인 에이전트 (원본 메시지 ts → 엔트리) */
@@ -415,6 +418,57 @@ export const cancelAgent = (messageTs: string): boolean => {
     5 * 60 * 1000,
   );
   return true;
+};
+
+// ─── 메모리 관리: 주기적 정리 함수 ──────────────────────
+
+/** stale 에이전트 강제 중단 (10분 초과) */
+const ACTIVE_AGENT_MAX_AGE_MS = 10 * 60 * 1000;
+
+export const cleanupStaleAgents = (): number => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [ts, entry] of activeAgents) {
+    if (now - entry.startedAt > ACTIVE_AGENT_MAX_AGE_MS) {
+      console.warn(
+        `[cleanup] stale agent aborted: ${entry.agentName} (${ts}, age=${Math.round((now - entry.startedAt) / 60000)}min)`,
+      );
+      entry.controller.abort();
+      activeAgents.delete(ts);
+      cleaned++;
+    }
+  }
+  return cleaned;
+};
+
+/** 모든 활성 에이전트 즉시 중단 (shutdown용) */
+export const cancelAllAgents = (): void => {
+  for (const [, entry] of activeAgents) {
+    entry.controller.abort();
+  }
+  activeAgents.clear();
+};
+
+/** 만료된 세션 엔트리 정리 (런타임 주기적 실행) */
+export const cleanupExpiredSessions = (): number => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const agent of Object.keys(sessionStore)) {
+    for (const key of Object.keys(sessionStore[agent])) {
+      if (now - sessionStore[agent][key].updatedAt > SESSION_TTL_MS) {
+        delete sessionStore[agent][key];
+        cleaned++;
+      }
+    }
+    if (Object.keys(sessionStore[agent]).length === 0) {
+      delete sessionStore[agent];
+    }
+  }
+  if (cleaned > 0) {
+    saveSessionStore();
+    console.log(`[session] periodic cleanup: ${cleaned} expired entries removed`);
+  }
+  return cleaned;
 };
 
 /**
@@ -1091,6 +1145,7 @@ export const handleMessage = async (
     agentName,
     channel: event.channel,
     slackApp,
+    startedAt: Date.now(),
   });
 
   // 🧠 리액션으로 처리 중 표시
@@ -1537,11 +1592,13 @@ export const handleMessage = async (
     if (resultText && !skipPosting) {
       try {
         const postResult =
-          await slackApp.client.chat.postMessage({
-            channel: event.channel,
-            text: resultText + metaFooter,
-            thread_ts: event.thread_ts ?? event.ts,
-          });
+          await rateLimited(() =>
+            slackApp.client.chat.postMessage({
+              channel: event.channel,
+              text: resultText + metaFooter,
+              thread_ts: event.thread_ts ?? event.ts,
+            }),
+          );
         postedTs = postResult.ts;
         console.log(
           `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
@@ -1656,11 +1713,13 @@ export const handleMessage = async (
 
     // 에러 시 Slack에 알림
     try {
-      await slackApp.client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: event.thread_ts ?? event.ts,
-        text: `[${agentName}] 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`,
-      });
+      await rateLimited(() =>
+        slackApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `[${agentName}] 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`,
+        }),
+      );
     } catch (postErr) {
       console.error('[runtime] 오류 알림 포스팅 실패:', postErr);
     }

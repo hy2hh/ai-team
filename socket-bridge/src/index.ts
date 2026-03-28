@@ -18,6 +18,9 @@ import {
   validatePersonaFiles,
   flushSessionStore,
   cancelAgent,
+  cancelAllAgents,
+  cleanupStaleAgents,
+  cleanupExpiredSessions,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -38,11 +41,13 @@ import {
   hasPendingApproval,
   cleanupExpiredApprovals,
   onApproved,
+  cancelAllPendingTimers,
 } from './auto-proceed.js';
 import {
   shouldVerify,
   runCrossVerification,
 } from './cross-verify.js';
+import { rateLimited } from './rate-limiter.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -355,6 +360,8 @@ interface DebounceEntry {
   threadTs: string | null;
   /** 원본 raw 이벤트 (마지막 메시지 기준) */
   raw: Record<string, unknown>;
+  /** 엔트리 생성 시각 (TTL 정리용) */
+  createdAt: number;
 }
 
 /**
@@ -399,7 +406,7 @@ const isValidAgent = (name: string): boolean =>
 
 // ─── 리액션 유틸리티 ─────────────────────────────────────
 
-/** 리액션 추가 (실패 무시) */
+/** 리액션 추가 (실패 무시, rate limited) */
 const safeAddReaction = async (
   app: App,
   channel: string,
@@ -407,11 +414,13 @@ const safeAddReaction = async (
   name: string,
 ): Promise<void> => {
   try {
-    await app.client.reactions.add({
-      channel,
-      timestamp: ts,
-      name,
-    });
+    await rateLimited(() =>
+      app.client.reactions.add({
+        channel,
+        timestamp: ts,
+        name,
+      }),
+    );
   } catch {
     // 리액션 실패 무시
   }
@@ -426,11 +435,13 @@ const safeSwapReaction = async (
   to: string,
 ): Promise<void> => {
   try {
-    await app.client.reactions.remove({
-      channel,
-      timestamp: ts,
-      name: from,
-    });
+    await rateLimited(() =>
+      app.client.reactions.remove({
+        channel,
+        timestamp: ts,
+        name: from,
+      }),
+    );
   } catch {
     // 제거 실패 무시
   }
@@ -1176,6 +1187,33 @@ const executeParallel = async (
  * @param key - 디바운스 키
  * @param apps - Slack App 인스턴스 목록
  */
+
+// ── 메시지 처리 동시성 제한 (P1-3) ──────────────────
+const MAX_CONCURRENT_HANDLERS = 3;
+let activeHandlerCount = 0;
+const handlerQueue: Array<() => void> = [];
+
+const acquireHandlerSlot = (): Promise<void> => {
+  if (activeHandlerCount < MAX_CONCURRENT_HANDLERS) {
+    activeHandlerCount++;
+    return Promise.resolve();
+  }
+  return new Promise((resolve) => {
+    handlerQueue.push(() => {
+      activeHandlerCount++;
+      resolve();
+    });
+  });
+};
+
+const releaseHandlerSlot = (): void => {
+  activeHandlerCount--;
+  const next = handlerQueue.shift();
+  if (next) {
+    next();
+  }
+};
+
 const flushDebounceBuffer = async (
   key: string,
   apps: App[],
@@ -1452,36 +1490,38 @@ const flushDebounceBuffer = async (
     }
   };
 
-  executeTask()
-    .then(() => {
-      const e2eElapsed = (
-        (Date.now() - e2eStart) /
-        1000
-      ).toFixed(1);
-      console.log(
-        `[perf] e2e complete: [${agentNames}] ${e2eElapsed}s (${routing.method})`,
-      );
-      // 모든 메시지의 claim을 completed로
-      for (const m of messages) {
-        updateClaim(m.ts, 'completed');
-      }
-    })
-    .catch((err) => {
-      const e2eElapsed = (
-        (Date.now() - e2eStart) /
-        1000
-      ).toFixed(1);
-      console.error(
-        `[perf] e2e failed: [${agentNames}] ${e2eElapsed}s`,
-      );
-      for (const m of messages) {
-        updateClaim(m.ts, 'failed');
-      }
-      console.error(
-        `[error] ${agentNames} 실행 실패:`,
-        err,
-      );
-    });
+  acquireHandlerSlot().then(() => {
+    executeTask()
+      .then(() => {
+        const e2eElapsed = (
+          (Date.now() - e2eStart) /
+          1000
+        ).toFixed(1);
+        console.log(
+          `[perf] e2e complete: [${agentNames}] ${e2eElapsed}s (${routing.method})`,
+        );
+        for (const m of messages) {
+          updateClaim(m.ts, 'completed');
+        }
+      })
+      .catch((err) => {
+        const e2eElapsed = (
+          (Date.now() - e2eStart) /
+          1000
+        ).toFixed(1);
+        console.error(
+          `[perf] e2e failed: [${agentNames}] ${e2eElapsed}s`,
+        );
+        for (const m of messages) {
+          updateClaim(m.ts, 'failed');
+        }
+        console.error(
+          `[error] ${agentNames} 실행 실패:`,
+          err,
+        );
+      })
+      .finally(() => releaseHandlerSlot());
+  });
 };
 
 // ─── 메인 ────────────────────────────────────────────────
@@ -1534,6 +1574,8 @@ const main = async () => {
     }
 
     app.event('message', async ({ event }) => {
+      let msgTs = '';
+      try {
       const msg = event as unknown as Record<string, unknown>;
 
       // subtype 필터: message_changed, message_deleted 등 무시 (file_share는 허용)
@@ -1544,6 +1586,7 @@ const main = async () => {
 
       const text = (msg.text as string) ?? '';
       const ts = (msg.ts as string) ?? '';
+      msgTs = ts;
 
       // 첨부 파일 정보 추출 및 이미지 다운로드 (file_share 이벤트)
       // msg.file (singular) 도 처리 (Slack API에 따라 단수/복수 혼용)
@@ -1706,6 +1749,7 @@ const main = async () => {
           channelName,
           threadTs,
           raw: msg,
+          createdAt: Date.now(),
           timer: setTimeout(
             () =>
               flushDebounceBuffer(debounceKey, apps),
@@ -1717,6 +1761,16 @@ const main = async () => {
           `[debounce] 새 버퍼: "${text.slice(0, 30)}..." (${DEBOUNCE_DELAY}ms 대기)`,
         );
       }
+      } catch (err) {
+        console.error(`[error] message handler uncaught error (ts=${msgTs}):`, err);
+        if (msgTs) {
+          try {
+            updateClaim(msgTs, 'failed');
+          } catch {
+            // claim 업데이트 실패는 무시
+          }
+        }
+      }
     });
 
     // ─── 이모지 기반 에이전트 제어 ──────────────────
@@ -1726,6 +1780,7 @@ const main = async () => {
     app.event(
       'reaction_added',
       async ({ event: reactionEvent }) => {
+        try {
         const re = reactionEvent as unknown as {
           reaction: string;
           item: { ts: string; channel: string };
@@ -1788,6 +1843,9 @@ const main = async () => {
           }
           default:
             break;
+        }
+        } catch (err) {
+          console.error('[error] reaction handler uncaught error:', err);
         }
       },
     );
@@ -1994,18 +2052,65 @@ const main = async () => {
     24 * 60 * 60 * 1000,
   );
 
+  // ── 메모리 관리 인터벌 ──────────────────────────────
+  // debounceBuffer stale 엔트리 정리 (5분 주기)
+  const DEBOUNCE_MAX_AGE_MS = 5 * 60 * 1000;
+  const debounceCleanupInterval = setInterval(() => {
+    const now = Date.now();
+    for (const [key, entry] of debounceBuffer) {
+      if (now - entry.createdAt > DEBOUNCE_MAX_AGE_MS) {
+        clearTimeout(entry.timer);
+        debounceBuffer.delete(key);
+        console.warn(`[cleanup] stale debounce entry removed: ${key}`);
+      }
+    }
+  }, 5 * 60 * 1000);
+
+  // activeAgents stale 엔트리 정리 (5분 주기)
+  const agentCleanupInterval = setInterval(
+    cleanupStaleAgents,
+    5 * 60 * 1000,
+  );
+
+  // sessionStore 만료 엔트리 정리 (1시간 주기)
+  const sessionCleanupInterval = setInterval(
+    cleanupExpiredSessions,
+    60 * 60 * 1000,
+  );
+
   // 종료 시그널 처리
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
+
+    // 1. 모든 인터벌 정리
     clearInterval(cleanupInterval);
     clearInterval(orphanCheckInterval);
     clearInterval(heartbeatInterval);
     clearInterval(maintenanceInterval);
-    // 세션 저장소 즉시 flush (debounce 타이머 누락 방지)
+    clearInterval(debounceCleanupInterval);
+    clearInterval(agentCleanupInterval);
+    clearInterval(sessionCleanupInterval);
+
+    // 2. debounce 타이머 전체 정리
+    for (const [key, entry] of debounceBuffer) {
+      clearTimeout(entry.timer);
+      debounceBuffer.delete(key);
+    }
+    console.log('[shutdown] debounce 타이머 정리 완료');
+
+    // 3. 활성 에이전트 중단
+    cancelAllAgents();
+    console.log('[shutdown] 활성 에이전트 중단 완료');
+
+    // 4. pending approval 타이머 정리
+    cancelAllPendingTimers();
+    console.log('[shutdown] pending approval 타이머 정리 완료');
+
+    // 5. 세션 저장소 flush
     flushSessionStore();
-    // Promise.allSettled()로 부분 실패 시에도 shutdown 계속 진행
+
+    // 6. Socket Mode 연결 종료
     const results = await Promise.allSettled(apps.map((app) => app.stop()));
-    // 개별 실패 로깅
     results.forEach((result, idx) => {
       if (result.status === 'rejected') {
         const agentName = AGENTS[idx]?.name || `agent[${idx}]`;

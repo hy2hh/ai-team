@@ -135,7 +135,9 @@ export const registerAutoProceed = async (
     // veto window 타이머 시작
     if (vetoExpires) {
       const timer = setTimeout(() => {
-        resolveApproval(approvalId, 'auto_approved', slackApp);
+        resolveApproval(approvalId, 'auto_approved', slackApp).catch((err) => {
+          console.error(`[auto-proceed] auto-resolve failed for #${approvalId}:`, err);
+        });
       }, vetoWindowMs);
       activeTimers.set(approvalId, timer);
     }
@@ -297,4 +299,12 @@ export const cleanupExpiredApprovals = async (
       `[auto-proceed] startup 정리: ${rows.length}개 만료 승인 자동 처리`,
     );
   }
+};
+
+/** 모든 pending 타이머 취소 (shutdown용) */
+export const cancelAllPendingTimers = (): void => {
+  for (const [, timer] of activeTimers) {
+    clearTimeout(timer);
+  }
+  activeTimers.clear();
 };
