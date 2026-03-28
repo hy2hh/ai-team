@@ -12,10 +12,13 @@ import { Board as BoardType, Card as CardType } from '@/lib/types';
 import { api } from '@/lib/api';
 import Column from './Column';
 
+const BOARD_ID = Number(process.env.NEXT_PUBLIC_BOARD_ID ?? 1);
+
 export default function Board() {
   const [board, setBoard] = useState<BoardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [dragError, setDragError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -23,7 +26,7 @@ export default function Board() {
 
   const load = useCallback(async () => {
     try {
-      const data = await api.getBoard(1);
+      const data = await api.getBoard(BOARD_ID);
       setBoard(data);
       setError(null);
     } catch {
@@ -39,7 +42,7 @@ export default function Board() {
     return () => clearInterval(interval);
   }, [load]);
 
-  const handleDragEnd = async (event: DragEndEvent) => {
+  const handleDragEnd = useCallback(async (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || !board) return;
 
@@ -79,6 +82,14 @@ export default function Board() {
 
     if (sourceColumnId === targetColumnId || !movingCard) return;
 
+    // WIP limit 체크
+    const targetCol = board.columns.find(col => col.id === targetColumnId);
+    if (targetCol?.wip_limit && targetCol.cards.length >= targetCol.wip_limit) {
+      setDragError(`"${targetCol.name}" 컬럼이 WIP 한도(${targetCol.wip_limit})에 도달했습니다.`);
+      setTimeout(() => setDragError(null), 3000);
+      return;
+    }
+
     // 낙관적 UI 업데이트: API 응답 전 즉시 상태 반영
     const optimisticBoard = {
       ...board,
@@ -99,9 +110,11 @@ export default function Board() {
       await load(); // 서버 상태와 최종 동기화
     } catch (e) {
       console.error('Failed to move card', e);
+      setDragError('카드 이동에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      setTimeout(() => setDragError(null), 3000);
       await load(); // 실패 시 서버 상태로 롤백
     }
-  };
+  }, [board, load]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -118,12 +131,19 @@ export default function Board() {
   if (!board) return null;
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-        {board.columns.map((col) => (
-          <Column key={col.id} column={col} onRefresh={load} />
-        ))}
-      </div>
-    </DndContext>
+    <>
+      {dragError && (
+        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+          {dragError}
+        </div>
+      )}
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+          {board.columns.map((col) => (
+            <Column key={col.id} column={col} onRefresh={load} />
+          ))}
+        </div>
+      </DndContext>
+    </>
   );
 }
