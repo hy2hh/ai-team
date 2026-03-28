@@ -456,6 +456,15 @@ const buildContextRulesPrefix = (): string => {
     '- 작업 완료 후 "다음 뭐하지?" 대기 금지. 반드시 다음 단계를 추천하세요.',
     '- 판단이 필요하면 스스로 판단하고 실행하세요. 확신이 없는 경우에만 에스컬레이션.',
     '',
+    '## Definition of Done (구현 작업 필수)',
+    '- 모든 async 함수에 에러 핸들링 (try-catch + 사용자 에러 메시지)',
+    '- 매직 넘버/문자열 → 상수 또는 환경변수 분리 (하드코딩 금지)',
+    '- 스펙의 AC 전부 통과 (Happy Path + 에러 케이스 + 엣지 케이스)',
+    '- 빌드 + 린트 통과 + 런타임 실행 확인',
+    '- Frontend: 접근성(aria-label), 로딩/에러/빈 상태 UI, 반응형',
+    '- Backend: 입력 검증, 일관된 에러 응답, N+1 쿼리 방지',
+    '- 완료 보고에 DoD 체크리스트 포함 필수 (shared/processes/definition-of-done.md 참조)',
+    '',
     '## 파일 수정 권한',
     '- Write/Edit 도구로 프로젝트 파일을 직접 수정할 수 있습니다.',
     '- `.claude/agents/shared/`, `.memory/`, 프로젝트 코드 파일 모두 수정 가능합니다.',
@@ -1145,19 +1154,33 @@ export const handleMessage = async (
                 ['designer', 'frontend', 'backend', 'researcher', 'secops'].includes(a),
               );
 
-              // 2+ 구현 에이전트 위임 시 스펙 파일 존재 검증
+              // 2+ 구현 에이전트 위임 시 스펙 파일 + 에러 케이스 AC 검증
               const implAgents = valid.filter((a) =>
                 ['designer', 'frontend', 'backend'].includes(a),
               );
               if (implAgents.length >= 2) {
                 const specsDir = join(PROJECT_DIR, 'docs', 'specs');
-                const hasSpecs = existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md') && f !== 'README.md');
-                if (!hasSpecs) {
+                const specFiles = existsSync(specsDir)
+                  ? readdirSync(specsDir).filter((f) => f.endsWith('.md') && f !== 'README.md')
+                  : [];
+                if (specFiles.length === 0) {
                   console.warn(`[enforcement] delegate 차단: 2+ 구현 에이전트(${implAgents.join(', ')}) 위임에 스펙 파일 없음`);
                   return {
                     content: [{
                       type: 'text' as const,
                       text: `⛔ 위임 차단: 구현 에이전트 ${implAgents.length}명(${implAgents.join(', ')}) 위임에는 docs/specs/에 Feature Spec 파일이 필요합니다. 먼저 스펙을 작성하세요. 템플릿: .claude/context/pm/templates/feature-spec.md`,
+                    }],
+                  };
+                }
+                // 최신 스펙 파일에 에러 케이스 AC가 있는지 검증
+                const latestSpec = specFiles.sort().pop()!;
+                const specContent = readFileSync(join(specsDir, latestSpec), 'utf-8');
+                if (!specContent.includes('에러 케이스') || !specContent.includes('- [')) {
+                  console.warn(`[enforcement] delegate 차단: 스펙 ${latestSpec}에 에러 케이스 AC 누락`);
+                  return {
+                    content: [{
+                      type: 'text' as const,
+                      text: `⛔ 위임 차단: 스펙 파일 ${latestSpec}에 에러 케이스 AC가 없거나 비어 있습니다. "에러 케이스" 섹션에 구체적인 Given/When/Then을 작성하세요.`,
                     }],
                   };
                 }
@@ -1203,13 +1226,26 @@ export const handleMessage = async (
               );
               if (allImplAgents.size >= 2) {
                 const specsDir = join(PROJECT_DIR, 'docs', 'specs');
-                const hasSpecs = existsSync(specsDir) && readdirSync(specsDir).some((f) => f.endsWith('.md') && f !== 'README.md');
-                if (!hasSpecs) {
+                const specFiles = existsSync(specsDir)
+                  ? readdirSync(specsDir).filter((f) => f.endsWith('.md') && f !== 'README.md')
+                  : [];
+                if (specFiles.length === 0) {
                   console.warn(`[enforcement] delegate_sequential 차단: 구현 에이전트 ${[...allImplAgents].join(', ')} 참여에 스펙 파일 없음`);
                   return {
                     content: [{
                       type: 'text' as const,
                       text: `⛔ 순차 위임 차단: 구현 에이전트 ${allImplAgents.size}명(${[...allImplAgents].join(', ')}) 참여에는 docs/specs/에 Feature Spec 파일이 필요합니다. 먼저 스펙을 작성하세요. 템플릿: .claude/context/pm/templates/feature-spec.md`,
+                    }],
+                  };
+                }
+                const latestSpec = specFiles.sort().pop()!;
+                const specContent = readFileSync(join(specsDir, latestSpec), 'utf-8');
+                if (!specContent.includes('에러 케이스') || !specContent.includes('- [')) {
+                  console.warn(`[enforcement] delegate_sequential 차단: 스펙 ${latestSpec}에 에러 케이스 AC 누락`);
+                  return {
+                    content: [{
+                      type: 'text' as const,
+                      text: `⛔ 순차 위임 차단: 스펙 파일 ${latestSpec}에 에러 케이스 AC가 없거나 비어 있습니다. "에러 케이스" 섹션에 구체적인 Given/When/Then을 작성하세요.`,
                     }],
                   };
                 }
@@ -1477,6 +1513,23 @@ export const handleMessage = async (
         );
         resultText += '\n\n> ⚠️ _[bridge 자동 경고] 위 응답에 승인 요청 패턴이 감지되었습니다. 에이전트는 즉시 실행해야 합니다._';
       }
+    }
+
+    // ── 완료 보고 시 DoD 증거 누락 감지 ──────────────────────
+    // 구현 에이전트(frontend/backend/designer)가 "완료" 선언 시 DoD 체크리스트 없으면 경고
+    const IMPL_AGENTS = ['frontend', 'backend', 'designer'];
+    const COMPLETION_PATTERNS = [/완료/, /Done/, /Fixed/, /구현.*완료/, /작업.*마무리/];
+    const DOD_EVIDENCE_PATTERNS = [/DoD/, /에러 핸들링/, /하드코딩/, /런타임/, /빌드.*통과/, /lint.*통과/, /AC.*통과/, /체크/];
+    if (
+      resultText &&
+      IMPL_AGENTS.includes(agentName) &&
+      COMPLETION_PATTERNS.some((p) => p.test(resultText)) &&
+      !DOD_EVIDENCE_PATTERNS.some((p) => p.test(resultText))
+    ) {
+      console.warn(
+        `[enforcement] ${agentName} 완료 보고에 DoD 증거 누락`,
+      );
+      resultText += '\n\n> ⚠️ _[bridge 자동 경고] 완료 보고에 DoD 체크리스트가 없습니다. `shared/processes/definition-of-done.md` 기준으로 증거를 첨부하세요._';
     }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)

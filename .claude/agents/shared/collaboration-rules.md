@@ -146,6 +146,7 @@
 
 모든 에이전트가 따라야 하는 공통 프로세스는 `shared/processes/`에 위치한다:
 
+- **definition-of-done.md** — DoD 체크리스트 (에러 핸들링, 하드코딩 금지, AC 전체 통과 등)
 - **verification-before-completion.md** — 완료 선언 전 필수 검증 게이트
 - **systematic-debugging.md** — 4-Phase 체계적 디버깅 (Frontend, Backend, SecOps)
 - **code-review-protocol.md** — 리뷰 요청/응답 프로세스 + 리뷰어 매트릭스
