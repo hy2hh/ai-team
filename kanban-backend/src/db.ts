@@ -40,11 +40,19 @@ function initSchema(): void {
       description TEXT,
       priority TEXT NOT NULL DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
       assignee TEXT,
+      progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
       position INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Migration: progress 컬럼이 없는 기존 DB에 추가
+  const cols = database.prepare("PRAGMA table_info(cards)").all() as { name: string }[];
+  const hasProgress = cols.some(c => c.name === 'progress');
+  if (!hasProgress) {
+    database.exec("ALTER TABLE cards ADD COLUMN progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100)");
+  }
 }
 
 function seedData(): void {

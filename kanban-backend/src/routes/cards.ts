@@ -14,15 +14,16 @@ router.get('/', (req: Request, res: Response) => {
 
 router.post('/', (req: Request, res: Response) => {
   const db = getDb();
-  const { column_id, title, description, priority = 'medium', assignee } = req.body;
+  const { column_id, title, description, priority = 'medium', assignee, progress = 0 } = req.body;
   if (!column_id || !title) return res.status(400).json({ error: 'column_id and title required' });
 
+  const progressVal = Math.max(0, Math.min(100, Number(progress) || 0));
   const maxPos = (db.prepare('SELECT MAX(position) as maxp FROM cards WHERE column_id = ?').get(column_id) as { maxp: number | null }).maxp;
   const position = (maxPos ?? -1) + 1;
 
   const result = db.prepare(
-    'INSERT INTO cards (column_id, title, description, priority, assignee, position) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(column_id, title, description || null, priority, assignee || null, position);
+    'INSERT INTO cards (column_id, title, description, priority, assignee, progress, position) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(column_id, title, description || null, priority, assignee || null, progressVal, position);
 
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid) as Card;
   res.status(201).json(card);
@@ -30,10 +31,11 @@ router.post('/', (req: Request, res: Response) => {
 
 router.patch('/:id', (req: Request, res: Response) => {
   const db = getDb();
-  const { title, description, priority, assignee } = req.body;
+  const { title, description, priority, assignee, progress } = req.body;
+  const progressVal = progress !== undefined ? Math.max(0, Math.min(100, Number(progress) || 0)) : null;
   db.prepare(
-    'UPDATE cards SET title = COALESCE(?, title), description = COALESCE(?, description), priority = COALESCE(?, priority), assignee = COALESCE(?, assignee), updated_at = datetime(\'now\') WHERE id = ?'
-  ).run(title || null, description || null, priority || null, assignee || null, req.params.id);
+    'UPDATE cards SET title = COALESCE(?, title), description = COALESCE(?, description), priority = COALESCE(?, priority), assignee = COALESCE(?, assignee), progress = COALESCE(?, progress), updated_at = datetime(\'now\') WHERE id = ?'
+  ).run(title || null, description || null, priority || null, assignee || null, progressVal, req.params.id);
   const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card | undefined;
   if (!card) return res.status(404).json({ error: 'Card not found' });
   res.json(card);

@@ -9,6 +9,35 @@ const priorityColors = {
   low: 'bg-green-500',
 };
 
+const agentColors: Record<string, string> = {
+  homer:  'bg-blue-500',
+  bart:   'bg-cyan-500',
+  marge:  'bg-purple-500',
+  lisa:   'bg-green-500',
+  krusty: 'bg-orange-500',
+  sid:    'bg-pink-500',
+};
+
+function getProgressColor(progress: number) {
+  if (progress >= 67) return 'bg-green-500';
+  if (progress >= 34) return 'bg-yellow-500';
+  return 'bg-red-500';
+}
+
+function AgentAvatar({ name }: { name: string }) {
+  const key = name.toLowerCase();
+  const color = agentColors[key] ?? 'bg-slate-500';
+  const initial = name.charAt(0).toUpperCase();
+  return (
+    <span
+      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold shrink-0 ${color}`}
+      title={name}
+    >
+      {initial}
+    </span>
+  );
+}
+
 interface Props {
   card: CardType;
   onDelete: (id: number) => void;
@@ -25,6 +54,8 @@ export default function Card({ card, onDelete }: Props) {
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const progress = card.progress ?? 0;
 
   return (
     <div
@@ -46,11 +77,29 @@ export default function Card({ card, onDelete }: Props) {
       {card.description && (
         <p className="text-slate-400 text-xs mt-1 line-clamp-2">{card.description}</p>
       )}
+
+      {/* 진행률 바 */}
+      <div className="mt-2">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-slate-400 text-xs">진행률</span>
+          <span className="text-slate-300 text-xs font-medium">{progress}%</span>
+        </div>
+        <div className="w-full bg-slate-600 rounded-full h-1.5">
+          <div
+            className={`h-1.5 rounded-full transition-all ${getProgressColor(progress)}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 mt-2">
         <span className={`inline-block w-2 h-2 rounded-full ${priorityColors[card.priority]}`} />
         <span className="text-slate-400 text-xs capitalize">{card.priority}</span>
         {card.assignee && (
-          <span className="ml-auto text-slate-400 text-xs">@{card.assignee}</span>
+          <div className="ml-auto flex items-center gap-1.5">
+            <AgentAvatar name={card.assignee} />
+            <span className="text-slate-400 text-xs">{card.assignee}</span>
+          </div>
         )}
       </div>
     </div>

@@ -16,7 +16,7 @@ export default function Column({ column, onRefresh }: Props) {
   const [showModal, setShowModal] = useState(false);
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}` });
 
-  const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string }) => {
+  const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => {
     await api.createCard({ column_id: column.id, ...data });
     setShowModal(false);
     onRefresh();

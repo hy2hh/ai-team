@@ -24,6 +24,7 @@ export interface Card {
   description: string | null;
   priority: 'low' | 'medium' | 'high';
   assignee: string | null;
+  progress: number;
   position: number;
   created_at: string;
   updated_at: string;

@@ -3,7 +3,7 @@ import { useState } from 'react';
 
 interface Props {
   columnId: number;
-  onAdd: (data: { title: string; description: string; priority: string; assignee: string }) => void;
+  onAdd: (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => void;
   onClose: () => void;
 }
 
@@ -12,11 +12,12 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [assignee, setAssignee] = useState('');
+  const [progress, setProgress] = useState(0);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title: title.trim(), description, priority, assignee });
+    onAdd({ title: title.trim(), description, priority, assignee, progress });
   };
 
   return (
@@ -55,6 +56,22 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
             onChange={(e) => setAssignee(e.target.value)}
             className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
           />
+          {/* 진행률 슬라이더 */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-slate-300 text-sm">진행률</label>
+              <span className="text-slate-300 text-sm font-medium">{progress}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={progress}
+              onChange={(e) => setProgress(Number(e.target.value))}
+              className="w-full accent-blue-500"
+            />
+          </div>
           <div className="flex gap-2 pt-1">
             <button
               type="submit"

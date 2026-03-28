@@ -11,7 +11,7 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   getBoard: (id: number) => fetchJson<import('./types').Board>(`/boards/${id}`),
-  createCard: (data: { column_id: number; title: string; description?: string; priority?: string; assignee?: string }) =>
+  createCard: (data: { column_id: number; title: string; description?: string; priority?: string; assignee?: string; progress?: number }) =>
     fetchJson<import('./types').Card>('/cards', { method: 'POST', body: JSON.stringify(data) }),
   moveCard: (id: number, column_id: number, position?: number) =>
     fetchJson<import('./types').Card>(`/cards/${id}/move`, {
