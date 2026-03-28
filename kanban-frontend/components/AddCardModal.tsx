@@ -21,16 +21,16 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-slate-800 rounded-xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <h2 className="text-white text-lg font-semibold mb-4">새 카드 추가</h2>
+    <div className="fixed inset-0 bg-[var(--color-bg-overlay)] flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-[var(--color-bg-surface)] border border-[var(--color-border)] rounded-xl p-6 w-full max-w-md shadow-xl transition-colors duration-200" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-[var(--color-text-primary)] text-lg font-semibold mb-4">새 카드 추가</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <input
             type="text"
             placeholder="제목 *"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[var(--color-bg-input)] text-[var(--color-text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--color-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] transition-colors"
             autoFocus
           />
           <textarea
@@ -38,12 +38,12 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full bg-[var(--color-bg-input)] text-[var(--color-text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--color-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] resize-none transition-colors"
           />
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[var(--color-bg-input)] text-[var(--color-text-primary)] rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] transition-colors border border-[var(--color-border)]"
           >
             <option value="low">낮음 (Low)</option>
             <option value="medium">보통 (Medium)</option>
@@ -54,13 +54,13 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
             placeholder="담당자 (선택)"
             value={assignee}
             onChange={(e) => setAssignee(e.target.value)}
-            className="w-full bg-slate-700 text-white rounded-lg px-3 py-2 text-sm placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full bg-[var(--color-bg-input)] text-[var(--color-text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--color-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)] transition-colors"
           />
           {/* 진행률 슬라이더 */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-slate-300 text-sm">진행률</label>
-              <span className="text-slate-300 text-sm font-medium">{progress}%</span>
+              <label className="text-[var(--color-text-secondary)] text-sm">진행률</label>
+              <span className="text-[var(--color-text-secondary)] text-sm font-medium">{progress}%</span>
             </div>
             <input
               type="range"
@@ -75,14 +75,14 @@ export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Pr
           <div className="flex gap-2 pt-1">
             <button
               type="submit"
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+              className="flex-1 bg-[var(--color-action-primary)] hover:bg-[var(--color-action-primary-hover)] text-[var(--color-text-inverse)] rounded-lg py-2 text-sm font-medium transition-colors"
             >
               추가
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg py-2 text-sm font-medium transition-colors"
+              className="flex-1 bg-[var(--color-action-secondary)] hover:bg-[var(--color-action-secondary-hover)] text-[var(--color-text-primary)] rounded-lg py-2 text-sm font-medium transition-colors"
             >
               취소
             </button>

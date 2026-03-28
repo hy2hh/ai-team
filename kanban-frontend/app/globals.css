@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* =============================================
+   라이트 모드 (기본값)
+   ============================================= */
+:root,
+[data-theme="light"] {
+  /* 배경 레이어 */
+  --color-bg-base:        #f8fafc;
+  --color-bg-surface:     #ffffff;
+  --color-bg-elevated:    #f1f5f9;
+  --color-bg-card:        #ffffff;
+  --color-bg-input:       #f8fafc;
+  --color-bg-overlay:     rgba(0, 0, 0, 0.4);
+
+  /* 테두리 */
+  --color-border:         #e2e8f0;
+  --color-border-strong:  #cbd5e1;
+
+  /* 텍스트 */
+  --color-text-primary:   #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #94a3b8;
+  --color-text-inverse:   #ffffff;
+
+  /* 액션 */
+  --color-action-primary:         #2563eb;
+  --color-action-primary-hover:   #1d4ed8;
+  --color-action-secondary:       #e2e8f0;
+  --color-action-secondary-hover: #cbd5e1;
+
+  /* 포커스 */
+  --color-focus-ring: #3b82f6;
+
+  /* 드래그/드롭 */
+  --color-drag-over: #3b82f6;
+
+  /* 상태 색상 */
+  --color-priority-high:    #ef4444;
+  --color-priority-medium:  #eab308;
+  --color-priority-low:     #22c55e;
+  --color-progress-high:    #22c55e;
+  --color-progress-medium:  #eab308;
+  --color-progress-low:     #ef4444;
+
+  /* 에이전트 아바타 */
+  --color-agent-homer:  #3b82f6;
+  --color-agent-bart:   #06b6d4;
+  --color-agent-marge:  #a855f7;
+  --color-agent-lisa:   #22c55e;
+  --color-agent-krusty: #f97316;
+  --color-agent-sid:    #ec4899;
+}
+
+/* =============================================
+   다크 모드
+   ============================================= */
+[data-theme="dark"] {
+  /* 배경 레이어 */
+  --color-bg-base:        #0f172a;
+  --color-bg-surface:     #1e293b;
+  --color-bg-elevated:    #1e293b;
+  --color-bg-card:        #334155;
+  --color-bg-input:       #334155;
+  --color-bg-overlay:     rgba(0, 0, 0, 0.6);
+
+  /* 테두리 */
+  --color-border:         #334155;
+  --color-border-strong:  #475569;
+
+  /* 텍스트 */
+  --color-text-primary:   #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted:     #64748b;
+  --color-text-inverse:   #ffffff;
+
+  /* 액션 */
+  --color-action-primary:         #2563eb;
+  --color-action-primary-hover:   #1d4ed8;
+  --color-action-secondary:       #334155;
+  --color-action-secondary-hover: #475569;
+
+  /* 포커스 */
+  --color-focus-ring: #60a5fa;
+
+  /* 드래그/드롭 */
+  --color-drag-over: #60a5fa;
+
+  /* 상태 색상 — 다크에서 동일 유지 */
+  --color-priority-high:    #ef4444;
+  --color-priority-medium:  #eab308;
+  --color-priority-low:     #22c55e;
+  --color-progress-high:    #22c55e;
+  --color-progress-medium:  #eab308;
+  --color-progress-low:     #ef4444;
+
+  /* 에이전트 아바타 — 다크에서 동일 유지 */
+  --color-agent-homer:  #3b82f6;
+  --color-agent-bart:   #06b6d4;
+  --color-agent-marge:  #a855f7;
+  --color-agent-lisa:   #22c55e;
+  --color-agent-krusty: #f97316;
+  --color-agent-sid:    #ec4899;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-bg-base:              var(--color-bg-base);
+  --color-bg-surface:           var(--color-bg-surface);
+  --color-bg-elevated:          var(--color-bg-elevated);
+  --color-bg-card:              var(--color-bg-card);
+  --color-bg-input:             var(--color-bg-input);
+  --color-border:               var(--color-border);
+  --color-border-strong:        var(--color-border-strong);
+  --color-text-primary:         var(--color-text-primary);
+  --color-text-secondary:       var(--color-text-secondary);
+  --color-text-muted:           var(--color-text-muted);
+  --color-text-inverse:         var(--color-text-inverse);
+  --color-action-primary:       var(--color-action-primary);
+  --color-action-primary-hover: var(--color-action-primary-hover);
+  --color-action-secondary:     var(--color-action-secondary);
+  --color-focus-ring:           var(--color-focus-ring);
+  --color-drag-over:            var(--color-drag-over);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
   font-family: Arial, Helvetica, sans-serif;
 }

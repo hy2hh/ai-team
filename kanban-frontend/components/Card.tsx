@@ -63,28 +63,28 @@ export default function Card({ card, onDelete }: Props) {
       style={style}
       {...attributes}
       {...listeners}
-      className="bg-slate-700 rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-shadow group"
+      className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all duration-200 group"
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-white text-sm font-medium leading-snug flex-1">{card.title}</p>
+        <p className="text-[var(--color-text-primary)] text-sm font-medium leading-snug flex-1">{card.title}</p>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
-          className="text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs shrink-0"
+          className="text-[var(--color-text-muted)] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs shrink-0"
         >
           ✕
         </button>
       </div>
       {card.description && (
-        <p className="text-slate-400 text-xs mt-1 line-clamp-2">{card.description}</p>
+        <p className="text-[var(--color-text-secondary)] text-xs mt-1 line-clamp-2">{card.description}</p>
       )}
 
       {/* 진행률 바 */}
       <div className="mt-2">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-slate-400 text-xs">진행률</span>
-          <span className="text-slate-300 text-xs font-medium">{progress}%</span>
+          <span className="text-[var(--color-text-secondary)] text-xs">진행률</span>
+          <span className="text-[var(--color-text-secondary)] text-xs font-medium">{progress}%</span>
         </div>
-        <div className="w-full bg-slate-600 rounded-full h-1.5">
+        <div className="w-full bg-[var(--color-border-strong)] rounded-full h-1.5">
           <div
             className={`h-1.5 rounded-full transition-all ${getProgressColor(progress)}`}
             style={{ width: `${progress}%` }}
@@ -94,11 +94,11 @@ export default function Card({ card, onDelete }: Props) {
 
       <div className="flex items-center gap-2 mt-2">
         <span className={`inline-block w-2 h-2 rounded-full ${priorityColors[card.priority]}`} />
-        <span className="text-slate-400 text-xs capitalize">{card.priority}</span>
+        <span className="text-[var(--color-text-secondary)] text-xs capitalize">{card.priority}</span>
         {card.assignee && (
           <div className="ml-auto flex items-center gap-1.5">
             <AgentAvatar name={card.assignee} />
-            <span className="text-slate-400 text-xs">{card.assignee}</span>
+            <span className="text-[var(--color-text-secondary)] text-xs">{card.assignee}</span>
           </div>
         )}
       </div>

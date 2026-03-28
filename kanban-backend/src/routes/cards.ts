@@ -46,11 +46,25 @@ router.patch('/:id/move', (req: Request, res: Response) => {
   const { column_id, position } = req.body;
   if (column_id === undefined) return res.status(400).json({ error: 'column_id required' });
 
-  db.prepare(
-    'UPDATE cards SET column_id = ?, position = COALESCE(?, position), updated_at = datetime(\'now\') WHERE id = ?'
-  ).run(column_id, position ?? null, req.params.id);
+  const moveCard = db.transaction(() => {
+    const existing = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card | undefined;
+    if (!existing) return null;
 
-  const card = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card | undefined;
+    // position이 명시되지 않으면 대상 컬럼의 마지막 위치에 추가
+    let newPosition = position;
+    if (newPosition === undefined || newPosition === null) {
+      const maxPos = (db.prepare('SELECT MAX(position) as maxp FROM cards WHERE column_id = ? AND id != ?').get(column_id, req.params.id) as { maxp: number | null }).maxp;
+      newPosition = (maxPos ?? -1) + 1;
+    }
+
+    db.prepare(
+      'UPDATE cards SET column_id = ?, position = ?, updated_at = datetime(\'now\') WHERE id = ?'
+    ).run(column_id, newPosition, req.params.id);
+
+    return db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as Card;
+  });
+
+  const card = moveCard();
   if (!card) return res.status(404).json({ error: 'Card not found' });
   res.json(card);
 });

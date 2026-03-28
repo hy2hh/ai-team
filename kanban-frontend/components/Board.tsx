@@ -65,28 +65,47 @@ export default function Board() {
 
     if (targetColumnId === null) return;
 
-    // Find source column
+    // Find source column and moving card
     let sourceColumnId: number | null = null;
+    let movingCard: CardType | null = null;
     for (const col of board.columns) {
-      if (col.cards.some((c: CardType) => c.id === cardId)) {
+      const found = col.cards.find((c: CardType) => c.id === cardId);
+      if (found) {
         sourceColumnId = col.id;
+        movingCard = found;
         break;
       }
     }
 
-    if (sourceColumnId === targetColumnId) return;
+    if (sourceColumnId === targetColumnId || !movingCard) return;
+
+    // 낙관적 UI 업데이트: API 응답 전 즉시 상태 반영
+    const optimisticBoard = {
+      ...board,
+      columns: board.columns.map(col => {
+        if (col.id === sourceColumnId) {
+          return { ...col, cards: col.cards.filter((c: CardType) => c.id !== cardId) };
+        }
+        if (col.id === targetColumnId) {
+          return { ...col, cards: [...col.cards, { ...movingCard!, column_id: targetColumnId! }] };
+        }
+        return col;
+      }),
+    };
+    setBoard(optimisticBoard);
 
     try {
       await api.moveCard(cardId, targetColumnId);
-      await load();
+      await load(); // 서버 상태와 최종 동기화
     } catch (e) {
       console.error('Failed to move card', e);
+      await load(); // 실패 시 서버 상태로 롤백
     }
   };
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="text-slate-400 text-sm animate-pulse">보드 로딩 중...</div>
+      <div className="text-[var(--color-text-secondary)] text-sm animate-pulse">보드 로딩 중...</div>
     </div>
   );
 

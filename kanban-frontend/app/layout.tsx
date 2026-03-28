@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { ThemeProvider } from '@/lib/theme';
 
 export const metadata: Metadata = {
   title: 'AI Team Kanban',
@@ -8,8 +9,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
-      <body className="bg-slate-900 text-white antialiased">{children}</body>
+    <html lang="ko" data-theme="dark" suppressHydrationWarning>
+      <body className="antialiased transition-colors duration-200">
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

@@ -31,10 +31,10 @@ export default function Column({ column, onRefresh }: Props) {
 
   return (
     <>
-      <div className={`flex flex-col w-72 shrink-0 rounded-xl bg-slate-800 ${isOver ? 'ring-2 ring-blue-400' : ''}`}>
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
-          <h3 className="text-white font-semibold text-sm">{column.name}</h3>
-          <span className="bg-slate-700 text-slate-300 text-xs rounded-full px-2 py-0.5">
+      <div className={`flex flex-col w-72 shrink-0 rounded-xl bg-[var(--color-bg-elevated)] transition-colors duration-200 ${isOver ? 'ring-2 ring-[var(--color-drag-over)]' : ''}`}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--color-border)]">
+          <h3 className="text-[var(--color-text-primary)] font-semibold text-sm">{column.name}</h3>
+          <span className="bg-[var(--color-bg-card)] text-[var(--color-text-secondary)] text-xs rounded-full px-2 py-0.5">
             {column.cards.length}{column.wip_limit ? `/${column.wip_limit}` : ''}
           </span>
         </div>
@@ -51,7 +51,7 @@ export default function Column({ column, onRefresh }: Props) {
         <div className="px-3 pb-3">
           <button
             onClick={() => setShowModal(true)}
-            className="w-full text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg py-2 text-sm transition-colors text-left px-3"
+            className="w-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] rounded-lg py-2 text-sm transition-colors text-left px-3"
           >
             + 카드 추가
           </button>
