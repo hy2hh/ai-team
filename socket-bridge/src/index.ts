@@ -618,6 +618,48 @@ const executeSingle = async (
     return;
   }
 
+  // ─── 의존성 감지: 순차 실행 필요 여부 ──────────────────
+  // 생산자→소비자 관계가 있으면 생산자를 먼저 실행하고
+  // 소비자는 생산자 결과를 받아 다음 라운드에서 실행
+  const DEPENDENCY_PAIRS: Array<[string, string]> = [
+    ['designer', 'frontend'],   // 디자인 → 구현
+    ['backend', 'frontend'],    // API → 프론트 통합
+    ['researcher', 'pm'],       // 리서치 → 기획
+  ];
+
+  const hasProducer = (t: string[]): string[] => {
+    const producers: string[] = [];
+    const consumers: string[] = [];
+    for (const [producer, consumer] of DEPENDENCY_PAIRS) {
+      if (t.includes(producer) && t.includes(consumer)) {
+        if (!producers.includes(producer)) {
+          producers.push(producer);
+        }
+        if (!consumers.includes(consumer)) {
+          consumers.push(consumer);
+        }
+      }
+    }
+    if (producers.length > 0) {
+      // 생산자만 먼저 실행, 소비자는 다음 라운드
+      return producers;
+    }
+    return t; // 의존성 없으면 전체 병렬
+  };
+
+  /** 의존성으로 다음 라운드로 연기된 에이전트 */
+  const deferredTargets: string[] = [];
+
+  const firstBatch = hasProducer(targets);
+  if (firstBatch.length < targets.length) {
+    const deferred = targets.filter((t) => !firstBatch.includes(t));
+    deferredTargets.push(...deferred);
+    console.log(
+      `[hub] 의존성 감지: 먼저=[${firstBatch.join(', ')}] 대기=[${deferred.join(', ')}]`,
+    );
+    targets = firstBatch;
+  }
+
   // ─── PM Hub 루프 시작 ───────────────────────────────
   console.log(
     `[hub] PM Hub 시작: targets=[${targets.join(', ')}]`,
@@ -822,6 +864,35 @@ const executeSingle = async (
     targets = pmReview.delegationTargets.filter(
       (name) => name !== 'pm' && isValidAgent(name),
     );
+
+    // 의존성 대기 에이전트 자동 주입
+    // PM이 새 타겟을 지정하지 않았지만 deferred 에이전트가 있으면 자동 추가
+    if (targets.length === 0 && deferredTargets.length > 0) {
+      const remaining = deferredTargets.filter(
+        (t) => !allExecutedAgents.has(t),
+      );
+      if (remaining.length > 0) {
+        targets = remaining;
+        // deferred에서 제거 (이번에 실행할 것이므로)
+        deferredTargets.length = 0;
+        console.log(
+          `[hub] 의존성 대기 에이전트 자동 주입: [${targets.join(', ')}]`,
+        );
+        // 중간 리뷰 결과를 Slack에 포스팅 (생산자 완료 보고)
+        if (pmReview.text) {
+          try {
+            const postResult = await pmApp.client.chat.postMessage({
+              channel: event.channel,
+              text: pmReview.text,
+              thread_ts: event.thread_ts ?? event.ts,
+            });
+            currentPmTs = postResult.ts as string | undefined;
+          } catch {
+            // 포스팅 실패 무시
+          }
+        }
+      }
+    }
 
     if (targets.length === 0) {
       // PM이 완료 판단 — 최종 요약을 Slack에 포스팅

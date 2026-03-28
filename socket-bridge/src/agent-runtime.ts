@@ -1128,7 +1128,7 @@ export const handleMessage = async (
         tools: [
           tool(
             'delegate',
-            '다른 에이전트에게 작업을 즉시 위임합니다. 지금 바로 실행해야 할 에이전트만 지정하세요. 향후 계획은 이 도구를 호출하지 마세요.',
+            '다른 에이전트에게 작업을 즉시 위임합니다. 의존성이 있는 작업은 먼저 실행할 에이전트만 지정하세요. 예: 디자이너 → 프론트엔드 순서가 필요하면 디자이너만 먼저 delegate하고, 리뷰 후 프론트엔드를 delegate하세요. 독립적인 작업만 한 번에 여러 에이전트를 지정하세요.',
             { agents: z.array(z.string()), reason: z.string() },
             async ({ agents, reason }) => {
               const valid = agents.filter((a: string) =>
