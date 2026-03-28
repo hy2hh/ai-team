@@ -13,15 +13,17 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggle: () => {},
 });
 
+function getInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'dark';
+  return (localStorage.getItem('kanban-theme') as Theme) ?? 'dark';
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
-    const stored = localStorage.getItem('kanban-theme') as Theme | null;
-    const initial = stored ?? 'dark';
-    setTheme(initial);
-    document.documentElement.setAttribute('data-theme', initial);
-  }, []);
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
 
   const toggle = () => {
     const next: Theme = theme === 'dark' ? 'light' : 'dark';

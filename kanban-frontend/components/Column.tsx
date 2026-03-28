@@ -87,7 +87,7 @@ export default function Column({ column, onRefresh }: Props) {
         </div>
       </div>
       {showAddModal && (
-        <AddCardModal columnId={column.id} onAdd={handleAdd} onClose={() => setShowAddModal(false)} />
+        <AddCardModal onAdd={handleAdd} onClose={() => setShowAddModal(false)} />
       )}
       {selectedCard && (
         <CardDetailModal

@@ -37,8 +37,8 @@ export default function Board() {
   }, []);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 5000);
+    void load();
+    const interval = setInterval(() => void load(), 5000);
     return () => clearInterval(interval);
   }, [load]);
 

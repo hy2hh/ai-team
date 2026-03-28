@@ -2,12 +2,11 @@
 import { useState } from 'react';
 
 interface Props {
-  columnId: number;
   onAdd: (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => void;
   onClose: () => void;
 }
 
-export default function AddCardModal({ columnId: _columnId, onAdd, onClose }: Props) {
+export default function AddCardModal({ onAdd, onClose }: Props) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
