@@ -10,6 +10,7 @@ import type { App } from '@slack/bolt';
 import { getDb } from './db.js';
 import { handleMessage } from './agent-runtime.js';
 import type { SlackEvent } from './types.js';
+import { rateLimited } from './rate-limiter.js';
 
 /** 검증 결과 등급 */
 export type VerifyResult = 'PASS' | 'WARN' | 'FAIL';
@@ -125,6 +126,22 @@ export const runCrossVerification = async (
     details: string;
   }> = [];
 
+  // ── 결과 텍스트 전처리: 잘림 방지 + 변경 파일 경로 추출 ──
+  // 기존: 2000자 하드 잘림 → 개선: 8000자까지 허용 + 파일 경로 별도 추출
+  const MAX_RESULT_LENGTH = 8000;
+  const truncatedResult = producerResult.length > MAX_RESULT_LENGTH
+    ? producerResult.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과 잘림, 실제 파일을 직접 읽어 검증하세요)'
+    : producerResult;
+
+  // 결과 텍스트에서 파일 경로 추출 (에이전트가 언급한 파일)
+  const filePathPattern = /(?:^|\s)((?:\.\/|\/|src\/|\.claude\/|\.memory\/|kanban-|socket-bridge\/)\S+\.(?:ts|tsx|md|json|js|mjs))/gm;
+  const mentionedFiles = [...new Set(
+    [...producerResult.matchAll(filePathPattern)].map((m) => m[1]),
+  )].slice(0, 10);
+  const fileHint = mentionedFiles.length > 0
+    ? `\n\n*변경된 파일 (직접 Read 도구로 확인하세요):*\n${mentionedFiles.map((f) => `- \`${f}\``).join('\n')}`
+    : '';
+
   // 검증자 병렬 실행
   const verifyPromises = verifiers.map(async ({ verifier, checkItems }) => {
     const verifyEvent: SlackEvent = {
@@ -137,10 +154,15 @@ export const runCrossVerification = async (
         '',
         `*검증 항목:* ${checkItems}`,
         '',
-        `*${producerAgent} 작업 결과:*`,
-        producerResult.slice(0, 2000),
+        '*중요: 텍스트만 보고 판단하지 마세요. 반드시 Read/Grep 도구로 실제 파일을 읽고 검증하세요.*',
+        fileHint,
         '',
-        '응답 형식: 첫 줄에 반드시 PASS, WARN, FAIL 중 하나를 적고, 그 다음 줄에 상세 내용을 적으세요.',
+        `*${producerAgent} 작업 결과:*`,
+        truncatedResult,
+        '',
+        '응답 형식:',
+        '1. 첫 줄: `VERDICT: PASS` 또는 `VERDICT: WARN` 또는 `VERDICT: FAIL`',
+        '2. 둘째 줄부터: 검증 상세 (실제 파일에서 확인한 증거 포함)',
       ].join('\n'),
       ts: event.ts,
       thread_ts: event.thread_ts ?? event.ts,
@@ -158,13 +180,23 @@ export const runCrossVerification = async (
         true,
       );
 
-      // 결과 파싱
-      const firstLine = response.text.trim().split('\n')[0].toUpperCase();
+      // ── 결과 파싱 개선: VERDICT: 접두사 기반 (기존 firstLine 방식보다 안정적) ──
+      const responseText = response.text.trim();
       let verifyResult: VerifyResult = 'WARN';
-      if (firstLine.includes('PASS')) {
-        verifyResult = 'PASS';
-      } else if (firstLine.includes('FAIL')) {
-        verifyResult = 'FAIL';
+
+      // 1차: VERDICT: 패턴 (가장 신뢰)
+      const verdictMatch = responseText.match(/VERDICT:\s*(PASS|WARN|FAIL)/i);
+      if (verdictMatch) {
+        verifyResult = verdictMatch[1].toUpperCase() as VerifyResult;
+      } else {
+        // 2차: 첫 5줄 내에서 PASS/FAIL/WARN 단독 단어 탐색
+        const firstLines = responseText.split('\n').slice(0, 5).join(' ').toUpperCase();
+        if (/\bFAIL\b/.test(firstLines)) {
+          verifyResult = 'FAIL';
+        } else if (/\bPASS\b/.test(firstLines)) {
+          verifyResult = 'PASS';
+        }
+        // 둘 다 없으면 기본 WARN 유지
       }
 
       recordVerification(
@@ -173,13 +205,13 @@ export const runCrossVerification = async (
         checkItems,
         verifyResult !== 'FAIL',
         1,
-        response.text.slice(0, 500),
+        responseText.slice(0, 1000),
       );
 
       return {
         verifier,
         result: verifyResult,
-        details: response.text.slice(0, 500),
+        details: responseText.slice(0, 1000),
       };
     } catch (err) {
       console.error(
@@ -211,11 +243,13 @@ export const runCrossVerification = async (
     .join('\n');
 
   try {
-    await slackApp.client.chat.postMessage({
-      channel: event.channel,
-      thread_ts: event.thread_ts ?? event.ts,
-      text: `*[Cross-Verification] ${producerAgent} 작업 검증 결과*\n${summary}`,
-    });
+    await rateLimited(() =>
+      slackApp.client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: event.thread_ts ?? event.ts,
+        text: `*[Cross-Verification] ${producerAgent} 작업 검증 결과*\n${summary}`,
+      }),
+    );
   } catch {
     // 포스팅 실패 무시
   }
