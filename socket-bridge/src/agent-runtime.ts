@@ -179,8 +179,8 @@ const SESSION_STORE_PATH = join(
   'thread-sessions.json',
 );
 
-/** TTL: 30일 (밀리초) */
-const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// SESSION_TTL_MS: config.ts에서 import (환경변수 BRIDGE_SESSION_TTL_MS로 조정 가능)
+import { SESSION_TTL_MS } from './config.js';
 
 /** 영구화 저장소 타입 */
 interface SessionStore {
@@ -353,7 +353,8 @@ setInterval(() => {
 }, 60 * 60 * 1000);
 
 /** threadSessions Map 최대 크기 (에이전트당) */
-const THREAD_SESSIONS_MAX = 200;
+// THREAD_SESSIONS_MAX: config.ts에서 import
+import { THREAD_SESSIONS_MAX } from './config.js';
 
 /**
  * 에이전트 bot user ID 매핑 (런타임에 index.ts에서 등록)

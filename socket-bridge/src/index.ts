@@ -48,6 +48,12 @@ import {
   runCrossVerification,
 } from './cross-verify.js';
 import { rateLimited } from './rate-limiter.js';
+import {
+  DEBOUNCE_DELAY,
+  MAX_CONCURRENT_HANDLERS,
+  AGENT_TIMEOUT_MS,
+  MAX_DELEGATION_DEPTH,
+} from './config.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -339,8 +345,7 @@ const processingMessages = new Set<string>();
 
 // ─── 메시지 디바운스 (연속 메시지 그룹핑) ────────────────
 
-/** 디바운스 대기 시간 (ms) */
-const DEBOUNCE_DELAY = 3000;
+// DEBOUNCE_DELAY: config.ts에서 import (환경변수 BRIDGE_DEBOUNCE_DELAY로 조정 가능)
 
 /** 디바운스 버퍼 항목 */
 interface DebounceEntry {
@@ -451,10 +456,10 @@ const safeSwapReaction = async (
 // ─── 실행 모드별 핸들러 ─────────────────────────────────
 
 /** PM Hub 최대 에이전트 실행 횟수 — 무한 루프 방지 */
-const MAX_DELEGATION_DEPTH = 3;
+// MAX_DELEGATION_DEPTH: config.ts에서 import
 
 /** 에이전트별 최대 실행 시간 (5분) — fan-out 타임아웃 */
-const AGENT_TIMEOUT_MS = 5 * 60 * 1000;
+// AGENT_TIMEOUT_MS: config.ts에서 import
 
 /**
  * 에이전트 실행에 타임아웃 적용
@@ -1189,7 +1194,7 @@ const executeParallel = async (
  */
 
 // ── 메시지 처리 동시성 제한 (P1-3) ──────────────────
-const MAX_CONCURRENT_HANDLERS = 3;
+// MAX_CONCURRENT_HANDLERS: config.ts에서 import
 let activeHandlerCount = 0;
 const handlerQueue: Array<() => void> = [];
 

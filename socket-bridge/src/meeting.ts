@@ -10,7 +10,7 @@
  * 6. 기록 (.memory/decisions/에 저장)
  */
 
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import type { App } from '@slack/bolt';
 import { getDb } from './db.js';
@@ -278,7 +278,10 @@ export const synthesizeAndDecide = async (
     decision,
   ].join('\n');
 
-  writeFileSync(decisionFile, decisionContent, 'utf-8');
+  // 원자적 파일 쓰기 (write→rename)
+  const tmpFile = decisionFile + '.tmp';
+  writeFileSync(tmpFile, decisionContent, 'utf-8');
+  renameSync(tmpFile, decisionFile);
   console.log(
     `[meeting] #${meetingId} 결정 기록: ${decisionFile}`,
   );

@@ -116,16 +116,18 @@ export const cleanupOrphanClaims = (): OrphanClaimInfo[] => {
     return [];
   }
 
-  const updateStmt = db.prepare(`
-    UPDATE claims SET status = 'failed', updated_at = ? WHERE message_ts = ?
-  `);
+  // 배치 UPDATE (O(1) vs 기존 O(n) 개별 UPDATE)
+  db.prepare(`
+    UPDATE claims SET status = 'failed', updated_at = ?
+    WHERE status = 'processing' AND updated_at < ?
+  `).run(now, cutoff);
 
-  const orphans: OrphanClaimInfo[] = [];
-
-  for (const row of rows) {
+  const orphans: OrphanClaimInfo[] = rows.map((row) => {
     const ageMs = now - row.updated_at;
-
-    const orphan: OrphanClaimInfo = {
+    console.warn(
+      `[claim] 오펀 감지 → failed: ${row.message_ts} (agent=${row.agent}, age=${Math.round(ageMs / 60000)}min)`,
+    );
+    return {
       messageTs: row.message_ts,
       agent: row.agent,
       timestamp: new Date(row.created_at).toISOString(),
@@ -133,14 +135,7 @@ export const cleanupOrphanClaims = (): OrphanClaimInfo[] => {
       ageMs,
       version: row.version,
     };
-
-    orphans.push(orphan);
-    updateStmt.run(now, row.message_ts);
-
-    console.warn(
-      `[claim] 오펀 감지 → failed: ${orphan.messageTs} (agent=${orphan.agent}, age=${Math.round(ageMs / 60000)}min)`,
-    );
-  }
+  });
 
   console.warn(`[claim] ${orphans.length}개 오펀 claim 복구 완료`);
 
