@@ -5,6 +5,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { ColumnWithCards, Card as CardType } from '@/lib/types';
 import Card from './Card';
 import AddCardModal from './AddCardModal';
+import CardDetailModal from './CardDetailModal';
 import { api } from '@/lib/api';
 
 interface Props {
@@ -13,12 +14,13 @@ interface Props {
 }
 
 export default function Column({ column, onRefresh }: Props) {
-  const [showModal, setShowModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}` });
 
   const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => {
     await api.createCard({ column_id: column.id, ...data });
-    setShowModal(false);
+    setShowAddModal(false);
     onRefresh();
   };
 
@@ -44,21 +46,28 @@ export default function Column({ column, onRefresh }: Props) {
         >
           <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
             {column.cards.map((card: CardType) => (
-              <Card key={card.id} card={card} onDelete={handleDelete} />
+              <Card key={card.id} card={card} onDelete={handleDelete} onCardClick={setSelectedCard} />
             ))}
           </SortableContext>
         </div>
         <div className="px-3 pb-3">
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => setShowAddModal(true)}
             className="w-full text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] rounded-lg py-2 text-sm transition-colors text-left px-3"
           >
             + 카드 추가
           </button>
         </div>
       </div>
-      {showModal && (
-        <AddCardModal columnId={column.id} onAdd={handleAdd} onClose={() => setShowModal(false)} />
+      {showAddModal && (
+        <AddCardModal columnId={column.id} onAdd={handleAdd} onClose={() => setShowAddModal(false)} />
+      )}
+      {selectedCard && (
+        <CardDetailModal
+          card={selectedCard}
+          columnName={column.name}
+          onClose={() => setSelectedCard(null)}
+        />
       )}
     </>
   );

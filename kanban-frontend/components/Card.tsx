@@ -41,9 +41,10 @@ function AgentAvatar({ name }: { name: string }) {
 interface Props {
   card: CardType;
   onDelete: (id: number) => void;
+  onCardClick: (card: CardType) => void;
 }
 
-export default function Card({ card, onDelete }: Props) {
+export default function Card({ card, onDelete, onCardClick }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `card-${card.id}`,
     data: { type: 'card', card },
@@ -63,6 +64,7 @@ export default function Card({ card, onDelete }: Props) {
       style={style}
       {...attributes}
       {...listeners}
+      onClick={() => onCardClick(card)}
       className="bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-lg p-3 cursor-grab active:cursor-grabbing shadow-sm hover:shadow-md transition-all duration-200 group"
     >
       <div className="flex items-start justify-between gap-2">

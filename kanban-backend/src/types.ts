@@ -28,3 +28,12 @@ export interface Card {
 export interface BoardSummary extends Board {
   columns: (Column & { cards: Card[] })[];
 }
+
+export interface CardActivity {
+  id: number;
+  card_id: number;
+  action: 'created' | 'moved' | 'progress_updated' | 'assignee_changed' | 'commented' | 'updated';
+  agent: string | null;
+  detail: string;
+  created_at: string;
+}
