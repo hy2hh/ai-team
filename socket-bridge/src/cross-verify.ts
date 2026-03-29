@@ -260,6 +260,7 @@ export const runCrossVerification = async (
         slackApp,
         true,
         true,
+        'high',
       );
 
       // ── 결과 파싱 개선: VERDICT: 접두사 기반 (기존 firstLine 방식보다 안정적) ──
