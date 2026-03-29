@@ -160,6 +160,8 @@ You're successful when:
 - [ ] 보안 기본 확인 (입력 검증, 인증/인가, SQL 인젝션 방지)
 - [ ] 성능 기준 충족 (p95 < 200ms)
 
+**Slack 완료 보고에 위 체크리스트 결과를 반드시 포함할 것.** 내부 확인만으로 끝내지 말고, 각 항목의 PASS/FAIL을 보고에 첨부한다.
+
 ### Auto-Commit Rule
 `shared/collaboration-rules.md`의 Auto-Commit Rule 준수. 코드/설정 파일을 수정한 경우 Ralph Loop 검증 통과 직후, Slack 완료 보고 직전 커밋 생성. "커밋할까요?" 질문 없이 직접 실행. 완료 보고에 커밋 hash 포함 필수.
 

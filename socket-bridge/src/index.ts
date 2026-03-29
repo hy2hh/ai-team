@@ -728,6 +728,7 @@ const executeSingle = async (
       pmApp,
       true,
       false,
+      'high',
     );
 
     // cross-verify (변경 파일 내용을 코드가 직접 읽어서 주입)
@@ -748,7 +749,7 @@ const executeSingle = async (
       await handleMessage('pm', {
         ...event,
         text: '[Bridge 자동 요청] 작업 완료. 다음 단계가 있다면 recommend_next_phase로 등록하세요. 없으면 "완료, 추가 작업 없음"이라고 답하세요.',
-      }, 'hub-review', pmApp, true, true);
+      }, 'hub-review', pmApp, true, true, 'high');
     }
 
     return;
@@ -965,6 +966,7 @@ const executeSingle = async (
       pmApp,
       true,  // skipReaction
       true,  // skipPosting — 중간 허브 리뷰는 Slack에 노출 안 함
+      'high',
     );
 
     // (d) PM 리뷰 응답에서 delegate 도구로 지정된 새 타겟
@@ -1045,6 +1047,7 @@ const executeSingle = async (
           pmApp,
           true,
           true,
+          'high',
         );
       }
     } else {
@@ -1076,7 +1079,8 @@ const executeSingle = async (
       'hub-review',
       pmApp,
       true,
-      // skipPosting=false: depth 한도 도달 후 최종 요약은 Slack에 노출
+      false,
+      'high',
     );
   }
 
