@@ -180,7 +180,7 @@ const SESSION_STORE_PATH = join(
 );
 
 // SESSION_TTL_MS: config.ts에서 import (환경변수 BRIDGE_SESSION_TTL_MS로 조정 가능)
-import { SESSION_TTL_MS } from './config.js';
+import { SESSION_TTL_MS, MODEL_HIGH, MODEL_STANDARD } from './config.js';
 
 /** 영구화 저장소 타입 */
 interface SessionStore {
@@ -1098,6 +1098,7 @@ export const handleMessage = async (
   slackApp: App,
   skipReaction = false,
   skipPosting = false,
+  modelTier: 'high' | 'standard' = 'standard',
 ): Promise<HandleMessageResult> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
@@ -1455,10 +1456,13 @@ export const handleMessage = async (
       baseTools.push('mcp__escalation__escalate_to_pm');
     }
 
+    const selectedModel = modelTier === 'high' ? MODEL_HIGH : MODEL_STANDARD;
+    console.log(`[runtime] ${agentName} 모델 선택: ${selectedModel} (tier=${modelTier})`);
+
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       cwd: PROJECT_DIR,
       systemPrompt: session.systemPrompt,
-      model: 'claude-sonnet-4-6',
+      model: selectedModel,
       allowedTools: baseTools,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,

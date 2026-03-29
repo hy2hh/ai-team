@@ -145,6 +145,7 @@ export const collectOpinions = async (
         slackApp,
         true,
         true,
+        'high',
       );
 
       const opinion: MeetingOpinion = {
@@ -237,6 +238,7 @@ export const synthesizeAndDecide = async (
     slackApp,
     true,
     false,
+    'high',
   );
 
   const decision = response.text;
