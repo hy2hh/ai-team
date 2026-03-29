@@ -1730,7 +1730,7 @@ const main = async () => {
       );
 
       // 2차 필터: 파일 기반 claim lock (프로세스 재시작에도 안전)
-      if (!tryClaim(ts, 'bridge')) {
+      if (!tryClaim(ts, 'bridge', channel)) {
         console.log(
           `[claim] 이미 claim된 메시지: ${ts} — skip`,
         );
