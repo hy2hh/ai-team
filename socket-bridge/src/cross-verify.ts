@@ -6,11 +6,97 @@
  * 결과에 따라 PASS/WARN/FAIL을 반환한다.
  */
 
+import { execSync } from 'child_process';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import type { App } from '@slack/bolt';
 import { getDb } from './db.js';
 import { handleMessage } from './agent-runtime.js';
 import type { SlackEvent } from './types.js';
 import { rateLimited } from './rate-limiter.js';
+
+/** 프로젝트 루트 (socket-bridge의 부모) */
+const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..');
+
+/** 파일당 최대 문자 수 */
+const MAX_CHARS_PER_FILE = 3000;
+
+/** 전체 주입 최대 문자 수 */
+const MAX_TOTAL_CHARS = 15000;
+
+/** 허용 확장자 (텍스트 파일만) */
+const TEXT_EXTENSIONS = new Set([
+  '.ts', '.tsx', '.md', '.json', '.js', '.mjs', '.css', '.html',
+]);
+
+/**
+ * git 워킹 트리의 변경 파일 목록 스냅샷
+ * @returns 변경된 파일 경로 Set
+ */
+export const snapshotChangedFiles = (): Set<string> => {
+  try {
+    const output = execSync('git diff --name-only && git diff --name-only --cached', {
+      cwd: PROJECT_ROOT,
+      encoding: 'utf-8',
+      timeout: 5000,
+    });
+    return new Set(output.trim().split('\n').filter(Boolean));
+  } catch {
+    return new Set();
+  }
+};
+
+/**
+ * 두 스냅샷 차이에서 새로 변경된 파일 목록 추출
+ * @param before - 에이전트 실행 전 스냅샷
+ * @param after - 에이전트 실행 후 스냅샷
+ * @returns 새로 변경된 파일 경로 배열
+ */
+export const diffSnapshots = (
+  before: Set<string>,
+  after: Set<string>,
+): string[] =>
+  [...after].filter((f) => !before.has(f));
+
+/**
+ * 변경 파일 내용을 읽어 문자열로 조합
+ * @param changedFiles - 변경된 파일 경로 배열
+ * @returns 주입용 텍스트 (파일별 내용 포함)
+ */
+export const readChangedFileContents = (changedFiles: string[]): string => {
+  if (changedFiles.length === 0) {
+    return '';
+  }
+
+  const textFiles = changedFiles.filter((f) => {
+    const ext = f.slice(f.lastIndexOf('.'));
+    return TEXT_EXTENSIONS.has(ext);
+  });
+
+  const sections: string[] = [];
+  let totalChars = 0;
+
+  for (const filePath of textFiles) {
+    if (totalChars >= MAX_TOTAL_CHARS) {
+      sections.push(`\n... (${textFiles.length - sections.length}개 파일 생략, 총 용량 초과)`);
+      break;
+    }
+
+    try {
+      const absPath = resolve(PROJECT_ROOT, filePath);
+      let content = readFileSync(absPath, 'utf-8');
+      if (content.length > MAX_CHARS_PER_FILE) {
+        content = content.slice(0, MAX_CHARS_PER_FILE) + '\n... (잘림)';
+      }
+      sections.push(`### \`${filePath}\`\n\`\`\`\n${content}\n\`\`\``);
+      totalChars += content.length;
+    } catch {
+      sections.push(`### \`${filePath}\`\n(읽기 실패)`);
+    }
+  }
+
+  return sections.join('\n\n');
+};
 
 /** 검증 결과 등급 */
 export type VerifyResult = 'PASS' | 'WARN' | 'FAIL';
@@ -105,6 +191,7 @@ const recordVerification = (
  *
  * @param producerAgent - 작업 완료 에이전트
  * @param producerResult - 에이전트 출력 텍스트
+ * @param changedFiles - 에이전트가 실제 변경한 파일 경로 배열 (git diff 기반)
  * @param event - 원본 Slack 이벤트
  * @param slackApp - Slack App
  * @returns 검증 결과 배열
@@ -112,6 +199,7 @@ const recordVerification = (
 export const runCrossVerification = async (
   producerAgent: string,
   producerResult: string,
+  changedFiles: string[],
   event: SlackEvent,
   slackApp: App,
 ): Promise<Array<{ verifier: string; result: VerifyResult; details: string }>> => {
@@ -126,21 +214,17 @@ export const runCrossVerification = async (
     details: string;
   }> = [];
 
-  // ── 결과 텍스트 전처리: 잘림 방지 + 변경 파일 경로 추출 ──
-  // 기존: 2000자 하드 잘림 → 개선: 8000자까지 허용 + 파일 경로 별도 추출
-  const MAX_RESULT_LENGTH = 8000;
+  // ── 결과 텍스트 전처리 ──
+  const MAX_RESULT_LENGTH = 4000;
   const truncatedResult = producerResult.length > MAX_RESULT_LENGTH
-    ? producerResult.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과 잘림, 실제 파일을 직접 읽어 검증하세요)'
+    ? producerResult.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과 잘림)'
     : producerResult;
 
-  // 결과 텍스트에서 파일 경로 추출 (에이전트가 언급한 파일)
-  const filePathPattern = /(?:^|\s)((?:\.\/|\/|src\/|\.claude\/|\.memory\/|kanban-|socket-bridge\/)\S+\.(?:ts|tsx|md|json|js|mjs))/gm;
-  const mentionedFiles = [...new Set(
-    [...producerResult.matchAll(filePathPattern)].map((m) => m[1]),
-  )].slice(0, 10);
-  const fileHint = mentionedFiles.length > 0
-    ? `\n\n*변경된 파일 (직접 Read 도구로 확인하세요):*\n${mentionedFiles.map((f) => `- \`${f}\``).join('\n')}`
-    : '';
+  // ── 코드가 직접 읽은 변경 파일 내용 (구조적 강제) ──
+  const fileContents = readChangedFileContents(changedFiles);
+  const fileSection = fileContents
+    ? `\n\n*변경된 파일 내용 (${changedFiles.length}개, 코드가 직접 읽음):*\n${fileContents}`
+    : '\n\n*(변경된 파일 없음)*';
 
   // 검증자 병렬 실행
   const verifyPromises = verifiers.map(async ({ verifier, checkItems }) => {
@@ -153,16 +237,14 @@ export const runCrossVerification = async (
         `[Cross-Verification] ${producerAgent}의 작업 결과를 검증해주세요.`,
         '',
         `*검증 항목:* ${checkItems}`,
+        fileSection,
         '',
-        '*중요: 텍스트만 보고 판단하지 마세요. 반드시 Read/Grep 도구로 실제 파일을 읽고 검증하세요.*',
-        fileHint,
-        '',
-        `*${producerAgent} 작업 결과:*`,
+        `*${producerAgent} 작업 요약:*`,
         truncatedResult,
         '',
         '응답 형식:',
         '1. 첫 줄: `VERDICT: PASS` 또는 `VERDICT: WARN` 또는 `VERDICT: FAIL`',
-        '2. 둘째 줄부터: 검증 상세 (실제 파일에서 확인한 증거 포함)',
+        '2. 둘째 줄부터: 위 파일 내용 기반 검증 상세',
       ].join('\n'),
       ts: event.ts,
       thread_ts: event.thread_ts ?? event.ts,

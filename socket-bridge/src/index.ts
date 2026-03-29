@@ -46,6 +46,8 @@ import {
 import {
   shouldVerify,
   runCrossVerification,
+  snapshotChangedFiles,
+  diffSnapshots,
 } from './cross-verify.js';
 import { rateLimited } from './rate-limiter.js';
 import {
@@ -643,13 +645,16 @@ const executeSingle = async (
       `[hub] 순차 위임 시작: ${result.delegationSteps.length} steps`,
     );
     const pmApp = findAgentApp('pm', apps);
-    const seqResults: Array<{ agent: string; text: string }> = [];
+    const seqResults: Array<{ agent: string; text: string; changedFiles: string[] }> = [];
 
     for (let si = 0; si < result.delegationSteps.length; si++) {
       const step = result.delegationSteps[si];
       console.log(
         `[hub] 순차 위임: step ${si + 1}/${result.delegationSteps.length} [${step.agents.join(', ')}] — ${step.task}`,
       );
+
+      // git diff 스냅샷 (step 전)
+      const beforeSnapshot = snapshotChangedFiles();
 
       // step 내 에이전트는 병렬 실행
       const stepResults = await Promise.allSettled(
@@ -679,6 +684,10 @@ const executeSingle = async (
         }),
       );
 
+      // git diff 스냅샷 (step 후) — step 내 전체 변경 캡처
+      const afterSnapshot = snapshotChangedFiles();
+      const stepChangedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
+
       for (let i = 0; i < step.agents.length; i++) {
         const r = stepResults[i];
         seqResults.push({
@@ -686,6 +695,7 @@ const executeSingle = async (
           text: r.status === 'fulfilled'
             ? r.value.text
             : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+          changedFiles: stepChangedFiles,
         });
       }
 
@@ -719,12 +729,12 @@ const executeSingle = async (
       false,
     );
 
-    // cross-verify
+    // cross-verify (변경 파일 내용을 코드가 직접 읽어서 주입)
     for (const agentResult of seqResults) {
       if (shouldVerify(agentResult.agent)) {
-        console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작`);
+        console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
         try {
-          await runCrossVerification(agentResult.agent, agentResult.text, event, pmApp);
+          await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
         } catch (err) {
           console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
         }
@@ -753,6 +763,7 @@ const executeSingle = async (
   const accumulatedResults: Array<{
     agent: string;
     text: string;
+    changedFiles: string[];
   }> = [];
   let agentExecutionCount = 0;
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
@@ -807,6 +818,8 @@ const executeSingle = async (
         `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
       );
 
+      const beforeSingle = snapshotChangedFiles();
+
       const delegationResult = await withAgentTimeout(
         handleMessage(
           target,
@@ -818,6 +831,9 @@ const executeSingle = async (
         target,
         event.ts,
       );
+
+      const afterSingle = snapshotChangedFiles();
+      const singleChangedFiles = diffSnapshots(beforeSingle, afterSingle);
 
       // ✅ 완료 전환
       if (currentPmTs) {
@@ -836,6 +852,7 @@ const executeSingle = async (
       accumulatedResults.push({
         agent: target,
         text: delegationResult.text || '[응답 없음]',
+        changedFiles: singleChangedFiles,
       });
       agentExecutionCount += 1;
       allExecutedAgents.add(target);
@@ -870,6 +887,8 @@ const executeSingle = async (
         `[hub] 병렬 위임: [${batch.join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
       );
 
+      const beforeBatch = snapshotChangedFiles();
+
       const parallelResults = await Promise.allSettled(
         batch.map((target, i) => {
           const delegationEvent =
@@ -887,6 +906,9 @@ const executeSingle = async (
         }),
       );
 
+      const afterBatch = snapshotChangedFiles();
+      const batchChangedFiles = diffSnapshots(beforeBatch, afterBatch);
+
       for (let i = 0; i < batch.length; i++) {
         const r = parallelResults[i];
         accumulatedResults.push({
@@ -895,6 +917,7 @@ const executeSingle = async (
             r.status === 'fulfilled'
               ? r.value.text
               : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+          changedFiles: batchChangedFiles,
         });
         // ✅ 각 에이전트 완료 전환
         if (currentPmTs) {
@@ -965,17 +988,17 @@ const executeSingle = async (
       }
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
 
-      // ─── Cross-Verification 자동 실행 ──────────────────
-      // 에이전트 실행 결과 중 검증 가능한 에이전트가 있으면 자동 검증
+      // ─── Cross-Verification 자동 실행 (변경 파일 내용 코드 주입) ──
       for (const agentResult of accumulatedResults) {
         if (shouldVerify(agentResult.agent)) {
           console.log(
-            `[cross-verify] ${agentResult.agent} 자동 검증 시작`,
+            `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
           );
           try {
             const verifyResults = await runCrossVerification(
               agentResult.agent,
               agentResult.text,
+              agentResult.changedFiles,
               event,
               pmApp,
             );

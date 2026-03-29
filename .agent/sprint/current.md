@@ -86,3 +86,31 @@
 - 운영 환경 E2E 테스트 (sid가 Slack에 직접 메시지)
 - convene_meeting 자율 소집 테스트
 - auto-proceed veto window 실제 동작 테스트
+
+### [2026-03-29] Session: Production Hardening + 프로세스 강화 + cross-verify 개선
+
+**Tried:**
+- docs/specs/ 워크플로 + Feature Spec 템플릿 추가 → 규칙만으로는 부족
+- bridge 코드로 스펙 파일/에러 케이스 AC 없으면 위임 차단 → 성공 (도구가 에러 반환)
+- DoD 프로세스 + buildContextRulesPrefix 주입 + 완료 보고 시 DoD 미포함 경고 → 구현
+- "진행할까요?" 8개 패턴 감지 → 경고 자동 주입
+- P0: 메모리 누수 4건(debounce/activeAgents/sessionStore) TTL 정리 인터벌 추가
+- P0: message/reaction handler try-catch 래핑 + claim→failed 업데이트
+- P0: rate-limiter.ts 신규 (sliding window 50 req/min)
+- P1: graceful shutdown 완전 개선 (모든 타이머/에이전트/approval 정리)
+- P1: 동시성 제한 semaphore (MAX_CONCURRENT_HANDLERS=3)
+- P2: config.ts로 하드코딩 설정 외부화, 배치 SQL, 원자적 파일 쓰기
+- cross-verify: 2000자→8000자, VERDICT 파싱, 파일 경로 추출 + "Read로 읽어라" 지시
+- 프롬프팅 기법 3개(CoVe/Self-Consistency/PoT) 팀 회의 → 전부 불적용 결정
+
+**Learned:**
+- "프롬프트 < 코드 강제" 원칙이 이 프로젝트의 핵심 철학. 모든 개선은 이 기준으로 평가
+- 서브에이전트 탐색 결과를 그대로 신뢰하면 오탐 발생 (.env 커밋 오판). 반드시 직접 검증
+- cross-verify에 "파일을 읽어라" 프롬프트 추가는 코드 강제 철학과 모순 → sid가 "근본적으로 맞아?" 지적
+- 프로세스 문서(DoD, Feature Spec)는 1단계, 코드 강제가 2단계. 1단계만으로 완료 선언하면 안 됨
+- 회의 결론: baseline 메트릭 없이 기법 적용은 "문제 없이 솔루션 찾기"
+
+**Next:**
+- cross-verify 근본 재설계: 프롬프트 지시 대신 코드가 파일을 읽어서 검증 컨텍스트 주입
+- bridge 재시작 + E2E 테스트
+- P2-1 구조화된 로깅 (pino)
