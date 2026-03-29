@@ -94,12 +94,13 @@ export const registerAutoProceed = async (
       channel: req.channel,
       thread_ts: req.messageTs,
       text: [
-        `🔴 *[HIGH] sid 승인 대기 중*`,
+        `🔴 *[HIGH 리스크] sid 승인 필요 — 무기한 대기 중*`,
         `*다음 단계:* ${agentList}`,
         `*이유:* ${req.reason}`,
         `*요약:* ${req.actionSummary}`,
         '',
-        ':white_check_mark: 리액션 또는 "ㅇㅇ"으로 승인',
+        `이 스레드에 *승인* 또는 *거부* 로 답장하세요.`,
+        `(또는 ✅ / ❌ 리액션)`,
       ].join('\n'),
     });
   } else {
@@ -155,7 +156,7 @@ export const registerAutoProceed = async (
  */
 const resolveApproval = async (
   approvalId: number,
-  status: 'auto_approved' | 'manually_approved' | 'cancelled',
+  status: 'auto_approved' | 'manually_approved' | 'cancelled' | 'rejected',
   slackApp: App,
 ): Promise<void> => {
   const db = getDb();
@@ -179,12 +180,14 @@ const resolveApproval = async (
   }
 
   const agents = JSON.parse(row.agents) as string[];
-  const statusEmoji = status === 'cancelled' ? '⛔' : '✅';
+  const statusEmoji = (status === 'cancelled' || status === 'rejected') ? '⛔' : '✅';
   const statusText = status === 'cancelled'
     ? '취소됨'
-    : status === 'auto_approved'
-      ? '자동 진행'
-      : '수동 승인';
+    : status === 'rejected'
+      ? '거부됨'
+      : status === 'auto_approved'
+        ? '자동 진행'
+        : '수동 승인';
 
   // Slack 상태 업데이트
   try {
@@ -201,8 +204,8 @@ const resolveApproval = async (
     `[auto-proceed] ${statusText}: #${approvalId} [${agents.join(', ')}]`,
   );
 
-  // 승인된 경우 콜백 실행
-  if (status !== 'cancelled' && onApprovedCallback) {
+  // 승인된 경우 콜백 실행 (rejected/cancelled는 실행 안 함)
+  if (status !== 'cancelled' && status !== 'rejected' && onApprovedCallback) {
     onApprovedCallback(approvalId, agents, row.reason, row.channel, row.message_ts);
   }
 };
@@ -262,6 +265,28 @@ export const manuallyApprove = async (
   }
 
   return approved;
+};
+
+/**
+ * 채널의 pending 승인을 거부 ("거부", "reject" 등 텍스트)
+ * @returns 거부된 승인 수
+ */
+export const manuallyReject = async (
+  channel: string,
+  slackApp: App,
+): Promise<number> => {
+  const db = getDb();
+  const rows = db.prepare(
+    'SELECT id FROM pending_approvals WHERE channel = ? AND status = ? ORDER BY created_at ASC',
+  ).all(channel, 'pending') as Array<{ id: number }>;
+
+  let rejected = 0;
+  for (const row of rows) {
+    await resolveApproval(row.id, 'rejected', slackApp);
+    rejected++;
+  }
+
+  return rejected;
 };
 
 /**

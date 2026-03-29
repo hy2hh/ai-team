@@ -39,6 +39,7 @@ import { runMaintenance } from './db.js';
 import {
   cancelAutoProceed,
   manuallyApprove,
+  manuallyReject,
   hasPendingApproval,
   cleanupExpiredApprovals,
   onApproved,
@@ -1411,24 +1412,35 @@ const flushDebounceBuffer = async (
   // end-to-end 타이밍 시작
   const e2eStart = Date.now();
 
-  // ─── Auto-Proceed 텍스트 승인 체크 ──────────────────
-  // "ㅇㅇ", "ok", "진행", "ㄱ", "고" 등 승인 텍스트가
-  // pending approval이 있는 채널에서 발생하면 승인 처리 후 라우팅 건너뜀
+  // ─── Auto-Proceed 텍스트 승인/거부 체크 ──────────────────
+  // pending approval이 있는 채널에서 승인/거부 텍스트가 오면 처리 후 라우팅 건너뜀
   const APPROVAL_TEXT_PATTERN =
     /^[\s]*(ㅇㅇ|ok|진행|ㄱ|고|approve|승인|넵|네)[\s!.]*$/i;
-  if (
-    APPROVAL_TEXT_PATTERN.test(combinedText) &&
-    hasPendingApproval(slackEvent.channel)
-  ) {
-    const count = await manuallyApprove(
-      slackEvent.channel,
-      apps[0],
-    );
-    if (count > 0) {
-      console.log(
-        `[auto-proceed] 텍스트 승인: "${combinedText.trim()}" → ${count}개 승인`,
+  const REJECTION_TEXT_PATTERN =
+    /^[\s]*(거부|reject|취소|ㄴㄴ|노|no|반려|deny)[\s!.]*$/i;
+  if (hasPendingApproval(slackEvent.channel)) {
+    if (APPROVAL_TEXT_PATTERN.test(newMessagesText)) {
+      const count = await manuallyApprove(
+        slackEvent.channel,
+        apps[0],
       );
-      return;
+      if (count > 0) {
+        console.log(
+          `[auto-proceed] 텍스트 승인: "${newMessagesText.trim()}" → ${count}개 승인`,
+        );
+        return;
+      }
+    } else if (REJECTION_TEXT_PATTERN.test(newMessagesText)) {
+      const count = await manuallyReject(
+        slackEvent.channel,
+        apps[0],
+      );
+      if (count > 0) {
+        console.log(
+          `[auto-proceed] 텍스트 거부: "${newMessagesText.trim()}" → ${count}개 거부`,
+        );
+        return;
+      }
     }
   }
 
