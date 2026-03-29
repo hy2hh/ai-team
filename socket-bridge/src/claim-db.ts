@@ -143,6 +143,49 @@ export const cleanupOrphanClaims = (): OrphanClaimInfo[] => {
 };
 
 /**
+ * 브리지 재시작 복구용: 처리 중이던 모든 claim을 failed로 전환하고 반환
+ * age 제한 없음 — 브리지 재시작 자체가 모든 processing claim 중단을 의미함
+ * @returns 발견된 processing claim 목록 (재라우팅용)
+ */
+export const recoverProcessingClaimsOnStartup = (): OrphanClaimInfo[] => {
+  const db = getDb();
+  const now = Date.now();
+
+  const rows = db.prepare(`
+    SELECT * FROM claims
+    WHERE status = 'processing'
+  `).all() as ClaimRow[];
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  // 일괄 업데이트
+  db.prepare(`
+    UPDATE claims SET status = 'failed', updated_at = ?
+    WHERE status = 'processing'
+  `).run(now);
+
+  const orphans: OrphanClaimInfo[] = rows.map((row) => {
+    const ageMs = now - row.updated_at;
+    console.warn(
+      `[claim] 재시작 복구 → failed: ${row.message_ts} (agent=${row.agent}, age=${Math.round(ageMs / 60000)}min)`,
+    );
+    return {
+      messageTs: row.message_ts,
+      agent: row.agent,
+      timestamp: new Date(row.created_at).toISOString(),
+      channel: row.channel ?? undefined,
+      ageMs,
+      version: row.version,
+    };
+  });
+
+  console.log(`[claim] 재시작 복구: ${orphans.length}개 processing claim 발견`);
+  return orphans;
+};
+
+/**
  * 오펀 claim을 재큐잉용으로 초기화
  * 현재 버전이 MAX_REQUEUE_ATTEMPTS 미만인 경우에만 재큐잉 허용.
  *

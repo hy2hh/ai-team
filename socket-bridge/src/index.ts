@@ -27,6 +27,7 @@ import {
   updateClaim,
   cleanupExpiredClaims,
   cleanupOrphanClaims,
+  recoverProcessingClaimsOnStartup,
   requeueClaim,
   MAX_REQUEUE_ATTEMPTS,
 } from './claim-db.js';
@@ -1951,12 +1952,15 @@ const main = async () => {
     5 * 60 * 1000,
   );
 
-  // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행
-  const orphanCheckInterval = setInterval(async () => {
-    const orphans = cleanupOrphanClaims();
+  // ── 오펀 claim 처리 공통 함수 (재시작 복구 + 주기 감지 공유) ──
+  const processOrphanList = async (
+    orphans: import('./claim-db.js').OrphanClaimInfo[],
+    label: string,
+  ) => {
     if (orphans.length === 0 || apps.length === 0) {
       return;
     }
+    console.log(`[${label}] ${orphans.length}개 오펀 claim 처리 시작`);
 
     for (const orphan of orphans) {
       const canRequeue =
@@ -2006,7 +2010,7 @@ const main = async () => {
                 .map((a) => a.name)
                 .join(', ');
               console.log(
-                `[orphan-requeue] ${orphan.messageTs} 재라우팅: [${agentNames}] (v${newVersion}/${MAX_REQUEUE_ATTEMPTS})`,
+                `[${label}] ${orphan.messageTs} 재라우팅: [${agentNames}] (v${newVersion}/${MAX_REQUEUE_ATTEMPTS})`,
               );
 
               if (routing.execution === 'parallel') {
@@ -2046,7 +2050,7 @@ const main = async () => {
             }
           } catch (requeueErr) {
             console.error(
-              `[orphan-requeue] 재라우팅 실패: ${orphan.messageTs}`,
+              `[${label}] 재라우팅 실패: ${orphan.messageTs}`,
               requeueErr,
             );
             updateClaim(orphan.messageTs, 'failed');
@@ -2072,6 +2076,24 @@ const main = async () => {
         }
       }
     }
+  };
+
+  // 재시작 시 즉시 복구: 이전 세션에서 처리 중이던 claim 전체 재라우팅 (age 무관)
+  const startupOrphans = recoverProcessingClaimsOnStartup();
+  if (startupOrphans.length > 0) {
+    console.log(
+      `[startup-recovery] ${startupOrphans.length}개 미완료 태스크 감지 — 즉시 재라우팅 시작`,
+    );
+    // 앱이 완전히 연결된 직후 실행 (이벤트 루프에서 비동기 처리)
+    void processOrphanList(startupOrphans, 'startup-recovery');
+  } else {
+    console.log('[startup-recovery] 미완료 태스크 없음');
+  }
+
+  // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행 (2시간 이상 고착 감지)
+  const orphanCheckInterval = setInterval(async () => {
+    const orphans = cleanupOrphanClaims();
+    await processOrphanList(orphans, 'orphan-requeue');
   }, 30 * 60 * 1000);
 
   // DB 유지보수: 24시간마다 VACUUM + ANALYZE
