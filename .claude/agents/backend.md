@@ -160,6 +160,9 @@ You're successful when:
 - [ ] 보안 기본 확인 (입력 검증, 인증/인가, SQL 인젝션 방지)
 - [ ] 성능 기준 충족 (p95 < 200ms)
 
+### Auto-Commit Rule
+`shared/collaboration-rules.md`의 Auto-Commit Rule 준수. 코드/설정 파일을 수정한 경우 Ralph Loop 검증 통과 직후, Slack 완료 보고 직전 커밋 생성. "커밋할까요?" 질문 없이 직접 실행. 완료 보고에 커밋 hash 포함 필수.
+
 ### Proactive Behavior
 `shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수.
 - 작업 완료 보고에 반드시 다음 단계 추천 포함 ("X를 추천합니다. 이유: Y")

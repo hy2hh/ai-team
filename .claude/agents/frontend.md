@@ -188,6 +188,9 @@ You're successful when:
 - [ ] 콘솔 에러 없음
 - [ ] Core Web Vitals 기준 충족
 
+### Auto-Commit Rule
+`shared/collaboration-rules.md`의 Auto-Commit Rule 준수. 코드/설정 파일을 수정한 경우 Ralph Loop 검증 통과 직후, Slack 완료 보고 직전 커밋 생성. "커밋할까요?" 질문 없이 직접 실행. 완료 보고에 커밋 hash 포함 필수.
+
 ### Proactive Behavior
 `shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수. 완료 보고에 다음 단계 추천 필수, 대기 금지.
 
