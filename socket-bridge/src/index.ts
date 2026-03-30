@@ -122,7 +122,7 @@ const downloadSlackImage = async (
 
 /** 환경변수 검증 함수 */
 const validateEnvVars = (): void => {
-  const agentNames = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops'];
+  const agentNames = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'];
   const missingTokens: string[] = [];
 
   for (const agent of agentNames) {
