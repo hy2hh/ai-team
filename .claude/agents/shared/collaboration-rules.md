@@ -21,7 +21,10 @@
 4. Update `.memory/tasks/active-{delegatee-role}.md` with the new task
 
 ### When Receiving
-1. Acknowledge receipt immediately
+1. **위임 맥락 표시 (첫 줄 필수)**: 위임받은 경우 응답 첫 줄에 위임 맥락을 표시한다
+   - 형식: `_{위임자}로부터 위임받았습니다 — {위임 이유}_`
+   - 예시: `_Marge로부터 위임받았습니다 — 다크 모드는 디자인 스펙 정의가 먼저 필요한 작업_`
+   - 목적: sid가 각 에이전트 응답만 봐도 "누가 왜 이 작업을 보냈는지" 즉시 파악 가능
 2. Check `.memory/` for relevant context
 3. Execute the task
 4. Report completion in the thread
@@ -40,12 +43,26 @@
 | Architecture decision | Homer | All agents |
 | Sprint planning | Marge | All agents |
 
+## Permission Request Rules (권한 요청 필수)
+
+에이전트는 다음 상황에서 반드시 `mcp__permission__request_permission` 도구를 호출해야 한다:
+
+1. **도구가 훅에 의해 차단된 경우**: Edit/Write/Bash 도구가 훅에 막히면 우회 시도 금지. 즉시 `request_permission`을 호출하여 sid의 승인을 받는다.
+2. **공유 설정 파일 수정**: `.claude/agents/shared/`, `settings.json`, `.memory/` 등 팀 공통 파일 수정 시
+3. **되돌리기 어려운 작업**: DB 마이그레이션 실행, 외부 서비스 변경, 배포 등
+
+`request_permission` 호출 형식:
+- `reason`: 왜 이 작업이 필요한지 (1-2문장)
+- `action`: 구체적으로 무엇을 하려는지 (파일 경로, 명령어 등)
+
+**절대 금지**: 훅이 막은 작업을 python3, 다른 언어, 다른 도구로 우회하는 행위. 이는 보안 정책 위반이다.
+
 ## Escalation Rules
 - **Ambiguous tasks**: Ask sid for clarification first
 - **Blocked by another agent**: @mention them with clear request + deadline
 - **Conflicting requirements**: Escalate to Marge for prioritization
 - **Task exceeds expertise**: Acknowledge limitation and delegate
-- **Production changes**: Always require sid's approval
+- **Production changes**: Always require sid's approval via `request_permission`
 
 ## Memory Protocol
 
@@ -217,4 +234,15 @@ PM이 `convene_meeting` 도구로 회의를 소집한다. 프로세스:
 - **보고 순서**: Ralph Loop 검증 → 커밋 → **Slack 완료 보고** → 다음 단계 추천
 - **금지**: "다음 단계 추천"만 남기고 완료 보고를 생략하는 것
 - **금지**: 완료 보고 없이 다른 에이전트에게 위임만 하는 것
+- **금지**: `"추가 확인이 필요하다면"`, `"검증이 필요하다면"`, `"어떻게 할까요"` 등으로 완료 보고를 대체하거나 미루는 것
 - **위반 수준**: 보고 누락 = 중복 보고와 동등한 수준의 규칙 위반
+
+### Cross-Verification 완료 트리거
+
+Cross-verification PASS 수신은 완료 보고의 *즉시 트리거*이다.
+
+- **PASS 직후 의무**: Cross-verification이 전원 PASS 되면 즉시 완료 보고 발송. 대기·미루기 금지.
+- **PM 책임 (위임 조율자)**: 위임을 소집한 PM(Marge)이 최종 완료 보고 책임을 진다. `"Homer가 했으니 Homer가 보고"` 는 책임 회피 — 위임 조율자가 전체 흐름의 완료를 선언해야 한다.
+- **책임 회피 금지 패턴**: `"확인이 필요하다면"`, `"검증해볼까요"`, `"추가로 에이전트 개별 프롬프트에도 반영됐는지 확인이 필요합니다"` — 이는 완료 보고가 아니라 대기 상태이며 규칙 위반이다.
+- **WARN 수신 시**: 경고 내용을 완료 보고에 명시하고 후속 조치 계획을 포함한다.
+- **FAIL 수신 시**: 완료 보고 불가 — 이슈를 수정하고 재검증 후 PASS 시 보고한다.
