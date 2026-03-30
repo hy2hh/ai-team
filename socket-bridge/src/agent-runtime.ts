@@ -27,6 +27,8 @@ import {
 import { classifyRisk } from './risk-matrix.js';
 import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
+import { enqueue, type QueueTask, type EnqueueResult } from './queue-manager.js';
+import { postQueueStarted } from './queue-processor.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -1341,6 +1343,80 @@ export const handleMessage = async (
                   },
                 ],
               };
+            },
+          ),
+          tool(
+            'enqueue_tasks',
+            '복잡한 작업을 Task 단위로 분해하여 큐에 등록합니다. 각 Task는 독립 에이전트 세션에서 순차 실행되어 max_turns 초과 문제를 방지합니다. 3개 이상의 분석/조사 작업, 31턴 초과 위험이 있는 복잡한 작업에 사용하세요. 단순 단일 태스크는 delegate를 사용하세요.',
+            {
+              tasks: z.array(z.object({
+                agent: z.string().describe('태스크를 실행할 에이전트 (pm/designer/frontend/backend/researcher/secops)'),
+                task: z.string().describe('태스크 설명 (구체적일수록 좋음)'),
+                tier: z.enum(['high', 'standard', 'fast']).optional().describe('모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
+                dependsOn: z.number().optional().describe('선행 태스크의 인덱스 (0-based). 해당 태스크 완료 후 실행됨'),
+              })).describe('순차 실행할 태스크 배열'),
+              reason: z.string().describe('큐 등록 이유'),
+            },
+            async ({ tasks, reason }) => {
+              const validAgents = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops'];
+              const validTasks: QueueTask[] = tasks
+                .filter((t: { agent: string }) => validAgents.includes(t.agent))
+                .map((t: { agent: string; task: string; tier?: 'high' | 'standard' | 'fast'; dependsOn?: number }) => ({
+                  agent: t.agent,
+                  task: t.task,
+                  tier: t.tier,
+                  dependsOn: t.dependsOn,
+                }));
+
+              if (validTasks.length === 0) {
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: '⛔ 유효한 태스크가 없습니다. agent는 pm/designer/frontend/backend/researcher/secops 중 하나여야 합니다.',
+                  }],
+                };
+              }
+
+              try {
+                // 큐에 등록
+                const result: EnqueueResult = enqueue(
+                  validTasks,
+                  event.thread_ts ?? event.ts,
+                  event.channel,
+                );
+
+                // Slack에 큐 시작 알림
+                await postQueueStarted(
+                  slackApp,
+                  event.channel,
+                  event.thread_ts ?? event.ts,
+                  result.tasks,
+                );
+
+                console.log(
+                  `[delegation] PM enqueue_tasks: ${result.taskCount}개 태스크 등록 — ${reason}`,
+                );
+
+                const taskList = result.tasks
+                  .map((t) => `  ${t.sequence + 1}. [${t.agent}] ${t.task.slice(0, 50)}...`)
+                  .join('\n');
+
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: `큐 등록 완료 (${result.taskCount}개 태스크):\n${taskList}\n\n각 태스크는 독립 세션에서 순차 실행됩니다. 진행 상황은 스레드에서 확인하세요.`,
+                  }],
+                };
+              } catch (err) {
+                const errorMsg = err instanceof Error ? err.message : String(err);
+                console.error('[delegation] enqueue_tasks 실패:', err);
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: `⛔ 큐 등록 실패: ${errorMsg}`,
+                  }],
+                };
+              }
             },
           ),
           tool(

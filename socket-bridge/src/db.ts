@@ -130,6 +130,41 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ON verification_results(message_ts);
     `,
   },
+  {
+    version: 3,
+    sql: `
+      -- Task Queue 시스템 (복잡한 작업을 독립 세션으로 분해)
+      CREATE TABLE IF NOT EXISTS task_queue (
+        id               TEXT    PRIMARY KEY,
+        parent_queue_id  TEXT,                   -- 같은 배치의 ID (그룹핑용)
+        sequence         INTEGER NOT NULL,       -- 배치 내 순서 (0-based)
+        depends_on       INTEGER,                -- 선행 sequence 번호 (null = 즉시 실행 가능)
+        agent            TEXT    NOT NULL,
+        task             TEXT    NOT NULL,
+        context          TEXT,                   -- 이전 Task 결과 (실행 시 주입)
+        tier             TEXT    DEFAULT 'standard',
+        status           TEXT    DEFAULT 'queued',  -- queued | running | completed | failed | skipped
+        result           TEXT,
+        error            TEXT,
+        thread_ts        TEXT    NOT NULL,
+        channel          TEXT    NOT NULL,
+        created_at       INTEGER NOT NULL,
+        started_at       INTEGER,
+        completed_at     INTEGER,
+        retry_count      INTEGER DEFAULT 0,
+        max_retries      INTEGER DEFAULT 1
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_task_queue_status
+        ON task_queue(status);
+
+      CREATE INDEX IF NOT EXISTS idx_task_queue_thread
+        ON task_queue(thread_ts);
+
+      CREATE INDEX IF NOT EXISTS idx_task_queue_parent
+        ON task_queue(parent_queue_id);
+    `,
+  },
 ];
 
 /**

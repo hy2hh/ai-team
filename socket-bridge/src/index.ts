@@ -58,6 +58,11 @@ import {
   AGENT_TIMEOUT_MS,
   MAX_DELEGATION_DEPTH,
 } from './config.js';
+import {
+  startQueueProcessor,
+  stopQueueProcessor,
+} from './queue-processor.js';
+import { cancelQueueByThread } from './queue-manager.js';
 import { resolvePermissionRequest } from './permission-request.js';
 
 // ─── 설정 ───────────────────────────────────────────────
@@ -1955,6 +1960,13 @@ const main = async () => {
                 `[control] ⛔ 사용자 리액션으로 에이전트 중단: ${re.item.ts}`,
               );
             }
+            // 큐에 등록된 태스크도 취소 (스레드 기준)
+            const queueCancelled = cancelQueueByThread(re.item.ts);
+            if (queueCancelled > 0) {
+              console.log(
+                `[control] ⛔ 큐 태스크 ${queueCancelled}개 취소: ${re.item.ts}`,
+              );
+            }
             break;
           }
           case 'x': {
@@ -2065,6 +2077,9 @@ const main = async () => {
     () => writeHeartbeat('bridge', 'active'),
     5 * 60 * 1000,
   );
+
+  // Task Queue Processor 시작 (5초 주기 폴링)
+  startQueueProcessor(apps[0]);
 
   // ── 오펀 claim 처리 공통 함수 (재시작 복구 + 주기 감지 공유) ──
   const processOrphanList = async (
