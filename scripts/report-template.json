@@ -1,0 +1,37 @@
+{
+  "title": "보고서 제목",
+  "type": "Investigation Report",
+  "date": "2026-03-30",
+  "author": "Homer (Backend)",
+  "tags": ["ai-team", "example"],
+  "executiveSummary": "핵심 결론을 2-3문장으로 요약합니다.",
+  "sections": [
+    {
+      "title": "1. 배경 및 문제 정의",
+      "summary": "왜 이 조사를 시작했는가",
+      "content": "상세 내용을 여기에 작성합니다."
+    },
+    {
+      "title": "2. 조사 결과",
+      "subsections": [
+        {
+          "title": "주제 A",
+          "content": "주제 A에 대한 상세 내용",
+          "items": ["항목 1", "항목 2"]
+        },
+        {
+          "title": "주제 B",
+          "content": "주제 B에 대한 상세 내용",
+          "code": "// 관련 코드 예시"
+        }
+      ]
+    },
+    {
+      "title": "3. 결론 및 권고",
+      "items": [
+        { "label": "단기 조치", "value": "즉시 적용 가능한 해결책" },
+        { "label": "중기 계획", "value": "1개월 내 구현 목표" }
+      ]
+    }
+  ]
+}

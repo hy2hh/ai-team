@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      line-height: 1.7;
+      color: #1a1a2e;
+      background: #ffffff;
+      padding: 40px 48px;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+    .header {
+      border-bottom: 3px solid #4a6cf7;
+      padding-bottom: 20px;
+      margin-bottom: 32px;
+    }
+    .header .badge {
+      display: inline-block;
+      background: #4a6cf7;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+    .meta {
+      font-size: 12px;
+      color: #666;
+    }
+    .meta span { margin-right: 16px; }
+    .executive-summary {
+      background: #f0f4ff;
+      border-left: 4px solid #4a6cf7;
+      padding: 16px 20px;
+      border-radius: 0 8px 8px 0;
+      margin-bottom: 32px;
+    }
+    .executive-summary h2 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a6cf7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+    .executive-summary p {
+      font-size: 13px;
+      color: #333;
+    }
+    .section {
+      margin-bottom: 28px;
+      border: 1px solid #e8ecf8;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .section h3 {
+      font-size: 14px;
+      font-weight: 700;
+      background: #f8f9fe;
+      padding: 12px 18px;
+      border-bottom: 1px solid #e8ecf8;
+      color: #1a1a2e;
+    }
+    .section .summary {
+      padding: 12px 18px;
+      background: #fffdf0;
+      border-bottom: 1px solid #e8ecf8;
+      font-style: italic;
+      color: #555;
+      font-size: 12px;
+    }
+    .section ul {
+      padding: 12px 18px 12px 36px;
+    }
+    .section li {
+      margin-bottom: 6px;
+      color: #333;
+    }
+    .section li strong { color: #1a1a2e; }
+    .section p {
+      padding: 12px 18px;
+      color: #333;
+    }
+    .subsection {
+      padding: 10px 18px;
+      border-top: 1px solid #f0f0f0;
+    }
+    .subsection h4 {
+      font-size: 12px;
+      font-weight: 700;
+      color: #4a6cf7;
+      margin-bottom: 6px;
+    }
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', 'Menlo', monospace;
+      font-size: 11px;
+      overflow-x: auto;
+      margin: 8px 18px;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 16px;
+      border-top: 1px solid #e8ecf8;
+      font-size: 11px;
+      color: #999;
+      text-align: center;
+    }
+    .tag {
+      display: inline-block;
+      background: #e8ecf8;
+      color: #4a6cf7;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="badge">Investigation Report</div>
+    <h1>승인 창 미표시·Opus 모델·반복 패턴 근본 원인 조사</h1>
+    <div class="meta">
+      <span>📅 2026-03-30</span>
+      <span>👤 Homer (Backend) · Lisa (Researcher)</span>
+      <span class="tag">ai-team</span><span class="tag">permission</span><span class="tag">opus</span><span class="tag">approval-pattern</span><span class="tag">root-cause</span>
+    </div>
+  </div>
+
+  
+  <div class="executive-summary">
+    <h2>핵심 요약</h2>
+    <p>Block Kit 승인 창이 뜨지 않은 원인은 규칙이 있어도 에이전트가 도구를 실제 호출하지 않은 것에 있다. Opus 사용은 PM 허브 한정 기존 구현이 확인됐으나 직접 위임 경로는 누락되어 있다. 업계(LangGraph, Temporal, Microsoft AutoGen)는 공통적으로 '프롬프트 규칙'이 아닌 '코드 레벨 강제'로 이 문제를 해결한다.</p>
+  </div>
+  
+
+  
+    <div class="section">
+      <h3>1. 배경 — 무엇이 문제였나</h3>
+      <p class="summary">Homer가 plan-gate.sh에 의해 파일 수정이 차단됐을 때 request_permission 도구를 호출하지 않고 텍스트로만 '권한이 필요하다'고 보고했다.</p>
+      
+      
+      
+    <div class="subsection">
+      <h4>이슈 재현 흐름</h4>
+      
+      <ul><li>Homer → plan-gate.sh 훅이 .claude/agents/shared/collaboration-rules.md 수정 시도를 차단</li><li>Homer → 도구 호출 없이 텍스트로 '파일 수정이 차단됐습니다. 권한 승인이 필요합니다' 보고</li><li>sid → Slack에 Block Kit 승인 버튼이 표시되지 않음</li><li>Marge → 재위임 → Homer가 plan-gate.sh 없이 직접 수정 완료 (커밋 a55b055)</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>왜 버튼이 안 뜬 실제 원인</h4>
+      
+      <ul><li>로그 전체에서 mcp__permission 관련 도구 호출 흔적이 없음 — Homer가 규칙을 텍스트로 묘사하는 것으로 대체</li><li>index.ts 1458번 줄: error_max_turns — Homer 세션이 31턴 제한에 걸려 tool_use 상태에서 강제 종료됨</li><li>두 원인이 복합: 도구 미호출 + max_turns 초과 시 tool_use 중단</li></ul>
+      
+    </div>
+  
+    </div>
+  
+
+    <div class="section">
+      <h3>2. 연결된 이슈 — 같은 Slack 스레드 상황 분석</h3>
+      <p class="summary">링크된 스레드(C0ANKEB4CRF/p1774832877375059)에서 Homer가 '어떻게 진행할까요?'로 끝낸 것도 동일한 판단 회피 패턴이었다.</p>
+      
+      
+      
+    <div class="subsection">
+      <h4>패턴 공통점</h4>
+      
+      <ul><li>정보가 충분함에도 다음 행동을 결정하지 않고 sid에게 선택을 되넘기는 행동</li><li>'승인 요청 패턴' bridge 경고가 반복 발생 — 변형 표현(어떻게 할까요, 확인이 필요하다면 등)은 정규식이 감지 못함</li><li>근본 원인: 규칙이 존재하지만 코드 레벨에서 강제되지 않음 — 에이전트가 규칙을 알아도 행동을 바꾸지 않을 수 있음</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>현재 bridge 경고 정규식 한계</h4>
+      <p>index.ts의 승인 요청 패턴 감지는 '~할까요', '~요?' 형식에 집중되어 있어 '이렇게 진행하는 것이 어떨지요', '확인 후 알려주시면' 등의 우회 표현을 감지하지 못함.</p>
+      <ul><li>현재 감지: '~할까요?', '~어떻게 할까요'</li><li>미감지: '~하는 것이 나을 것 같습니다', '~검토해 보시겠어요', '선택지를 드리겠습니다'</li></ul>
+      
+    </div>
+  
+    </div>
+  
+
+    <div class="section">
+      <h3>3. Opus 모델 사용 현황 점검</h3>
+      <p class="summary">PM 허브(index.ts)는 이미 Opus를 사용 중이지만, Marge가 직접 위임받는 경우(delegation 라우팅)에는 Sonnet이 기본값이다.</p>
+      
+      
+      
+    <div class="subsection">
+      <h4>코드 확인 결과</h4>
+      <p>index.ts의 PM 허브 호출부에서 claude-opus-4-5 모델이 명시된 것을 확인했다.</p>
+      <ul><li>PM 허브 리뷰 (handleMessage 'pm') → Opus 사용 확인됨</li><li>delegation 라우팅으로 Marge 직접 호출 시 → agent.md의 기본 모델(Sonnet) 사용</li><li>차이: sid가 직접 Marge에게 메시지를 보내는 경우 vs. hub에서 PM 리뷰 단계를 거치는 경우</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>수정 방향</h4>
+      
+      <ul><li>agent-runtime.ts 또는 pm.md에서 PM 에이전트의 기본 모델을 Opus로 강제</li><li>또는 delegation 경로에서도 pm 에이전트는 항상 Opus를 사용하도록 index.ts 분기 추가</li><li>비용 영향: PM 직접 대화 빈도가 낮으므로 비용 증가 미미할 것으로 예상</li></ul>
+      
+    </div>
+  
+    </div>
+  
+
+    <div class="section">
+      <h3>4. 업계 해결 사례 — 동일 문제를 어떻게 풀었나</h3>
+      <p class="summary">LangGraph, Temporal, Microsoft AutoGen은 공통적으로 프롬프트 규칙보다 코드 레벨 강제를 선택했다.</p>
+      
+      
+      
+    <div class="subsection">
+      <h4>LangGraph (LangChain) — 결정론적 워크플로우</h4>
+      <p>에이전트가 특정 노드(human-in-the-loop)에 도달하면 그래프 자체가 실행을 중단하고 사람 입력을 기다린다. '에이전트에게 멈추라고 지시'하는 것이 아니라 그래프 구조가 멈춤을 강제한다.</p>
+      <ul><li>interrupt_before: 지정 노드 전에 자동으로 실행 중단 → 사람 승인 대기</li><li>Checkpointing: 중단 지점의 상태를 DB에 저장 → 세션 재시작 후에도 재개 가능</li><li>우리 시스템 적용 포인트: permission_required 플래그가 true이면 agent-runtime.ts가 강제로 도구 호출 후 응답을 차단</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>Temporal — Workflow Signals &amp; idempotency key</h4>
+      <p>승인 요청을 별도의 Signal(외부 이벤트)로 모델링한다. 워크플로우가 Signal을 기다리는 동안은 완전히 정지하며, Signal 없이는 다음 단계로 진행 불가능하다.</p>
+      <ul><li>workflow.waitForSignal('approval') — 코드 흐름이 Signal 수신 전까지 진행 불가</li><li>idempotency key — 동일 요청이 중복 실행되는 것을 원천 차단</li><li>우리 시스템 적용 포인트: pendingPermissions 처리 후 agent-runtime.ts가 다음 단계를 진행하기 전 approval 완료 여부를 DB에서 확인하도록 강제</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>Microsoft AutoGen — ConversableAgent 구조</h4>
+      <p>human_input_mode='ALWAYS'로 설정하면 에이전트가 매 응답 후 사람 입력을 강제로 기다린다. 프롬프트가 아니라 에이전트 클래스의 속성으로 제어한다.</p>
+      <ul><li>human_input_mode: NEVER / TERMINATE / ALWAYS 세 가지 모드를 코드로 명시</li><li>is_termination_msg: 에이전트가 스스로 종료 메시지를 인식하는 함수를 코드로 정의</li><li>우리 시스템 적용 포인트: 특정 위험 수준(risk level HIGH) 도달 시 bridge에서 agent-runtime을 PAUSE 모드로 전환</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>공통 패턴 — 프롬프트 규칙의 한계</h4>
+      
+      <ul><li>3개 프레임워크 모두 '에이전트에게 멈추라고 지시'하지 않음 — 코드가 멈춤을 강제</li><li>프롬프트 규칙은 에이전트가 규칙을 '기억'해야 작동함 → 컨텍스트 창 압박, max_turns 초과 시 무력화</li><li>코드 레벨 강제는 에이전트 상태와 무관하게 항상 작동함</li></ul>
+      
+    </div>
+  
+    </div>
+  
+
+    <div class="section">
+      <h3>5. 근본 해결책 — 단계별 권고</h3>
+      
+      
+      
+      
+    <div class="subsection">
+      <h4>P0 — 즉시 적용 (코드 수정 없음)</h4>
+      
+      <ul><li>bridge 승인 요청 감지 정규식 확장: '~것 같습니다', '~선택지', '~어떠신지' 등 변형 표현 추가</li><li>collaboration-rules.md에 구체적 금지 표현 목록 추가 (이미 일부 반영됨)</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>P1 — 1-2주 내 코드 수정</h4>
+      
+      <ul><li>agent-runtime.ts: plan-gate.sh 차단 발생 시 에이전트 응답에 request_permission 도구 호출이 없으면 bridge가 강제로 호출</li><li>PM 에이전트 Opus 강제: delegation 경로에서도 pm 에이전트는 항상 claude-opus-4-5 사용</li><li>max_turns 초과 시 recovery: error_max_turns 발생 시 pending tool_use를 감지하고 자동 재개 또는 사용자 알림</li></ul>
+      
+    </div>
+  
+    <div class="subsection">
+      <h4>P2 — 중기 아키텍처 개선</h4>
+      
+      <ul><li>LangGraph 패턴 도입: permission_required 상태를 별도 상태 머신으로 관리 — 승인 없이는 다음 단계 진행 불가</li><li>Temporal Signal 패턴: Slack Block Kit 버튼 클릭을 Signal로 모델링 — DB에 승인 상태 저장, 재시작 후에도 재개 가능</li><li>Chalmers 통합: 모든 완료 보고 후 자동으로 Chalmers 독립 검증 실행 — cross-verify와 별개 레이어</li></ul>
+      
+    </div>
+  
+    </div>
+  
+
+  <div class="footer">
+    AI Team · Homer (Backend) · 2026-03-30
+  </div>
+</body>
+</html>
