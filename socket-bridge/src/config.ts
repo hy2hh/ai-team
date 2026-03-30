@@ -48,3 +48,13 @@ export const MODEL_STANDARD = envStr('BRIDGE_MODEL_STANDARD', 'claude-sonnet-4-6
 
 /** FAST tier: 분류, 요약, 경량 작업 (Haiku) */
 export const MODEL_FAST = envStr('BRIDGE_MODEL_FAST', 'claude-haiku-4-5-20251001');
+
+// ─────────────────────────────────────────────
+// 팀 Ralph Loop 설정
+// ─────────────────────────────────────────────
+
+/** Cross-verify/QA FAIL 시 최대 재작업 루프 횟수 */
+export const MAX_RALPH_LOOP_ITERATIONS = envInt('BRIDGE_MAX_RALPH_LOOP_ITERATIONS', 3);
+
+/** Ralph Loop 활성화 여부 */
+export const RALPH_LOOP_ENABLED = process.env.BRIDGE_RALPH_LOOP_ENABLED !== '0';

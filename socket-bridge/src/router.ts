@@ -23,6 +23,7 @@ const ALL_AGENT_NAMES = [
   'backend',
   'researcher',
   'secops',
+  'qa',
 ];
 
 /** 키워드 기반 라우팅 규칙 */
@@ -33,6 +34,7 @@ const ROUTING_RULES: Record<string, RegExp> = {
   pm: /기획|로드맵|스프린트|우선순위|PRD|일정|요구사항|계획/i,
   researcher: /조사|트렌드|경쟁사|시장 분석/i,
   secops: /보안|인증|권한|취약점|SSL|토큰|암호화/i,
+  qa: /QA|품질|검증|테스트|리뷰|검수|완료.*확인|DoD/i,
 };
 
 /** 에이전트별 scope 설명 (LLM 라우팅 프롬프트용) */
@@ -47,6 +49,7 @@ export const AGENT_SCOPES: Record<string, string> = {
   researcher:
     '시장 조사, 경쟁사 분석, 트렌드, 기회 평가, 기술 스카우팅',
   secops: '보안 리뷰, 위협 모델링, 취약점 평가, 인증/인가, 암호화',
+  qa: '독립 품질 검증, 산출물 리뷰, DoD 체크, 증거 기반 검수, 완료 판정',
 };
 
 /** JSON 스키마 검증 — classifyWithLlm 응답 */
@@ -171,6 +174,7 @@ const DISPLAY_NAME_TO_AGENT: Record<string, string> = {
   homer: 'backend',
   lisa: 'researcher',
   wiggum: 'secops',
+  chalmers: 'qa',
 };
 
 /**

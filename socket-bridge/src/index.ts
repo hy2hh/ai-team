@@ -64,6 +64,11 @@ import {
 } from './queue-processor.js';
 import { cancelQueueByThread } from './queue-manager.js';
 import { resolvePermissionRequest } from './permission-request.js';
+import {
+  initQaLoopTable,
+  cleanupOldLoopStates,
+  runRalphLoop,
+} from './qa-loop.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
@@ -179,6 +184,11 @@ const AGENTS: AgentConfig[] = [
     botToken: process.env.SLACK_BOT_TOKEN_SECOPS!,
     appToken: process.env.SLACK_APP_TOKEN_SECOPS!,
   },
+  {
+    name: 'qa',
+    botToken: process.env.SLACK_BOT_TOKEN_QA!,
+    appToken: process.env.SLACK_APP_TOKEN_QA!,
+  },
 ];
 
 // ─── Bot 자기 메시지 필터용 ──────────────────────────────
@@ -203,6 +213,7 @@ const AGENT_DISPLAY_NAMES: Record<string, string> = {
   backend: 'Homer',
   researcher: 'Lisa',
   secops: 'Wiggum',
+  qa: 'Chalmers',
 };
 
 /**
@@ -760,7 +771,26 @@ const executeSingle = async (
       if (shouldVerify(agentResult.agent)) {
         console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
         try {
-          await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
+          const verifyResults = await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
+          const hasFail = verifyResults.some((r) => r.result === 'FAIL');
+          if (hasFail) {
+            console.warn(`[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`);
+            const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
+            const agentApp = findAgentApp(agentResult.agent, apps);
+            try {
+              const loopResult = await runRalphLoop(
+                agentResult.agent,
+                event.text,
+                failedVerifier?.details ?? 'Cross-verify FAIL',
+                event,
+                agentApp,
+                pmApp,
+              );
+              console.log(`[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`);
+            } catch (loopErr) {
+              console.error(`[qa-loop] Ralph Loop 실패: ${agentResult.agent}`, loopErr);
+            }
+          }
         } catch (err) {
           console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
         }
@@ -1045,8 +1075,29 @@ const executeSingle = async (
             );
             if (hasFail) {
               console.warn(
-                `[cross-verify] ${agentResult.agent}: FAIL 감지 — 에스컬레이션`,
+                `[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`,
               );
+              // Ralph Loop: 자동 재작업 → 재검증 루프
+              const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
+              const agentApp = findAgentApp(agentResult.agent, apps);
+              try {
+                const loopResult = await runRalphLoop(
+                  agentResult.agent,
+                  event.text, // 원래 작업
+                  failedVerifier?.details ?? 'Cross-verify FAIL',
+                  event,
+                  agentApp,
+                  pmApp,
+                );
+                console.log(
+                  `[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`,
+                );
+              } catch (loopErr) {
+                console.error(
+                  `[qa-loop] Ralph Loop 실패: ${agentResult.agent}`,
+                  loopErr,
+                );
+              }
             }
           } catch (err) {
             console.error(
@@ -2078,6 +2129,14 @@ const main = async () => {
   const cleanupInterval = setInterval(
     cleanupExpiredClaims,
     60 * 60 * 1000,
+  );
+
+  // Ralph Loop 테이블 초기화 + 오래된 상태 정리
+  initQaLoopTable();
+  cleanupOldLoopStates();
+  const qaLoopCleanupInterval = setInterval(
+    cleanupOldLoopStates,
+    24 * 60 * 60 * 1000, // 24시간마다
   );
 
   // 하트비트: 브리지 활성 상태 기록 + 만료 하트비트 정리
