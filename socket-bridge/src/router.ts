@@ -30,6 +30,23 @@ export const parseQACommand = (
   return { isQACommand: false };
 };
 
+/** 텍스트에서 docs/specs/*.md 경로를 추출 (QA 명령어 외 일반 텍스트에서도 사용) */
+const SPEC_PATH_EXTRACT_PATTERN = /docs\/specs\/[^\s\])"']+\.md/i;
+
+/**
+ * 텍스트에서 Feature Spec 경로를 추출
+ *
+ * "QA 실행" 명령어 외에도 일반 위임 텍스트에 포함된
+ * docs/specs/*.md 경로를 파싱할 때 사용한다.
+ *
+ * @param text - 파싱할 텍스트
+ * @returns specPath (없으면 undefined)
+ */
+export const extractSpecPath = (text: string): string | undefined => {
+  const match = SPEC_PATH_EXTRACT_PATTERN.exec(text);
+  return match ? match[0] : undefined;
+};
+
 /** 전체 에이전트 브로드캐스트 패턴 (인사, 공지, 전체 호출) */
 const BROADCAST_PATTERN =
   /친구들|여러분|모두들|다들|전원|공지합니다|공지사항|좋은 아침|좋은 저녁|안녕하세요|수고하셨|수고했|다같이|팀[  ]?전체/i;

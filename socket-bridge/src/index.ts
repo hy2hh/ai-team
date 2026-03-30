@@ -11,6 +11,7 @@ import type { AgentConfig, SlackEvent } from './types.js';
 import {
   registerBotUser,
   routeMessage,
+  extractSpecPath,
 } from './router.js';
 import {
   handleMessage,
@@ -791,6 +792,18 @@ const executeSingle = async (
             } catch (loopErr) {
               console.error(`[qa-loop] Ralph Loop 실패: ${agentResult.agent}`, loopErr);
             }
+          } else {
+            // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
+            const specPath = extractSpecPath(event.text);
+            if (specPath) {
+              console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+              try {
+                const qaApp = findAgentApp('qa', apps);
+                await runDirectQA(specPath, event, qaApp);
+              } catch (qaErr) {
+                console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+              }
+            }
           }
         } catch (err) {
           console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
@@ -1098,6 +1111,18 @@ const executeSingle = async (
                   `[qa-loop] Ralph Loop 실패: ${agentResult.agent}`,
                   loopErr,
                 );
+              }
+            } else {
+              // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
+              const specPath = extractSpecPath(event.text);
+              if (specPath) {
+                console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+                try {
+                  const qaApp = findAgentApp('qa', apps);
+                  await runDirectQA(specPath, event, qaApp);
+                } catch (qaErr) {
+                  console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+                }
               }
             }
           } catch (err) {

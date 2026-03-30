@@ -1421,6 +1421,39 @@ export const handleMessage = async (
             },
           ),
           tool(
+            'run_qa',
+            'QA Agent(Chalmers)를 실행하여 Feature Spec의 AC를 E2E 검증합니다. Cross-Verification PASS 후 수동 실행 또는 특정 스펙 재검증 시 사용하세요.',
+            {
+              specPath: z.string().describe('검증할 스펙 파일 경로 (예: docs/specs/2026-03-30_feature-name.md)'),
+              reason: z.string().optional().describe('실행 이유 (선택)'),
+            },
+            async ({ specPath, reason }: { specPath: string; reason?: string }) => {
+              console.log(`[run_qa] QA 실행 요청: specPath=${specPath}${reason ? `, reason=${reason}` : ''}`);
+              try {
+                // dynamic import로 circular dependency 방지 (qa-loop → agent-runtime 순환 참조)
+                const { runDirectQA } = await import('./qa-loop.js');
+                // 백그라운드 실행 (PM 응답 블로킹 없이)
+                runDirectQA(specPath, event, slackApp).catch((err: unknown) => {
+                  console.error('[run_qa] QA 실행 실패:', err);
+                });
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: `✅ QA 실행 예약됨: \`${specPath}\`${reason ? ` — ${reason}` : ''}`,
+                  }],
+                };
+              } catch (err) {
+                console.error('[run_qa] 도구 오류:', err);
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: `❌ QA 실행 실패: ${err instanceof Error ? err.message : String(err)}`,
+                  }],
+                };
+              }
+            },
+          ),
+          tool(
             'recommend_next_phase',
             '다음 작업 단계를 추천합니다. bridge가 리스크를 분류하여 자동 진행 또는 sid 승인 대기를 결정합니다. 작업 완료 리뷰 후 다음 단계가 명확할 때 호출하세요.',
             {
@@ -1545,6 +1578,7 @@ export const handleMessage = async (
       baseTools.push(
         'mcp__delegation__delegate',
         'mcp__delegation__delegate_sequential',
+        'mcp__delegation__run_qa',
         'mcp__delegation__recommend_next_phase',
         'mcp__delegation__convene_meeting',
       );

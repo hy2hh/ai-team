@@ -38,7 +38,7 @@ export interface LoopState {
 /**
  * 루프 상태를 DB에 기록/업데이트
  */
-const upsertLoopState = (state: LoopState): void => {
+export const upsertLoopState = (state: LoopState): void => {
   try {
     const db = getDb();
     db.prepare(`
@@ -66,7 +66,7 @@ const upsertLoopState = (state: LoopState): void => {
 /**
  * 현재 루프 상태 조회
  */
-const getLoopState = (messageTs: string, agent: string): LoopState | null => {
+export const getLoopState = (messageTs: string, agent: string): LoopState | null => {
   try {
     const db = getDb();
     const row = db.prepare(`
@@ -213,12 +213,26 @@ export const runChalmersQA = async (
           qaResult = 'PASS';
         }
       } else {
-        // 폴백: 전체 텍스트에서 FAIL/PASS 탐색
-        const upperText = responseText.toUpperCase();
-        if (/\bFAIL\b/.test(upperText)) {
-          qaResult = 'FAIL';
-        } else if (/\bPASS\b/.test(upperText)) {
-          qaResult = 'PASS';
+        // QA 결과 섹션 이후의 종합 판정 패턴 추가 지원
+        // 🧪 [QA 검증 결과] 블록 이후 "*종합 판정:* FAIL/PASS" 형태
+        const qaBlockMatch = responseText.match(/🧪.*?\*종합\s*판정[*:\s]+(PASS|CONDITIONAL\s*PASS|FAIL)/i);
+        if (qaBlockMatch) {
+          const verdict = qaBlockMatch[1].toUpperCase();
+          if (verdict === 'FAIL') {
+            qaResult = 'FAIL';
+          } else if (verdict.includes('CONDITIONAL')) {
+            qaResult = 'WARN';
+          } else {
+            qaResult = 'PASS';
+          }
+        } else {
+          // 폴백: 전체 텍스트에서 FAIL/PASS 탐색
+          const upperText = responseText.toUpperCase();
+          if (/\bFAIL\b/.test(upperText)) {
+            qaResult = 'FAIL';
+          } else if (/\bPASS\b/.test(upperText)) {
+            qaResult = 'PASS';
+          }
         }
       }
     }
@@ -526,8 +540,36 @@ export const runDirectQA = async (
 
   console.log(`[qa-loop] runDirectQA: specPath=${specPath}`);
 
+  // 중복 실행 방지: 동일 event.ts + 'chalmers' 조합이 이미 PENDING이면 스킵
+  const existingState = getLoopState(event.ts, 'chalmers');
+  if (existingState?.lastResult === 'PENDING') {
+    try {
+      await rateLimited(() =>
+        slackApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `⏳ *[QA 중복 실행 방지]* 이미 \`${specPath}\`에 대한 QA가 진행 중입니다.`,
+        }),
+      );
+    } catch {
+      // 포스팅 실패 무시
+    }
+    return { result: 'WARN', details: '중복 실행 방지 — 이미 실행 중' };
+  }
+
+  // 실행 중 상태 마킹 (PENDING)
+  upsertLoopState({
+    messageTs: event.ts,
+    agent: 'chalmers',
+    iteration: 1,
+    maxIterations: 1,
+    lastResult: 'PENDING',
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
   // Chalmers QA 직접 호출 (재작업 루프 없음)
-  return runChalmersQA(
+  const qaResult = await runChalmersQA(
     'user',      // producerAgent: 사용자가 직접 요청
     event.text,  // producerResult: 원본 명령어 텍스트
     [],          // changedFiles: 직접 실행이므로 빈 배열
@@ -535,6 +577,19 @@ export const runDirectQA = async (
     slackApp,
     specPath,
   );
+
+  // QA 완료 후 상태 업데이트
+  upsertLoopState({
+    messageTs: event.ts,
+    agent: 'chalmers',
+    iteration: 1,
+    maxIterations: 1,
+    lastResult: qaResult.result,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  });
+
+  return qaResult;
 };
 
 /**
