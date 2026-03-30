@@ -643,6 +643,7 @@ const AGENT_PERSONA_FILES: Record<string, string> = {
   backend: '.claude/agents/backend.md',
   researcher: '.claude/agents/researcher.md',
   secops: '.claude/agents/secops.md',
+  qa: '.claude/agents/chalmers.md',
 };
 
 /**
