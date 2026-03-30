@@ -16,3 +16,4 @@ dist/
 # Runtime state
 socket-bridge/bridge.log
 socket-bridge/thread-sessions.json
+socket-bridge/thread-sessions.json.backup.*
