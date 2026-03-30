@@ -1,13 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Read(/Users/sid/git/ai-team/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/agents/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/agents/shared/**)",
-      "Edit(/Users/sid/git/ai-team/.memory/**)",
-      "Write(/Users/sid/git/ai-team/.memory/**)",
-      "Write(/Users/sid/git/ai-team/.claude/agents/shared/**)",
-      "Write(/Users/sid/git/ai-team/.claude/agents/**)"
+      "Read(/Users/hangheejo/git/ai-team/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.memory/**)",
+      "Write(/Users/hangheejo/git/ai-team/.memory/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/agents/**)"
     ]
   },
   "hooks": {
