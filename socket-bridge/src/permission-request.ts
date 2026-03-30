@@ -19,13 +19,16 @@ interface PendingPermission {
   timeoutId: ReturnType<typeof setTimeout>;
   agentName: string;
   action: string;
+  slackApp: App;
+  channel: string;
+  messageTs: string;
 }
 
 /** 대기 중인 권한 요청 Map: permissionId → PendingPermission */
 const pendingPermissions = new Map<string, PendingPermission>();
 
-/** 권한 요청 자동 타임아웃: 10분 */
-const PERMISSION_TIMEOUT_MS = 10 * 60 * 1000;
+/** 권한 요청 자동 타임아웃: 환경변수로 설정 가능, 기본 10분 */
+const PERMISSION_TIMEOUT_MS = parseInt(process.env.PERMISSION_TIMEOUT_MS ?? '', 10) || 10 * 60 * 1000;
 
 /**
  * Block Kit 권한 요청 메시지를 Slack에 전송하고 사용자 응답 대기
@@ -48,7 +51,7 @@ export const postPermissionRequest = async (
 ): Promise<boolean> => {
   const permissionId = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  await slackApp.client.chat.postMessage({
+  const postResult = await slackApp.client.chat.postMessage({
     channel,
     thread_ts: threadTs,
     text: `[권한 요청] ${agentName}: ${action}`,
@@ -83,12 +86,37 @@ export const postPermissionRequest = async (
     ],
   });
 
+  const messageTs = (postResult as { ts?: string }).ts ?? '';
   console.log(`[permission] 권한 요청 전송: ${permissionId} — ${agentName}: ${action}`);
 
   return new Promise<boolean>((resolve) => {
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       pendingPermissions.delete(permissionId);
-      console.log(`[permission] 타임아웃 (10분 초과): ${permissionId}`);
+      const timeoutMinutes = Math.round(PERMISSION_TIMEOUT_MS / 60000);
+      console.log(`[permission] 타임아웃 (${timeoutMinutes}분 초과): ${permissionId}`);
+
+      // 만료된 버튼을 Slack에서 업데이트하여 클릭 불가 상태 명확화
+      if (messageTs) {
+        try {
+          await slackApp.client.chat.update({
+            channel,
+            ts: messageTs,
+            text: `⏰ 만료됨 — ${agentName}: ${action}`,
+            blocks: [
+              {
+                type: 'section',
+                text: {
+                  type: 'mrkdwn',
+                  text: `⏰ *만료됨* — 권한 요청이 ${timeoutMinutes}분 초과로 자동 취소되었습니다.\n\n*에이전트:* ${agentName}\n*작업:* \`${action}\``,
+                },
+              },
+            ],
+          });
+        } catch (err) {
+          console.error('[permission] 만료 메시지 업데이트 실패:', err);
+        }
+      }
+
       resolve(false);
     }, PERMISSION_TIMEOUT_MS);
 
@@ -97,6 +125,9 @@ export const postPermissionRequest = async (
       timeoutId,
       agentName,
       action,
+      slackApp,
+      channel,
+      messageTs,
     });
   });
 };

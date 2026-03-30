@@ -1556,7 +1556,7 @@ export const handleMessage = async (
       tools: [
         tool(
           'request_permission',
-          'sid에게 Slack Block Kit 버튼으로 권한 승인을 요청합니다. 파일 수정, DB 마이그레이션, 배포 등 되돌리기 어려운 작업 전에 호출하세요. sid가 [✅ 승인] 또는 [❌ 거부]를 클릭할 때까지 대기합니다.',
+          'sid에게 Slack Block Kit 버튼으로 권한 승인을 요청합니다. 반드시 다음 경우에만 호출하세요: (1) DB 마이그레이션 실행, (2) 프로덕션 배포, (3) 외부 API 과금 발생, (4) .claude/agents/shared/ 디렉토리 파일 수정. 일반 파일 생성/수정, 신규 에이전트 파일(.claude/agents/*.md) 작성, 코드 구현에는 호출하지 마세요. sid가 [✅ 승인] 또는 [❌ 거부]를 클릭할 때까지 대기합니다.',
           {
             reason: z.string().describe('권한이 필요한 이유 (맥락 설명)'),
             action: z.string().describe('수행하려는 구체적 작업 (예: collaboration-rules.md 수정)'),
