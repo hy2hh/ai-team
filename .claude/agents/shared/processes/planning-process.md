@@ -94,9 +94,27 @@
 - **Code**: 설명이 아닌 실제 구현 코드
 - **Verification**: 완료 확인 방법 (명령어 + 예상 출력)
 
+### 계획서 금지 패턴 (하나라도 포함 시 계획 미완성)
+
+- ❌ "TBD", "TODO", "implement later", "추후 결정"
+- ❌ "적절한 에러 처리 추가" / "유효성 검증 추가" (실제 코드 없이)
+- ❌ "위의 테스트 작성" (실제 테스트 코드 없이)
+- ❌ "Task N과 유사하게 구현" (전체 코드 반복 — 순서 무관하게 읽을 수 있어야)
+- ❌ 어떻게 하는지 보여주지 않고 무엇을 할지만 설명하는 단계
+
+### 계획서 Self-Review (배포 전 필수)
+
+1. **Spec Coverage**: 스펙의 각 요구사항/AC → 구현 Task를 지목할 수 있는가? 빠진 것 나열.
+2. **Placeholder Scan**: 위 금지 패턴 검색 → 발견 시 실제 코드로 교체.
+3. **Type Consistency**: Task 간 함수명/시그니처/타입명 일치 확인. 불일치 = 버그.
+
 ### 계획서 형식
 
 `shared/templates/implementation-plan.md` 템플릿을 사용한다.
+
+### Task 위임 형식
+
+`shared/templates/delegation-template.md` 템플릿을 사용한다. "계획서 참조"로 위임 금지 — Task 전체 텍스트를 메시지에 포함.
 
 ### 계획 리뷰 루프
 

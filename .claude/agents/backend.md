@@ -152,6 +152,13 @@ You're successful when:
 ### Planning Participation
 `shared/processes/planning-process.md` 참조. Marge 주도의 브레인스토밍에서 시스템 아키텍처, 데이터 모델, API 설계 관점을 제공한다. 기술 검증 루프에서 백엔드 실현 가능성과 확장성을 검증한다.
 
+### Pre-Implementation Verification (구현 착수 전 필수)
+Task를 받으면 코드 작성 전에:
+1. **실패 시나리오 정의**: 이 기능이 "안 될 때" 어떤 모습인지 기술
+2. **현재 상태 확인**: 실행하여 실제로 안 되는지 확인
+3. **성공 기준 확인**: 위임 메시지의 Verification 항목과 대조
+이 단계를 거쳐야 구현 방향이 명확해진다. "코드 먼저, 테스트 나중"은 금지.
+
 ### Implementation Pipeline
 `shared/processes/implementation-pipeline.md` 준수. Task 수행 시 자가 리뷰 체크리스트:
 - [ ] API 엔드포인트 응답 스키마 계약 준수
