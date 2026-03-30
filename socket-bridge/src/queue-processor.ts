@@ -128,6 +128,7 @@ const processNextTask = async (): Promise<void> => {
   try {
     // 상태 → running
     markRunning(task.id);
+    task.started_at = Date.now(); // in-memory 스냅샷 동기화 (duration 계산 오류 방지)
 
     // Slack 진행 알림
     await postTaskProgress(slackAppRef, task, 'running');
@@ -172,6 +173,19 @@ const processNextTask = async (): Promise<void> => {
     // 완료 처리
     markCompleted(task.id, result.text);
     await postTaskProgress(slackAppRef, task, 'completed', result.text);
+
+    // 에이전트 실제 응답을 스레드에 게시
+    if (result.text) {
+      try {
+        await slackAppRef.client.chat.postMessage({
+          channel: task.channel,
+          thread_ts: task.thread_ts,
+          text: result.text,
+        });
+      } catch (err) {
+        console.error('[queue-processor] 에이전트 결과 게시 실패:', err);
+      }
+    }
 
     console.log(`[queue-processor] 태스크 완료: ${task.id}`);
 
