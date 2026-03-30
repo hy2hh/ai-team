@@ -107,11 +107,15 @@ const getLoopState = (messageTs: string, agent: string): LoopState | null => {
  * Cross-verify와 달리 Chalmers는 전체 작업 결과를
  * 독립적·증거 기반으로 검증한다.
  *
+ * specPath가 제공되면 QA 모드(Feature Spec AC 기반 E2E 검증)로 동작한다.
+ * specPath가 없으면 코드리뷰 모드(파일 기반 산출물 검증)로 동작한다.
+ *
  * @param producerAgent - 작업을 완료한 에이전트
  * @param producerResult - 에이전트 출력 텍스트
  * @param changedFiles - 변경된 파일 경로 배열
  * @param event - 원본 Slack 이벤트
  * @param slackApp - Slack App
+ * @param specPath - (선택) Feature Spec 경로 — 제공 시 QA 모드로 실행
  * @returns QA 결과 (PASS/WARN/FAIL + 상세)
  */
 export const runChalmersQA = async (
@@ -120,8 +124,11 @@ export const runChalmersQA = async (
   changedFiles: string[],
   event: SlackEvent,
   slackApp: App,
+  specPath?: string,
 ): Promise<{ result: VerifyResult; details: string }> => {
   const MAX_RESULT_LENGTH = 4000;
+  const MAX_DETAILS_LENGTH = 4000;
+
   const truncatedResult = producerResult.length > MAX_RESULT_LENGTH
     ? producerResult.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과 잘림)'
     : producerResult;
@@ -130,26 +137,41 @@ export const runChalmersQA = async (
     ? changedFiles.map((f) => `• \`${f}\``).join('\n')
     : '*(변경된 파일 없음)*';
 
+  const isQaMode = Boolean(specPath);
+
   const qaEvent: SlackEvent = {
     type: 'message',
     channel: event.channel,
     channel_name: event.channel_name,
     user: 'qa-loop',
-    text: [
-      `[QA 검증 요청] ${producerAgent}의 작업 결과를 독립 검증해주세요.`,
-      '',
-      `*변경된 파일 (${changedFiles.length}개):*`,
-      fileList,
-      '',
-      `*${producerAgent} 작업 요약:*`,
-      truncatedResult,
-      '',
-      '위 파일을 직접 읽고(Read), 빌드/린트/런타임 테스트(Bash)로 검증해주세요.',
-      '',
-      '응답 형식:',
-      '1. 첫 줄: `VERDICT: PASS` 또는 `VERDICT: WARN` 또는 `VERDICT: FAIL`',
-      '2. 둘째 줄부터: 검증 상세 (확인된 항목, Critical/Important/Minor 이슈)',
-    ].join('\n'),
+    text: isQaMode
+      ? [
+          `[QA 검증 요청] Feature Spec AC 기반 E2E 검증을 실행해주세요.`,
+          '',
+          `*스펙 파일:* \`${specPath}\``,
+          '',
+          `*구현 에이전트:* ${producerAgent}`,
+          `*변경된 파일 (${changedFiles.length}개):*`,
+          fileList,
+          '',
+          `*${producerAgent} 작업 요약:*`,
+          truncatedResult,
+          '',
+          `스펙 파일(\`${specPath}\`)을 읽어 AC를 추출하고, Layer 1 → Layer 2 → Layer 3 순서로 E2E 검증을 실행해주세요.`,
+          '검증 완료 후 🧪 [QA 검증 결과] 형식으로 보고해주세요.',
+        ].join('\n')
+      : [
+          `[QA 검증 요청] ${producerAgent}의 작업 결과를 독립 검증해주세요.`,
+          '',
+          `*변경된 파일 (${changedFiles.length}개):*`,
+          fileList,
+          '',
+          `*${producerAgent} 작업 요약:*`,
+          truncatedResult,
+          '',
+          '위 파일을 직접 읽고(Read), 빌드/린트/런타임 테스트(Bash)로 검증해주세요.',
+          '검증 완료 후 코드리뷰 보고 형식으로 종합 판정(PASS/CONDITIONAL PASS/FAIL)을 포함해 보고해주세요.',
+        ].join('\n'),
     ts: event.ts,
     thread_ts: event.thread_ts ?? event.ts,
     mentions: [],
@@ -168,24 +190,42 @@ export const runChalmersQA = async (
     );
 
     // 결과 파싱
+    // QA 모드: "결과: N PASS, N FAIL" 또는 "→ FAIL 있으면/FAIL 없으면" 패턴
+    // 코드리뷰 모드: "종합 판정: PASS/CONDITIONAL PASS/FAIL" 패턴
     const responseText = response.text.trim();
     let qaResult: VerifyResult = 'WARN';
 
-    const verdictMatch = responseText.match(/VERDICT:\s*(PASS|WARN|FAIL)/i);
-    if (verdictMatch) {
-      qaResult = verdictMatch[1].toUpperCase() as VerifyResult;
+    // QA 모드 파싱: "결과:" 섹션에서 FAIL 여부 확인
+    const qaResultMatch = responseText.match(/결과:\s*\d+\s*PASS,\s*(\d+)\s*FAIL/);
+    if (qaResultMatch) {
+      const failCount = parseInt(qaResultMatch[1], 10);
+      qaResult = failCount > 0 ? 'FAIL' : 'PASS';
     } else {
-      const firstLines = responseText.split('\n').slice(0, 5).join(' ').toUpperCase();
-      if (/\bFAIL\b/.test(firstLines)) {
-        qaResult = 'FAIL';
-      } else if (/\bPASS\b/.test(firstLines)) {
-        qaResult = 'PASS';
+      // 코드리뷰 모드 파싱: "종합 판정:" 패턴
+      const verdictMatch = responseText.match(/종합\s*판정[:\s]+(PASS|CONDITIONAL\s*PASS|FAIL)/i);
+      if (verdictMatch) {
+        const verdict = verdictMatch[1].toUpperCase();
+        if (verdict === 'FAIL') {
+          qaResult = 'FAIL';
+        } else if (verdict.includes('CONDITIONAL')) {
+          qaResult = 'WARN';
+        } else {
+          qaResult = 'PASS';
+        }
+      } else {
+        // 폴백: 전체 텍스트에서 FAIL/PASS 탐색
+        const upperText = responseText.toUpperCase();
+        if (/\bFAIL\b/.test(upperText)) {
+          qaResult = 'FAIL';
+        } else if (/\bPASS\b/.test(upperText)) {
+          qaResult = 'PASS';
+        }
       }
     }
 
     return {
       result: qaResult,
-      details: responseText.slice(0, 2000),
+      details: responseText.slice(0, MAX_DETAILS_LENGTH),
     };
   } catch (err) {
     console.error('[qa-loop] Chalmers QA 실행 실패:', err);
@@ -296,6 +336,7 @@ export interface RalphLoopResult {
  * @param event - 원본 Slack 이벤트
  * @param slackApp - Slack App (위임 에이전트용)
  * @param pmApp - PM Slack App (검증용)
+ * @param specPath - (선택) Feature Spec 경로 — 제공 시 Chalmers가 QA 모드로 실행
  * @returns 최종 결과
  */
 export const runRalphLoop = async (
@@ -305,6 +346,7 @@ export const runRalphLoop = async (
   event: SlackEvent,
   slackApp: App,
   pmApp: App,
+  specPath?: string,
 ): Promise<RalphLoopResult> => {
   if (!RALPH_LOOP_ENABLED) {
     console.log('[qa-loop] Ralph Loop 비활성화됨');
@@ -368,6 +410,7 @@ export const runRalphLoop = async (
         reworkResult.changedFiles,
         event,
         pmApp,
+        specPath,
       );
 
       if (qaResult.result !== 'FAIL') {
@@ -417,6 +460,81 @@ export const runRalphLoop = async (
     iterations: state.iteration,
     details: `최대 반복 횟수(${MAX_RALPH_LOOP_ITERATIONS}) 도달. sid 에스컬레이션.`,
   };
+};
+
+/** runDirectQA 결과 */
+export interface DirectQAResult {
+  result: VerifyResult;
+  details: string;
+}
+
+/**
+ * QA 직접 실행 — 사용자 명령어 "QA 실행 docs/specs/xxx.md" 처리
+ *
+ * runRalphLoop()과 달리 재작업 루프 없이 Chalmers QA를 1회 직접 호출한다.
+ * 파일 존재 여부를 먼저 검증하고, 미존재 시 에러 메시지를 반환한다.
+ *
+ * @param specPath - Feature Spec 경로 (e.g. docs/specs/xxx.md)
+ * @param event - 원본 Slack 이벤트
+ * @param slackApp - Slack App
+ * @returns QA 결과 (PASS/WARN/FAIL + 상세)
+ */
+export const runDirectQA = async (
+  specPath: string,
+  event: SlackEvent,
+  slackApp: App,
+): Promise<DirectQAResult> => {
+  // 스펙 파일 존재 검증
+  const { existsSync } = await import('fs');
+  const { resolve } = await import('path');
+
+  const projectRoot = resolve(import.meta.dirname, '..', '..');
+  const absoluteSpecPath = resolve(projectRoot, specPath);
+
+  if (!existsSync(absoluteSpecPath)) {
+    const errorMsg = [
+      `❌ *[QA 직접 실행 오류]* 스펙 파일을 찾을 수 없습니다.`,
+      ``,
+      `*경로:* \`${specPath}\``,
+      ``,
+      `올바른 사용법:`,
+      `> \`QA 실행 docs/specs/파일명.md\``,
+      `> \`QA 검증 docs/specs/파일명.md\``,
+      `> \`qa run docs/specs/파일명.md\``,
+      ``,
+      `\`docs/specs/\` 디렉토리에 존재하는 스펙 파일 경로를 정확히 입력해주세요.`,
+    ].join('\n');
+
+    try {
+      const { rateLimited } = await import('./rate-limiter.js');
+      await rateLimited(() =>
+        slackApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: errorMsg,
+        }),
+      );
+    } catch (postErr) {
+      console.error('[qa-loop] 에러 메시지 게시 실패:', postErr);
+    }
+
+    return {
+      result: 'FAIL',
+      details: `스펙 파일 미존재: ${specPath}`,
+    };
+  }
+
+  console.log(`[qa-loop] runDirectQA: specPath=${specPath}`);
+
+  // Chalmers QA 직접 호출 (재작업 루프 없음)
+  return runChalmersQA(
+    'user',      // producerAgent: 사용자가 직접 요청
+    event.text,  // producerResult: 원본 명령어 텍스트
+    [],          // changedFiles: 직접 실행이므로 빈 배열
+    event,
+    slackApp,
+    specPath,
+  );
 };
 
 /**

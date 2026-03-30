@@ -64,6 +64,10 @@ export interface RoutingResult {
   execution: ExecutionMode;
   /** 라우팅 방식 */
   method: RoutingMethod;
+  /** QA 직접 실행 명령어 여부 (runDirectQA() 분기용) */
+  isQACommand?: boolean;
+  /** QA 명령어에서 파싱된 스펙 파일 경로 */
+  specPath?: string;
 }
 
 /** 에이전트별 세션 정보 */

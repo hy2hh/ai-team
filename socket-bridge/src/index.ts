@@ -68,6 +68,7 @@ import {
   initQaLoopTable,
   cleanupOldLoopStates,
   runRalphLoop,
+  runDirectQA,
 } from './qa-loop.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
@@ -1591,6 +1592,23 @@ const flushDebounceBuffer = async (
 
   // 실행
   const executeTask = async () => {
+    // QA 직접 실행 명령어 분기 — 재작업 루프 없이 Chalmers QA 1회 직접 호출
+    if (routing.isQACommand && routing.specPath) {
+      const qaApp = findAgentApp('qa', apps);
+      console.log(
+        `[qa-loop] QA 직접 실행 명령어 감지: specPath=${routing.specPath}`,
+      );
+      const qaResult = await runDirectQA(
+        routing.specPath,
+        slackEvent,
+        qaApp,
+      );
+      console.log(
+        `[qa-loop] runDirectQA 완료: specPath=${routing.specPath} result=${qaResult.result}`,
+      );
+      return;
+    }
+
     switch (routing.execution) {
       case 'parallel': {
         await executeParallel(

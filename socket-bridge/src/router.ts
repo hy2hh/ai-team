@@ -7,6 +7,29 @@ import type {
   RoutingResult,
 } from './types.js';
 
+/** QA 직접 실행 명령어 패턴 */
+const QA_COMMAND_PATTERN =
+  /(?:QA|qa)\s*(?:실행|검증|run)\s+(docs\/specs\/[^\s]+\.md)/i;
+
+/**
+ * QA 실행 명령어 파싱
+ *
+ * "QA 실행 docs/specs/xxx.md", "qa run docs/specs/xxx.md",
+ * "QA 검증 docs/specs/xxx.md" 형태를 감지하고 specPath를 추출한다.
+ *
+ * @param text - Slack 메시지 텍스트
+ * @returns 파싱 결과 — isQACommand: 명령어 여부, specPath: 경로 (없으면 undefined)
+ */
+export const parseQACommand = (
+  text: string,
+): { isQACommand: boolean; specPath?: string } => {
+  const match = QA_COMMAND_PATTERN.exec(text);
+  if (match) {
+    return { isQACommand: true, specPath: match[1] };
+  }
+  return { isQACommand: false };
+};
+
 /** 전체 에이전트 브로드캐스트 패턴 (인사, 공지, 전체 호출) */
 const BROADCAST_PATTERN =
   /친구들|여러분|모두들|다들|전원|공지합니다|공지사항|좋은 아침|좋은 저녁|안녕하세요|수고하셨|수고했|다같이|팀[  ]?전체/i;
@@ -446,6 +469,21 @@ export const routeMessage = async (
     );
     return filtered.length > 0 ? filtered : ['pm'];
   };
+
+  // 0순위: QA 직접 실행 명령어 — 모든 다른 라우팅보다 우선
+  const qaCmd = parseQACommand(text);
+  if (qaCmd.isQACommand) {
+    console.log(
+      `[perf] stage=qa-command specPath=${qaCmd.specPath ?? '(none)'} elapsed=${Date.now() - routeStart}ms`,
+    );
+    return {
+      agents: [toRoutingAgent('qa')],
+      execution: 'single',
+      method: 'keyword',
+      isQACommand: true,
+      specPath: qaCmd.specPath,
+    };
+  }
 
   // 1순위: @mention — 스레드 제한 없이 명시적 멘션은 항상 우선
   const mentions = parseMentions(text);
