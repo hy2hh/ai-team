@@ -15,8 +15,8 @@ const envInt = (key: string, fallback: number): number => {
 /** 디바운스 대기 시간 (ms) */
 export const DEBOUNCE_DELAY = envInt('BRIDGE_DEBOUNCE_DELAY', 3000);
 
-/** 에이전트 실행 타임아웃 (ms) */
-export const AGENT_TIMEOUT_MS = envInt('BRIDGE_AGENT_TIMEOUT_MS', 5 * 60 * 1000);
+/** 에이전트 실행 타임아웃 (ms, 기본 1시간) */
+export const AGENT_TIMEOUT_MS = envInt('BRIDGE_AGENT_TIMEOUT_MS', 60 * 60 * 1000);
 
 /** 세션 TTL (ms, 기본 30일) */
 export const SESSION_TTL_MS = envInt('BRIDGE_SESSION_TTL_MS', 30 * 24 * 60 * 60 * 1000);

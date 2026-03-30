@@ -65,6 +65,16 @@ import {
 import { cancelQueueByThread } from './queue-manager.js';
 import { resolvePermissionRequest } from './permission-request.js';
 
+/** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
+const slackMsgLink = (channel: string, ts: string): string => {
+  const teamId = process.env.SLACK_TEAM_ID;
+  if (!teamId) {
+    return `\`${ts}\``;
+  }
+  const tsNoDot = ts.replace('.', '');
+  return `<https://app.slack.com/archives/${channel}/p${tsNoDot}|원본 메시지>`;
+};
+
 // ─── 설정 ───────────────────────────────────────────────
 
 const TEST_MODE = process.env.BRIDGE_TEST_MODE === '1';
@@ -2194,11 +2204,14 @@ const main = async () => {
         try {
           const isMaxReached =
             orphan.version >= MAX_REQUEUE_ATTEMPTS;
+          const msgLink = orphan.channel
+            ? slackMsgLink(orphan.channel, orphan.messageTs)
+            : `\`${orphan.messageTs}\``;
           await apps[0].client.chat.postMessage({
             channel: notifyChannel,
             text: isMaxReached
-              ? `⚠️ *오펀 Claim 복구 실패* — \`${orphan.messageTs}\` | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS} 한도 초과, 수동 조치 필요`
-              : `⚠️ *오펀 Claim 감지* — \`${orphan.messageTs}\` | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재라우팅 시도 중`,
+              ? `⚠️ *오펀 Claim 복구 실패* — ${msgLink} | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS} 한도 초과, 수동 조치 필요`
+              : `⚠️ *오펀 Claim 감지* — ${msgLink} | ${orphan.agent} (${Math.round(orphan.ageMs / 60000)}분 경과) | 재라우팅 시도 중`,
           });
         } catch {
           // 알림 실패 무시
