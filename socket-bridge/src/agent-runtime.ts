@@ -15,6 +15,7 @@ import {
   createSdkMcpServer,
   tool,
 } from '@anthropic-ai/claude-agent-sdk';
+import { postPermissionRequest } from './permission-request.js';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import type { App } from '@slack/bolt';
@@ -1077,6 +1078,15 @@ const getOrCreateSession = (agentName: string): AgentSession => {
 export interface DelegationStep {
   agents: string[];
   task: string;
+  /** 이 step에서 사용할 모델 tier ('high'=Opus, 'standard'=Sonnet, 'fast'=Haiku). 기본값: 'standard' */
+  tier?: 'high' | 'standard' | 'fast';
+}
+
+/** 병렬 위임 대상 */
+export interface DelegationTarget {
+  agent: string;
+  /** 이 에이전트 실행 시 사용할 모델 tier. 기본값: 'standard' */
+  tier?: 'high' | 'standard' | 'fast';
 }
 
 /** handleMessage 반환 타입 */
@@ -1084,7 +1094,7 @@ export interface HandleMessageResult {
   text: string;
   postedTs?: string;
   /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 (병렬) */
-  delegationTargets: string[];
+  delegationTargets: DelegationTarget[];
   /** PM delegate_sequential 도구로 지정된 순차 위임 단계 */
   delegationSteps?: DelegationStep[];
   /** 에이전트가 escalate_to_pm 도구를 호출한 경우 이유 (PM 재라우팅 트리거) */
@@ -1186,7 +1196,7 @@ export const handleMessage = async (
         getPersistedSessionId(agentName, threadKey);
 
     // PM 전용: delegate 도구로 위임 의도를 수집하는 인라인 MCP 서버
-    const delegationQueue: string[] = [];
+    const delegationQueue: DelegationTarget[] = [];
     /** 순차 위임 단계 (delegate_sequential 사용 시) */
     const sequentialSteps: DelegationStep[] = [];
     // 비PM 에이전트: escalate_to_pm 도구로 PM 재라우팅 신호 수집
@@ -1205,8 +1215,12 @@ export const handleMessage = async (
           tool(
             'delegate',
             '다른 에이전트에게 작업을 즉시 위임합니다. 의존성이 있는 작업은 먼저 실행할 에이전트만 지정하세요. 예: 디자이너 → 프론트엔드 순서가 필요하면 디자이너만 먼저 delegate하고, 리뷰 후 프론트엔드를 delegate하세요. 독립적인 작업만 한 번에 여러 에이전트를 지정하세요.',
-            { agents: z.array(z.string()), reason: z.string() },
-            async ({ agents, reason }) => {
+            {
+              agents: z.array(z.string()),
+              reason: z.string(),
+              tier: z.enum(['high', 'standard', 'fast']).optional().describe('모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
+            },
+            async ({ agents, reason, tier }) => {
               const valid = agents.filter((a: string) =>
                 ['designer', 'frontend', 'backend', 'researcher', 'secops'].includes(a),
               );
@@ -1243,15 +1257,17 @@ export const handleMessage = async (
                 }
               }
 
-              delegationQueue.push(...valid);
+              const targets = valid.map((agent: string) => ({ agent, tier }));
+              delegationQueue.push(...targets);
+              const tierLabel = tier ? ` (tier=${tier})` : '';
               console.log(
-                `[delegation] PM delegate 호출: [${valid.join(', ')}] — ${reason}`,
+                `[delegation] PM delegate 호출: [${valid.join(', ')}]${tierLabel} — ${reason}`,
               );
               return {
                 content: [
                   {
                     type: 'text' as const,
-                    text: `위임 예약됨: [${valid.join(', ')}] — ${reason}`,
+                    text: `위임 예약됨: [${valid.join(', ')}]${tierLabel} — ${reason}`,
                   },
                 ],
               };
@@ -1264,15 +1280,17 @@ export const handleMessage = async (
               steps: z.array(z.object({
                 agents: z.array(z.string()).describe('이 step에서 실행할 에이전트'),
                 task: z.string().describe('이 step에서 수행할 작업 설명'),
+                tier: z.enum(['high', 'standard', 'fast']).optional().describe('이 step에서 사용할 모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
               })).describe('순차 실행할 step 배열 (앞에서부터 순서대로 실행)'),
               reason: z.string().describe('순차 실행이 필요한 이유'),
             },
             async ({ steps, reason: _reason }) => {
-              const validSteps = steps.map((step: { agents: string[]; task: string }) => ({
+              const validSteps = steps.map((step: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }) => ({
                 agents: step.agents.filter((a: string) =>
                   ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
                 ),
                 task: step.task,
+                tier: step.tier,
               })).filter((step: { agents: string[] }) => step.agents.length > 0);
 
               // 전체 step에서 구현 에이전트 2+ 참여 시 스펙 파일 검증
@@ -1455,6 +1473,43 @@ export const handleMessage = async (
       baseMcpServers.escalation = escalationServer;
       baseTools.push('mcp__escalation__escalate_to_pm');
     }
+
+    // 모든 에이전트: sid에게 Block Kit 버튼으로 권한 승인 요청
+    const permissionServer = createSdkMcpServer({
+      name: 'permission',
+      tools: [
+        tool(
+          'request_permission',
+          'sid에게 Slack Block Kit 버튼으로 권한 승인을 요청합니다. 파일 수정, DB 마이그레이션, 배포 등 되돌리기 어려운 작업 전에 호출하세요. sid가 [✅ 승인] 또는 [❌ 거부]를 클릭할 때까지 대기합니다.',
+          {
+            reason: z.string().describe('권한이 필요한 이유 (맥락 설명)'),
+            action: z.string().describe('수행하려는 구체적 작업 (예: collaboration-rules.md 수정)'),
+          },
+          async ({ reason, action }) => {
+            const approved = await postPermissionRequest(
+              slackApp,
+              event.channel,
+              event.thread_ts ?? event.ts,
+              agentName,
+              reason,
+              action,
+            );
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: approved
+                    ? `승인됨: "${action}" 작업을 진행하세요.`
+                    : `거부됨: "${action}" 작업을 중단하세요. sid가 요청을 거부했습니다.`,
+                },
+              ],
+            };
+          },
+        ),
+      ],
+    });
+    baseMcpServers.permission = permissionServer;
+    baseTools.push('mcp__permission__request_permission');
 
     const selectedModel = modelTier === 'high'
       ? MODEL_HIGH
