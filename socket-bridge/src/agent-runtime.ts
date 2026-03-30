@@ -1428,11 +1428,47 @@ export const handleMessage = async (
               reason: z.string().describe('추천 이유'),
               actionSummary: z.string().describe('다음 단계에서 수행할 작업 요약'),
               riskLevel: z.string().optional().describe('리스크 레벨 (LOW/MEDIUM/HIGH). 생략 시 자동 분류'),
+              dodPendingItems: z.array(z.string()).optional().describe('DoD 미완료 항목 목록 (예: ["런타임 테스트", "빌드 확인"]). 1개라도 있으면 자동 진행이 차단됩니다. 모든 DoD 항목 완료 후 재호출하세요.'),
+              hasCodeChanges: z.boolean().optional().describe('코드/설정 파일 변경 여부. true이면 QA(Chalmers)가 다음 단계 첫 번째로 자동 삽입됩니다.'),
             },
-            async ({ agents, reason, actionSummary, riskLevel }) => {
-              const valid = agents.filter((a: string) =>
-                ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
-              );
+            async ({ agents, reason, actionSummary, riskLevel, dodPendingItems, hasCodeChanges }) => {
+              // 방안 A: DoD 게이트 — 미완료 항목이 있으면 자동 진행 차단
+              if (dodPendingItems && dodPendingItems.length > 0) {
+                const itemList = dodPendingItems.map((i) => `• ${i}`).join('\n');
+                await slackApp.client.chat.postMessage({
+                  channel: event.channel,
+                  thread_ts: event.ts,
+                  text: [
+                    '🚫 *[DoD 미완료] 자동 진행 차단됨*',
+                    '',
+                    '*미완료 항목:*',
+                    itemList,
+                    '',
+                    'DoD 항목을 모두 완료한 뒤 `recommend_next_phase`를 다시 호출하세요.',
+                  ].join('\n'),
+                });
+                console.log(
+                  `[delegation] PM recommend_next_phase 차단 — DoD 미완료: [${dodPendingItems.join(', ')}]`,
+                );
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: `⛔ DoD 미완료로 자동 진행 차단됨. 미완료 항목: ${dodPendingItems.join(', ')}`,
+                  }],
+                };
+              }
+
+              const VALID_AGENTS = ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm', 'qa'];
+              let valid = agents.filter((a: string) => VALID_AGENTS.includes(a));
+
+              // 방안 B: 코드 변경 시 QA 자동 선행 삽입
+              if (hasCodeChanges && !valid.includes('qa')) {
+                valid = ['qa', ...valid];
+                console.log(
+                  `[delegation] PM recommend_next_phase: hasCodeChanges=true → qa 자동 삽입 [${valid.join(', ')}]`,
+                );
+              }
+
               const risk = classifyRisk(
                 `${reason} ${actionSummary}`,
                 riskLevel,
