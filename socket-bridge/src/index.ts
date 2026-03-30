@@ -58,6 +58,7 @@ import {
   AGENT_TIMEOUT_MS,
   MAX_DELEGATION_DEPTH,
 } from './config.js';
+import { resolvePermissionRequest } from './permission-request.js';
 
 // ─── 설정 ───────────────────────────────────────────────
 
@@ -631,7 +632,7 @@ const executeSingle = async (
 
   // PM delegate 도구로 지정된 위임 대상 사용 (텍스트 파싱 제거)
   let targets = result.delegationTargets.filter(
-    (name) => name !== 'pm' && isValidAgent(name),
+    (t) => t.agent !== 'pm' && isValidAgent(t.agent),
   );
 
   // 순차 위임 또는 병렬 위임이 없으면 종료
@@ -682,6 +683,8 @@ const executeSingle = async (
             'delegation',
             targetApp,
             true,
+            false,
+            step.tier ?? 'standard',
           );
         }),
       );
@@ -733,7 +736,12 @@ const executeSingle = async (
     );
 
     // cross-verify (변경 파일 내용을 코드가 직접 읽어서 주입)
+    // 동일 에이전트가 복수 step에 실행된 경우 마지막 결과만 검증 (중복 실행 방지)
+    const lastSeqResultPerAgent = new Map<string, { agent: string; text: string; changedFiles: string[] }>();
     for (const agentResult of seqResults) {
+      lastSeqResultPerAgent.set(agentResult.agent, agentResult);
+    }
+    for (const agentResult of lastSeqResultPerAgent.values()) {
       if (shouldVerify(agentResult.agent)) {
         console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
         try {
@@ -758,7 +766,7 @@ const executeSingle = async (
 
   // ─── PM Hub 루프 시작 (병렬 모드) ───────────────────
   console.log(
-    `[hub] PM Hub 시작: targets=[${targets.join(', ')}]`,
+    `[hub] PM Hub 시작: targets=[${targets.map((t) => t.agent).join(', ')}]`,
   );
 
   const pmApp = findAgentApp('pm', apps);
@@ -781,23 +789,24 @@ const executeSingle = async (
     agentExecutionCount < MAX_DELEGATION_DEPTH
   ) {
     // 순환 핸드오프 감지: 모든 타겟이 이미 실행된 경우 경고
-    const repeatedAgents = targets.filter((t) => allExecutedAgents.has(t));
+    const repeatedAgents = targets.filter((t) => allExecutedAgents.has(t.agent));
     if (repeatedAgents.length > 0) {
       console.warn(
-        `[hub] 순환 핸드오프 감지: [${repeatedAgents.join(', ')}] 이미 이번 허브 루프에서 실행됨 — PM이 재위임 요청`,
+        `[hub] 순환 핸드오프 감지: [${repeatedAgents.map((t) => t.agent).join(', ')}] 이미 이번 허브 루프에서 실행됨 — PM이 재위임 요청`,
       );
     }
     // 모든 타겟이 재실행 요청이면 경고 후 종료 (순수 무한루프)
     if (repeatedAgents.length === targets.length) {
       console.warn(
-        `[hub] 순환 루프 중단: 모든 타겟 [${targets.join(', ')}]이 이미 실행됨`,
+        `[hub] 순환 루프 중단: 모든 타겟 [${targets.map((t) => t.agent).join(', ')}]이 이미 실행됨`,
       );
       break;
     }
 
     // (a) 위임 에이전트 실행
     if (targets.length === 1) {
-      const target = targets[0];
+      const targetObj = targets[0];
+      const target = targetObj.agent;
       const targetApp = findAgentApp(target, apps);
       const delegationEvent = buildDelegationEvent(
         event,
@@ -817,8 +826,9 @@ const executeSingle = async (
         );
       }
 
+      const tierLabel = targetObj.tier ? ` (tier=${targetObj.tier})` : '';
       console.log(
-        `[hub] 위임: ${target} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
+        `[hub] 위임: ${target}${tierLabel} (${agentExecutionCount + 1}/${MAX_DELEGATION_DEPTH})`,
       );
 
       const beforeSingle = snapshotChangedFiles();
@@ -830,6 +840,8 @@ const executeSingle = async (
           'delegation',
           targetApp,
           true,
+          false,
+          targetObj.tier ?? 'standard',
         ),
         target,
         event.ts,
@@ -865,8 +877,8 @@ const executeSingle = async (
         MAX_DELEGATION_DEPTH - agentExecutionCount;
       const batch = targets.slice(0, remaining);
 
-      const batchApps = batch.map((target) =>
-        findAgentApp(target, apps),
+      const batchApps = batch.map((t) =>
+        findAgentApp(t.agent, apps),
       );
 
       // 🧠 각 에이전트가 PM 메시지에 리액션
@@ -874,7 +886,7 @@ const executeSingle = async (
         await Promise.all(
           batchApps.map((batchApp, i) => {
             console.log(
-              `[reaction] 🧠 ${batch[i]} → PM 메시지: ${currentPmTs}`,
+              `[reaction] 🧠 ${batch[i].agent} → PM 메시지: ${currentPmTs}`,
             );
             return safeAddReaction(
               batchApp,
@@ -887,24 +899,26 @@ const executeSingle = async (
       }
 
       console.log(
-        `[hub] 병렬 위임: [${batch.join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
+        `[hub] 병렬 위임: [${batch.map((t) => t.agent).join(', ')}] (${agentExecutionCount + batch.length}/${MAX_DELEGATION_DEPTH})`,
       );
 
       const beforeBatch = snapshotChangedFiles();
 
       const parallelResults = await Promise.allSettled(
-        batch.map((target, i) => {
+        batch.map((targetObj, i) => {
           const delegationEvent =
             buildDelegationEvent(
               event,
               accumulatedResults,
             );
           return handleMessage(
-            target,
+            targetObj.agent,
             delegationEvent,
             'delegation',
             batchApps[i],
             true,
+            false,
+            targetObj.tier ?? 'standard',
           );
         }),
       );
@@ -915,7 +929,7 @@ const executeSingle = async (
       for (let i = 0; i < batch.length; i++) {
         const r = parallelResults[i];
         accumulatedResults.push({
-          agent: batch[i],
+          agent: batch[i].agent,
           text:
             r.status === 'fulfilled'
               ? r.value.text
@@ -932,14 +946,14 @@ const executeSingle = async (
             'white_check_mark',
           );
           console.log(
-            `[reaction] ✅ ${batch[i]} 완료: ${currentPmTs}`,
+            `[reaction] ✅ ${batch[i].agent} 완료: ${currentPmTs}`,
           );
         }
       }
       agentExecutionCount += batch.length;
       // 순환 감지: 배치 실행된 에이전트 추가
       for (const t of batch) {
-        allExecutedAgents.add(t);
+        allExecutedAgents.add(t.agent);
       }
     }
 
@@ -972,7 +986,7 @@ const executeSingle = async (
 
     // (d) PM 리뷰 응답에서 delegate 도구로 지정된 새 타겟
     targets = pmReview.delegationTargets.filter(
-      (name) => name !== 'pm' && isValidAgent(name),
+      (t) => t.agent !== 'pm' && isValidAgent(t.agent),
     );
 
     if (targets.length === 0) {
@@ -993,7 +1007,12 @@ const executeSingle = async (
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');
 
       // ─── Cross-Verification 자동 실행 (변경 파일 내용 코드 주입) ──
+      // 동일 에이전트가 복수 라운드에 실행된 경우 마지막 결과만 검증 (중복 실행 방지)
+      const lastResultPerAgent = new Map<string, { agent: string; text: string; changedFiles: string[] }>();
       for (const agentResult of accumulatedResults) {
+        lastResultPerAgent.set(agentResult.agent, agentResult);
+      }
+      for (const agentResult of lastResultPerAgent.values()) {
         if (shouldVerify(agentResult.agent)) {
           console.log(
             `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
@@ -1817,6 +1836,85 @@ const main = async () => {
         }
       }
     });
+
+    // ─── Block Kit 권한 요청 버튼 핸들러 ────────────
+    // 에이전트가 request_permission 도구 호출 시 전송되는 버튼 응답 처리
+    app.action(
+      'permission_approve',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const permissionId = (action as { value?: string }).value ?? '';
+          const resolved = resolvePermissionRequest(permissionId, true);
+          if (resolved) {
+            // 버튼 메시지를 "승인됨" 상태로 업데이트
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '✅ 승인됨',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.',
+                    },
+                  },
+                ],
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[permission] permission_approve 핸들러 오류:', err);
+        }
+      },
+    );
+
+    app.action(
+      'permission_deny',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const permissionId = (action as { value?: string }).value ?? '';
+          const resolved = resolvePermissionRequest(permissionId, false);
+          if (resolved) {
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '❌ 거부됨',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.',
+                    },
+                  },
+                ],
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[permission] permission_deny 핸들러 오류:', err);
+        }
+      },
+    );
 
     // ─── 이모지 기반 에이전트 제어 ──────────────────
     // ⛔ black_square_for_stop → 에이전트 즉시 중단
