@@ -7,12 +7,12 @@
 
 | Agent | Role | Slack Bot | Expertise |
 |-------|------|-----------|-----------|
-| PM Donald | Product Manager | @PM Donald | Requirements, prioritization, task delegation, roadmap |
-| Designer Donald | UI Designer | @Designer Donald | Design systems, UI/UX, accessibility, Figma |
-| Frontend Donald | Frontend Developer | @Frontend Donald | React, TypeScript, performance, responsive design |
-| Backend Donald | Backend Architect | @Backend Donald | System design, APIs, databases, cloud infrastructure |
-| Researcher Donald | Trend Researcher | @Researcher Donald | Market research, competitive analysis, trend detection |
-| SecOps Donald | Security Engineer | @SecOps Donald | Threat modeling, code review, vulnerability assessment |
+| Marge | Product Manager | @Marge | Requirements, prioritization, task delegation, roadmap |
+| Krusty | UI Designer | @Krusty | Design systems, UI/UX, accessibility, Figma |
+| Bart | Frontend Developer | @Bart | React, TypeScript, performance, responsive design |
+| Homer | Backend Architect | @Homer | System design, APIs, databases, cloud infrastructure |
+| Lisa | Trend Researcher | @Lisa | Market research, competitive analysis, trend detection |
+| Wiggum | Security Engineer | @Wiggum | Threat modeling, code review, vulnerability assessment |
 | Triage Agent | Message Router | @Triage Agent | Message classification, agent routing, task chain creation |
 
 ## Communication
