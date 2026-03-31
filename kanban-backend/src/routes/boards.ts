@@ -21,6 +21,7 @@ router.get('/:id', (req: Request, res: Response) => {
       col.id as col_id, col.name as col_name, col.position as col_pos, col.wip_limit,
       c.id as card_id, c.title, c.description, c.priority,
       c.assignee, c.progress, c.position as card_pos, c.column_id,
+      c.due_date, c.tags,
       c.created_at, c.updated_at
     FROM columns col
     LEFT JOIN cards c ON c.column_id = col.id
@@ -42,6 +43,13 @@ router.get('/:id', (req: Request, res: Response) => {
       } as Column & { cards: Card[] });
     }
     if (row.card_id !== null) {
+      let tags: string[] = [];
+      try {
+        const parsed = JSON.parse((row.tags as string) ?? '[]');
+        tags = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        tags = [];
+      }
       colMap.get(colId)!.cards.push({
         id: row.card_id as number,
         column_id: row.column_id as number,
@@ -51,6 +59,8 @@ router.get('/:id', (req: Request, res: Response) => {
         assignee: row.assignee as string | null,
         progress: row.progress as number,
         position: row.card_pos as number,
+        due_date: (row.due_date as string | null) ?? null,
+        tags,
         created_at: row.created_at as string,
         updated_at: row.updated_at as string,
       } as Card);
