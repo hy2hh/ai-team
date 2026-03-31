@@ -178,6 +178,10 @@
 
 - **planning-process.md** — PM 주도 브레인스토밍 + 구현 계획 수립
 - **implementation-pipeline.md** — 3단계 검증 구현 파이프라인 (Frontend, Backend)
+- **structured-reasoning.md** — 중요 결정(아키텍처, 크로스도메인 위임, git 전략) 전 판단 근거 기록 의무
+- **walkthrough-protocol.md** — 3개 이상 파일 수정 시 `.memory/walkthroughs/`에 변경 요약 문서 생성
+
+`shared/api-contracts-protocol.md` — Homer↔Bart API 계약서 프로토콜 (`.memory/contracts/`)
 
 `shared/templates/` 의 템플릿을 상황에 맞게 사용한다:
 - **code-review-request.md** — Slack 리뷰 요청 포맷
