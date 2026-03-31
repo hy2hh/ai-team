@@ -1751,6 +1751,12 @@ const main = async () => {
       async ({ ack, body, action }) => {
         try {
           await ack();
+          const clickerId = (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(`[permission] 미인가 사용자 승인 시도: ${clickerId}`);
+            return;
+          }
           const permissionId = (action as { value?: string }).value ?? '';
           const resolved = resolvePermissionRequest(permissionId, true);
           if (resolved) {
@@ -1789,6 +1795,12 @@ const main = async () => {
       async ({ ack, body, action }) => {
         try {
           await ack();
+          const clickerId = (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(`[permission] 미인가 사용자 거부 시도: ${clickerId}`);
+            return;
+          }
           const permissionId = (action as { value?: string }).value ?? '';
           const resolved = resolvePermissionRequest(permissionId, false);
           if (resolved) {
