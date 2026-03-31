@@ -1,3 +1,4 @@
+// socket-bridge 진입점 — Slack 이벤트를 수신하여 에이전트에게 라우팅합니다
 import { config } from 'dotenv';
 import { join } from 'path';
 import { mkdir, writeFile } from 'fs/promises';
