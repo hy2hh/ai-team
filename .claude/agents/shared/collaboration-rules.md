@@ -171,7 +171,7 @@
 
 모든 에이전트가 따라야 하는 공통 프로세스는 `shared/processes/`에 위치한다:
 
-- **definition-of-done.md** — DoD 체크리스트 (에러 핸들링, 하드코딩 금지, AC 전체 통과 등)
+- **definition-of-done.md** — 완료 조건 체크리스트 (에러 핸들링, 하드코딩 금지, AC 전체 통과 등)
 - **verification-before-completion.md** — 완료 선언 전 필수 검증 게이트
 - **systematic-debugging.md** — 4-Phase 체계적 디버깅 (Frontend, Backend, SecOps)
 - **code-review-protocol.md** — 리뷰 요청/응답 프로세스 + 리뷰어 매트릭스
@@ -242,7 +242,7 @@ PM이 `convene_meeting` 도구로 회의를 소집한다. 프로세스:
 
 작업을 완료한 에이전트는 반드시 Slack에 완료 보고를 해야 한다. 보고 없는 완료는 완료가 아니다.
 
-- **보고 필수 항목**: 완료 내용, 수정 파일 (해당 시), 커밋 hash (해당 시), DoD 체크리스트 결과 (해당 시)
+- **보고 필수 항목**: 완료 내용, 수정 파일 (해당 시), 커밋 hash (해당 시), 완료 조건 체크리스트 결과 (해당 시)
 - **보고 순서**: Ralph Loop 검증 → 커밋 → **Slack 완료 보고** → 다음 단계 추천
 - **금지**: "다음 단계 추천"만 남기고 완료 보고를 생략하는 것
 - **금지**: 완료 보고 없이 다른 에이전트에게 위임만 하는 것

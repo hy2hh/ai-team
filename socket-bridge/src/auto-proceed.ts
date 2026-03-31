@@ -22,7 +22,7 @@ export interface AutoProceedRequest {
   reason: string;
   actionSummary: string;
   riskLevel: RiskLevel;
-  /** 방안 D: DoD 미완료 항목 목록 — MEDIUM 리스크 시 자동 진행 차단용 */
+  /** 방안 D: 완료 조건 미충족 항목 목록 — MEDIUM 리스크 시 자동 진행 차단용 */
   dodPendingItems?: string[];
 }
 
@@ -118,7 +118,7 @@ export const registerAutoProceed = async (
       ].join('\n'),
     });
 
-    // 방안 D: MEDIUM 리스크 + DoD 미완료 → 자동 진행 차단
+    // 방안 D: MEDIUM 리스크 + 완료 조건 미충족 → 자동 진행 차단
     if (req.riskLevel === 'MEDIUM' && req.dodPendingItems && req.dodPendingItems.length > 0) {
       const itemList = req.dodPendingItems.map((i) => `• ${i}`).join('\n');
       await slackApp.client.chat.postMessage({
@@ -135,7 +135,7 @@ export const registerAutoProceed = async (
       });
       // DB에는 기록하되 타이머는 시작하지 않음 (pending 상태 유지 → PM 수동 처리)
       console.log(
-        `[auto-proceed] 방안D 차단: #${approvalId} MEDIUM DoD 미완료 [${req.dodPendingItems.join(', ')}]`,
+        `[auto-proceed] 방안D 차단: #${approvalId} MEDIUM 완료 조건 미충족 [${req.dodPendingItems.join(', ')}]`,
       );
       return approvalId;
     }

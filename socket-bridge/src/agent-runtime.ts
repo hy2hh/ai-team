@@ -521,7 +521,7 @@ const buildContextRulesPrefix = (): string => {
     '- 빌드 + 린트 통과 + 런타임 실행 확인',
     '- Frontend: 접근성(aria-label), 로딩/에러/빈 상태 UI, 반응형',
     '- Backend: 입력 검증, 일관된 에러 응답, N+1 쿼리 방지',
-    '- 완료 보고에 DoD 체크리스트 포함 필수 (shared/processes/definition-of-done.md 참조)',
+    '- 완료 보고에 완료 조건 체크리스트 포함 필수 (shared/processes/definition-of-done.md 참조)',
     '',
     '## 파일 수정 권한',
     '- Write/Edit 도구로 프로젝트 파일을 직접 수정할 수 있습니다.',
@@ -1474,11 +1474,11 @@ export const handleMessage = async (
               reason: z.string().describe('추천 이유'),
               actionSummary: z.string().describe('다음 단계에서 수행할 작업 요약'),
               riskLevel: z.string().optional().describe('리스크 레벨 (LOW/MEDIUM/HIGH). 생략 시 자동 분류'),
-              dodPendingItems: z.array(z.string()).optional().describe('DoD 미완료 항목 목록 (예: ["런타임 테스트", "빌드 확인"]). 1개라도 있으면 자동 진행이 차단됩니다. 모든 DoD 항목 완료 후 재호출하세요.'),
+              dodPendingItems: z.array(z.string()).optional().describe('완료 조건 미충족 항목 목록 (예: ["런타임 테스트", "빌드 확인"]). 1개라도 있으면 자동 진행이 차단됩니다. 모든 완료 조건 충족 후 재호출하세요.'),
               hasCodeChanges: z.boolean().optional().describe('코드/설정 파일 변경 여부. true이면 QA(Chalmers)가 다음 단계 첫 번째로 자동 삽입됩니다.'),
             },
             async ({ agents, reason, actionSummary, riskLevel, dodPendingItems, hasCodeChanges }) => {
-              // 방안 A: DoD 게이트 — 미완료 항목이 있으면 자동 진행 차단
+              // 방안 A: 완료 조건 게이트 — 미충족 항목이 있으면 자동 진행 차단
               if (dodPendingItems && dodPendingItems.length > 0) {
                 const itemList = dodPendingItems.map((i) => `• ${i}`).join('\n');
                 await slackApp.client.chat.postMessage({
@@ -1494,12 +1494,12 @@ export const handleMessage = async (
                   ].join('\n'),
                 });
                 console.log(
-                  `[delegation] PM recommend_next_phase 차단 — DoD 미완료: [${dodPendingItems.join(', ')}]`,
+                  `[delegation] PM recommend_next_phase 차단 — 완료 조건 미충족: [${dodPendingItems.join(', ')}]`,
                 );
                 return {
                   content: [{
                     type: 'text' as const,
-                    text: `⛔ 작업 완료 조건 미충족으로 자동 진행 차단됨. 미완료 항목: ${dodPendingItems.join(', ')}`,
+                    text: `⛔ 완료 조건 미충족으로 자동 진행 차단됨. 미충족 항목: ${dodPendingItems.join(', ')}`,
                   }],
                 };
               }
@@ -1811,11 +1811,11 @@ export const handleMessage = async (
       }
     }
 
-    // ── 완료 보고 시 DoD 증거 누락 감지 ──────────────────────
-    // 구현 에이전트(frontend/backend/designer)가 "완료" 선언 시 DoD 체크리스트 없으면 경고
+    // ── 완료 보고 시 완료 조건 증거 누락 감지 ──────────────────────
+    // 구현 에이전트(frontend/backend/designer)가 "완료" 선언 시 완료 조건 체크리스트 없으면 경고
     const IMPL_AGENTS = ['frontend', 'backend', 'designer'];
     const COMPLETION_PATTERNS = [/완료/, /Done/, /Fixed/, /구현.*완료/, /작업.*마무리/];
-    const DOD_EVIDENCE_PATTERNS = [/DoD/, /완료 조건/, /에러 핸들링/, /하드코딩/, /런타임/, /빌드.*통과/, /lint.*통과/, /AC.*통과/, /체크/];
+    const DOD_EVIDENCE_PATTERNS = [/완료 조건/, /에러 핸들링/, /하드코딩/, /런타임/, /빌드.*통과/, /lint.*통과/, /AC.*통과/, /체크/];
     if (
       resultText &&
       IMPL_AGENTS.includes(agentName) &&
@@ -1823,7 +1823,7 @@ export const handleMessage = async (
       !DOD_EVIDENCE_PATTERNS.some((p) => p.test(resultText))
     ) {
       console.warn(
-        `[enforcement] ${agentName} 완료 보고에 DoD 증거 누락`,
+        `[enforcement] ${agentName} 완료 보고에 완료 조건 증거 누락`,
       );
       resultText += '\n\n> ⚠️ _[자동 경고] 완료 보고에 작업 완료 확인 항목이 없습니다. 빌드/런타임/에러 처리 확인 결과를 첨부하세요._';
     }
