@@ -540,6 +540,18 @@ export const runDirectQA = async (
 
   console.log(`[qa-loop] runDirectQA: specPath=${specPath}`);
 
+  // ⚒️ 처리 중 리액션 추가
+  try {
+    await slackApp.client.reactions.add({
+      channel: event.channel,
+      timestamp: event.ts,
+      name: 'hammer_and_pick',
+    });
+    console.log(`[reaction] ⚒️ QA 처리 중 추가: ${event.ts}`);
+  } catch {
+    // 리액션 실패는 무시
+  }
+
   // 중복 실행 방지: 동일 event.ts + 'chalmers' 조합이 이미 PENDING이면 스킵
   const existingState = getLoopState(event.ts, 'chalmers');
   if (existingState?.lastResult === 'PENDING') {
@@ -577,6 +589,22 @@ export const runDirectQA = async (
     slackApp,
     specPath,
   );
+
+  // ⚒️ → 결과 리액션 전환
+  try {
+    await slackApp.client.reactions.remove({
+      channel: event.channel,
+      timestamp: event.ts,
+      name: 'hammer_and_pick',
+    });
+    await slackApp.client.reactions.add({
+      channel: event.channel,
+      timestamp: event.ts,
+      name: qaResult.result === 'PASS' ? 'white_check_mark' : 'x',
+    });
+  } catch {
+    // 리액션 실패는 무시
+  }
 
   // QA 완료 후 상태 업데이트
   upsertLoopState({

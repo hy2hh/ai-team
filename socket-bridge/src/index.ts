@@ -872,16 +872,16 @@ const executeSingle = async (
         accumulatedResults,
       );
 
-      // 🧠 위임 에이전트가 PM 메시지에 리액션
+      // ⚒️ 위임 에이전트가 PM 메시지에 리액션
       if (currentPmTs) {
         await safeAddReaction(
           targetApp,
           event.channel,
           currentPmTs,
-          'brain',
+          'hammer_and_pick',
         );
         console.log(
-          `[reaction] 🧠 ${target} → PM 메시지: ${currentPmTs}`,
+          `[reaction] ⚒️ ${target} → PM 메시지: ${currentPmTs}`,
         );
       }
 
@@ -915,7 +915,7 @@ const executeSingle = async (
           targetApp,
           event.channel,
           currentPmTs,
-          'brain',
+          'hammer_and_pick',
           'white_check_mark',
         );
         console.log(
@@ -940,18 +940,18 @@ const executeSingle = async (
         findAgentApp(t.agent, apps),
       );
 
-      // 🧠 각 에이전트가 PM 메시지에 리액션
+      // ⚒️ 각 에이전트가 PM 메시지에 리액션
       if (currentPmTs) {
         await Promise.all(
           batchApps.map((batchApp, i) => {
             console.log(
-              `[reaction] 🧠 ${batch[i].agent} → PM 메시지: ${currentPmTs}`,
+              `[reaction] ⚒️ ${batch[i].agent} → PM 메시지: ${currentPmTs}`,
             );
             return safeAddReaction(
               batchApp,
               event.channel,
               currentPmTs!,
-              'brain',
+              'hammer_and_pick',
             );
           }),
         );
@@ -1001,7 +1001,7 @@ const executeSingle = async (
             batchApps[i],
             event.channel,
             currentPmTs,
-            'brain',
+            'hammer_and_pick',
             'white_check_mark',
           );
           console.log(
@@ -1604,12 +1604,12 @@ const flushDebounceBuffer = async (
     `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
   );
 
-  // 🔍 → 라우팅 완료, 에이전트 실행 시작 (🔍 제거)
+  // 🧠 → 라우팅 완료, 에이전트 실행 시작 (🧠 제거)
   try {
     await apps[0].client.reactions.remove({
       channel,
       timestamp: lastMessage.ts,
-      name: 'mag',
+      name: 'brain',
     });
   } catch {
     // 리액션 제거 실패 무시
@@ -1738,6 +1738,85 @@ const main = async () => {
       );
       process.exit(1);
     }
+
+    // ─── Block Kit 권한 요청 버튼 핸들러 (모든 앱에 등록) ────────────
+    // Slack은 메시지를 보낸 앱에만 interaction payload를 전달하므로,
+    // 모든 에이전트 앱에서 버튼 클릭을 수신할 수 있어야 함
+    app.action(
+      'permission_approve',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const permissionId = (action as { value?: string }).value ?? '';
+          const resolved = resolvePermissionRequest(permissionId, true);
+          if (resolved) {
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '✅ 승인됨',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.',
+                    },
+                  },
+                ],
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[permission] permission_approve 핸들러 오류:', err);
+        }
+      },
+    );
+
+    app.action(
+      'permission_deny',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const permissionId = (action as { value?: string }).value ?? '';
+          const resolved = resolvePermissionRequest(permissionId, false);
+          if (resolved) {
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '❌ 거부됨',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: {
+                      type: 'mrkdwn',
+                      text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.',
+                    },
+                  },
+                ],
+              });
+            }
+          }
+        } catch (err) {
+          console.error('[permission] permission_deny 핸들러 오류:', err);
+        }
+      },
+    );
 
     // 메시지 이벤트 핸들러 — 첫 번째 앱(PM)에서만 등록
     // 6개 앱이 모두 같은 메시지를 수신하므로 1개만 처리
@@ -1877,12 +1956,12 @@ const main = async () => {
         return;
       }
 
-      // 🔍 즉시 리액션 (읽었다는 피드백)
+      // 🧠 즉시 리액션 (라우팅 중 표시)
       try {
         await apps[0].client.reactions.add({
           channel,
           timestamp: ts,
-          name: 'mag',
+          name: 'brain',
         });
       } catch {
         // 리액션 실패 무시
@@ -1946,85 +2025,6 @@ const main = async () => {
       }
     });
 
-    // ─── Block Kit 권한 요청 버튼 핸들러 ────────────
-    // 에이전트가 request_permission 도구 호출 시 전송되는 버튼 응답 처리
-    app.action(
-      'permission_approve',
-      async ({ ack, body, action }) => {
-        try {
-          await ack();
-          const permissionId = (action as { value?: string }).value ?? '';
-          const resolved = resolvePermissionRequest(permissionId, true);
-          if (resolved) {
-            // 버튼 메시지를 "승인됨" 상태로 업데이트
-            const b = body as {
-              message?: { ts?: string };
-              channel?: { id?: string };
-              container?: { message_ts?: string; channel_id?: string };
-            };
-            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
-            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
-            if (channel && ts) {
-              await app.client.chat.update({
-                channel,
-                ts,
-                text: '✅ 승인됨',
-                blocks: [
-                  {
-                    type: 'section',
-                    text: {
-                      type: 'mrkdwn',
-                      text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.',
-                    },
-                  },
-                ],
-              });
-            }
-          }
-        } catch (err) {
-          console.error('[permission] permission_approve 핸들러 오류:', err);
-        }
-      },
-    );
-
-    app.action(
-      'permission_deny',
-      async ({ ack, body, action }) => {
-        try {
-          await ack();
-          const permissionId = (action as { value?: string }).value ?? '';
-          const resolved = resolvePermissionRequest(permissionId, false);
-          if (resolved) {
-            const b = body as {
-              message?: { ts?: string };
-              channel?: { id?: string };
-              container?: { message_ts?: string; channel_id?: string };
-            };
-            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
-            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
-            if (channel && ts) {
-              await app.client.chat.update({
-                channel,
-                ts,
-                text: '❌ 거부됨',
-                blocks: [
-                  {
-                    type: 'section',
-                    text: {
-                      type: 'mrkdwn',
-                      text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.',
-                    },
-                  },
-                ],
-              });
-            }
-          }
-        } catch (err) {
-          console.error('[permission] permission_deny 핸들러 오류:', err);
-        }
-      },
-    );
-
     // ─── 이모지 기반 에이전트 제어 ──────────────────
     // ⛔ black_square_for_stop → 에이전트 즉시 중단
     // ❌ x → auto-proceed 취소
@@ -2048,12 +2048,12 @@ const main = async () => {
 
         switch (re.reaction) {
           case 'black_square_for_stop': {
-            // 🔍 리액션 제거 (라우팅 중이었다면)
+            // 🧠 리액션 제거 (라우팅 중이었다면)
             try {
               await apps[0].client.reactions.remove({
                 channel: re.item.channel,
                 timestamp: re.item.ts,
-                name: 'mag',
+                name: 'brain',
               });
             } catch {
               // 이미 제거됨 무시

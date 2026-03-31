@@ -1163,17 +1163,17 @@ export const handleMessage = async (
     startedAt: Date.now(),
   });
 
-  // 🧠 리액션으로 처리 중 표시
+  // ⚒️ 리액션으로 처리 중 표시
   if (!skipReaction) {
     try {
       await slackApp.client.reactions.add({
         channel: event.channel,
         timestamp: event.ts,
-        name: 'brain',
+        name: 'hammer_and_pick',
       });
-      console.log(`[reaction] 🧠 추가 완료: ${event.ts}`);
+      console.log(`[reaction] ⚒️ 처리 중 추가: ${event.ts}`);
     } catch (err) {
-      console.error(`[reaction] 🧠 추가 실패:`, err);
+      console.error(`[reaction] ⚒️ 추가 실패:`, err);
     }
   }
 
@@ -1738,13 +1738,13 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // 🧠 → ✅ 완료 리액션 전환
+    // ⚒️ → ✅ 완료 리액션 전환
     if (!skipReaction) {
       try {
         await slackApp.client.reactions.remove({
           channel: event.channel,
           timestamp: event.ts,
-          name: 'brain',
+          name: 'hammer_and_pick',
         });
         await slackApp.client.reactions.add({
           channel: event.channel,
@@ -1872,13 +1872,13 @@ export const handleMessage = async (
         timestamp: new Date().toISOString(),
         elapsedMs: Date.now() - startTime,
       });
-      // 🧠 → ⛔ 중단 리액션
+      // ⚒️ → ⛔ 중단 리액션
       if (!skipReaction) {
         try {
           await slackApp.client.reactions.remove({
             channel: event.channel,
             timestamp: event.ts,
-            name: 'brain',
+            name: 'hammer_and_pick',
           });
           await slackApp.client.reactions.add({
             channel: event.channel,
@@ -1906,13 +1906,13 @@ export const handleMessage = async (
     });
     recordAgentStat(agentName, false);
 
-    // 🧠 → ❌ 에러 리액션 전환
+    // ⚒️ → ❌ 에러 리액션 전환
     if (!skipReaction) {
       try {
         await slackApp.client.reactions.remove({
           channel: event.channel,
           timestamp: event.ts,
-          name: 'brain',
+          name: 'hammer_and_pick',
         });
         await slackApp.client.reactions.add({
           channel: event.channel,
