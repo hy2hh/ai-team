@@ -159,6 +159,14 @@
 - Use emoji reactions to acknowledge (thumbs up = understood, eyes = reviewing)
 - Create new threads for new topics, don't reuse old ones
 
+### PM 완료 메시지 이모지 확인 규칙
+- **PM(Marge)은 에이전트가 채널에 완료 메시지를 발송하면 즉시 이모지 리액션으로 확인 표시해야 한다**
+- ✅ = 완료 확인 + 다음 단계 진행 (PASS)
+- 👀 = 검토 중 (아직 판단 전)
+- ❌ = 이슈 발견 (스레드에 내용 명시)
+- **적용 대상**: 모든 에이전트의 작업 완료 보고 메시지 (채널 직접 발송 + 스레드 완료 보고 모두 포함)
+- **시점**: 완료 메시지 수신 즉시 — 다음 작업 시작 전 반드시 리액션 처리
+
 ## Shared Processes
 
 모든 에이전트가 따라야 하는 공통 프로세스는 `shared/processes/`에 위치한다:
