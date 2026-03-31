@@ -19,6 +19,13 @@ import type { SlackEvent } from './types.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
+const MEETING_OPINION_LIMIT = Number(
+  process.env.MEETING_OPINION_LIMIT ?? 3000,
+);
+const MEETING_DECISION_LIMIT = Number(
+  process.env.MEETING_DECISION_LIMIT ?? 2000,
+);
+
 /** 회의 유형 */
 export type MeetingType =
   | 'architecture'
@@ -216,7 +223,7 @@ export const synthesizeAndDecide = async (
       '',
       '*참여자 의견:*',
       ...opinions.map(
-        (o) => `*${o.agent}:* ${o.opinion.slice(0, 500)}`,
+        (o) => `*${o.agent}:* ${o.opinion.slice(0, MEETING_OPINION_LIMIT)}`,
       ),
       '',
       '위 의견들을 종합하여:',
@@ -273,7 +280,7 @@ export const synthesizeAndDecide = async (
     '',
     '## 의견 요약',
     ...opinions.map(
-      (o) => `### ${o.agent}\n${o.opinion.slice(0, 300)}`,
+      (o) => `### ${o.agent}\n${o.opinion.slice(0, MEETING_DECISION_LIMIT)}`,
     ),
     '',
     '## 최종 결정',
