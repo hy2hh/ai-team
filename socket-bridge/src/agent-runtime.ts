@@ -1478,12 +1478,12 @@ export const handleMessage = async (
                   channel: event.channel,
                   thread_ts: event.ts,
                   text: [
-                    '🚫 *[DoD 미완료] 자동 진행 차단됨*',
+                    '🚫 *작업 완료 조건 미충족 — 자동 진행 차단됨*',
                     '',
                     '*미완료 항목:*',
                     itemList,
                     '',
-                    'DoD 항목을 모두 완료한 뒤 `recommend_next_phase`를 다시 호출하세요.',
+                    '아래 항목을 모두 완료한 뒤 다음 단계로 진행하세요.',
                   ].join('\n'),
                 });
                 console.log(
@@ -1492,7 +1492,7 @@ export const handleMessage = async (
                 return {
                   content: [{
                     type: 'text' as const,
-                    text: `⛔ DoD 미완료로 자동 진행 차단됨. 미완료 항목: ${dodPendingItems.join(', ')}`,
+                    text: `⛔ 작업 완료 조건 미충족으로 자동 진행 차단됨. 미완료 항목: ${dodPendingItems.join(', ')}`,
                   }],
                 };
               }
@@ -1808,7 +1808,7 @@ export const handleMessage = async (
     // 구현 에이전트(frontend/backend/designer)가 "완료" 선언 시 DoD 체크리스트 없으면 경고
     const IMPL_AGENTS = ['frontend', 'backend', 'designer'];
     const COMPLETION_PATTERNS = [/완료/, /Done/, /Fixed/, /구현.*완료/, /작업.*마무리/];
-    const DOD_EVIDENCE_PATTERNS = [/DoD/, /에러 핸들링/, /하드코딩/, /런타임/, /빌드.*통과/, /lint.*통과/, /AC.*통과/, /체크/];
+    const DOD_EVIDENCE_PATTERNS = [/DoD/, /완료 조건/, /에러 핸들링/, /하드코딩/, /런타임/, /빌드.*통과/, /lint.*통과/, /AC.*통과/, /체크/];
     if (
       resultText &&
       IMPL_AGENTS.includes(agentName) &&
@@ -1818,7 +1818,7 @@ export const handleMessage = async (
       console.warn(
         `[enforcement] ${agentName} 완료 보고에 DoD 증거 누락`,
       );
-      resultText += '\n\n> ⚠️ _[bridge 자동 경고] 완료 보고에 DoD 체크리스트가 없습니다. `shared/processes/definition-of-done.md` 기준으로 증거를 첨부하세요._';
+      resultText += '\n\n> ⚠️ _[자동 경고] 완료 보고에 작업 완료 확인 항목이 없습니다. 빌드/런타임/에러 처리 확인 결과를 첨부하세요._';
     }
 
     // ── 사실 주장 패턴 감지 (도구 미사용 시 경고) ──────────────────────

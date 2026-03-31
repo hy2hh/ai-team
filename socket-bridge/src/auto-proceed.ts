@@ -125,12 +125,12 @@ export const registerAutoProceed = async (
         channel: req.channel,
         thread_ts: req.messageTs,
         text: [
-          '🟡⛔ *[MEDIUM + DoD 미완료] 자동 진행 차단됨*',
+          '🟡⛔ *[보통 위험 + 완료 조건 미충족] 자동 진행 차단됨*',
           '',
           '*미완료 항목:*',
           itemList,
           '',
-          'MEDIUM 리스크는 DoD 완료 후에만 자동 진행됩니다. PM이 직접 판단하세요.',
+          '보통 위험 작업은 완료 조건 충족 후에만 자동 진행됩니다. PM이 직접 판단하세요.',
         ].join('\n'),
       });
       // DB에는 기록하되 타이머는 시작하지 않음 (pending 상태 유지 → PM 수동 처리)
