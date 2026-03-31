@@ -1772,6 +1772,11 @@ export const handleMessage = async (
       /승인.*기다리/,
       /확인.*부탁/,
       /의견.*주세요/,
+      // "A할까요, 아니면 B할까요?" — 이진 선택 위임 패턴
+      /할까요[,，]?\s*(아니면|or)\s*.{1,30}할까요/,
+      // "먼저 X할까요?" / "X부터 할까요?" — 순서 결정 위임 패턴
+      /먼저\s*.{1,20}할까요/,
+      /부터\s*.{1,20}할까요/,
     ];
     if (resultText) {
       const matched = ASK_PERMISSION_PATTERNS.find((p) => p.test(resultText));
