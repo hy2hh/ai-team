@@ -1506,6 +1506,7 @@ export const handleMessage = async (
                 `${reason} ${actionSummary}`,
                 riskLevel,
               );
+              // 방안 D: dodPendingItems를 registerAutoProceed에 전달 (MEDIUM 내부 게이트용)
               const approvalId = await registerAutoProceed(
                 {
                   messageTs: event.ts,
@@ -1514,6 +1515,7 @@ export const handleMessage = async (
                   reason,
                   actionSummary,
                   riskLevel: risk.level,
+                  dodPendingItems: dodPendingItems ?? [],
                 } as AutoProceedRequest,
                 slackApp,
               );

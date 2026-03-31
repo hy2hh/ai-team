@@ -22,6 +22,8 @@ export interface AutoProceedRequest {
   reason: string;
   actionSummary: string;
   riskLevel: RiskLevel;
+  /** 방안 D: DoD 미완료 항목 목록 — MEDIUM 리스크 시 자동 진행 차단용 */
+  dodPendingItems?: string[];
 }
 
 /** 대기 중인 승인의 DB 행 타입 */
@@ -115,6 +117,28 @@ export const registerAutoProceed = async (
         `*요약:* ${req.actionSummary}`,
       ].join('\n'),
     });
+
+    // 방안 D: MEDIUM 리스크 + DoD 미완료 → 자동 진행 차단
+    if (req.riskLevel === 'MEDIUM' && req.dodPendingItems && req.dodPendingItems.length > 0) {
+      const itemList = req.dodPendingItems.map((i) => `• ${i}`).join('\n');
+      await slackApp.client.chat.postMessage({
+        channel: req.channel,
+        thread_ts: req.messageTs,
+        text: [
+          '🟡⛔ *[MEDIUM + DoD 미완료] 자동 진행 차단됨*',
+          '',
+          '*미완료 항목:*',
+          itemList,
+          '',
+          'MEDIUM 리스크는 DoD 완료 후에만 자동 진행됩니다. PM이 직접 판단하세요.',
+        ].join('\n'),
+      });
+      // DB에는 기록하되 타이머는 시작하지 않음 (pending 상태 유지 → PM 수동 처리)
+      console.log(
+        `[auto-proceed] 방안D 차단: #${approvalId} MEDIUM DoD 미완료 [${req.dodPendingItems.join(', ')}]`,
+      );
+      return approvalId;
+    }
 
     // MEDIUM: sid에게 DM 알림
     if (req.riskLevel === 'MEDIUM' && sidUserId) {
