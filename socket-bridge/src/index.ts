@@ -71,6 +71,10 @@ import {
   runRalphLoop,
   runDirectQA,
 } from './qa-loop.js';
+import {
+  startContextCleanupScheduler,
+  formatCleanupReport,
+} from './context-cleanup.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
@@ -533,6 +537,11 @@ const withAgentTimeout = <T>(
 
 /** 위임받는 에이전트용 이벤트 생성 */
 /** UTF-8 안전 문자열 자르기 (서로게이트 페어 보호) */
+
+const DELEGATION_RESULT_LIMIT = Number(
+  process.env.DELEGATION_RESULT_LIMIT ?? 3000,
+);
+
 const safeSlice = (str: string, maxLen: number): string => {
   if (str.length <= maxLen) {
     return str;
@@ -558,7 +567,7 @@ const buildDelegationEvent = (
   if (accumulatedResults.length > 0) {
     parts.push('[이전 작업 결과]');
     for (const r of accumulatedResults) {
-      parts.push(`— ${r.agent}: ${safeSlice(r.text, 1500)}`);
+      parts.push(`— ${r.agent}: ${safeSlice(r.text, DELEGATION_RESULT_LIMIT)}`);
     }
     parts.push('');
   }
@@ -580,7 +589,7 @@ const buildPmReviewEvent = (
   const parts = ['[에이전트 실행 결과 보고]'];
 
   for (const r of accumulatedResults) {
-    parts.push(`— ${r.agent}: ${safeSlice(r.text, 1500)}`);
+    parts.push(`— ${r.agent}: ${safeSlice(r.text, DELEGATION_RESULT_LIMIT)}`);
   }
 
   if (executedAgents && executedAgents.size > 0) {
@@ -2362,6 +2371,20 @@ const main = async () => {
     24 * 60 * 60 * 1000,
   );
 
+  // 컨텍스트 정리 스케줄러: 매일 자정 실행
+  const notifyChannel = process.env.SLACK_CHANNEL_AI_TEAM ?? process.env.SLACK_NOTIFY_CHANNEL;
+  const stopContextCleanup = startContextCleanupScheduler(async (result) => {
+    if (!notifyChannel || apps.length === 0) return;
+    try {
+      await apps[0].client.chat.postMessage({
+        channel: notifyChannel,
+        text: formatCleanupReport(result),
+      });
+    } catch (err) {
+      console.error('[context-cleanup] Slack 알림 실패:', err);
+    }
+  });
+
   // ── 메모리 관리 인터벌 ──────────────────────────────
   // debounceBuffer stale 엔트리 정리 (5분 주기)
   const DEBOUNCE_MAX_AGE_MS = 5 * 60 * 1000;
@@ -2400,6 +2423,7 @@ const main = async () => {
     clearInterval(debounceCleanupInterval);
     clearInterval(agentCleanupInterval);
     clearInterval(sessionCleanupInterval);
+    stopContextCleanup();
 
     // 2. debounce 타이머 전체 정리
     for (const [key, entry] of debounceBuffer) {

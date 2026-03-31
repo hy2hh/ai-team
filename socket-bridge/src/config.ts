@@ -58,3 +58,29 @@ export const MAX_RALPH_LOOP_ITERATIONS = envInt('BRIDGE_MAX_RALPH_LOOP_ITERATION
 
 /** Ralph Loop 활성화 여부 */
 export const RALPH_LOOP_ENABLED = process.env.BRIDGE_RALPH_LOOP_ENABLED !== '0';
+
+// ─────────────────────────────────────────────
+// 컨텍스트 정리 스케줄러 설정
+// ─────────────────────────────────────────────
+
+/** decisions/ 파일을 archive로 이동하는 기준 (일) */
+export const CLEANUP_ARCHIVE_AFTER_DAYS = envInt(
+  'BRIDGE_CLEANUP_ARCHIVE_AFTER_DAYS',
+  90,
+);
+
+/** conversations/ 파일을 삭제하는 기준 (일) */
+export const CLEANUP_CONVERSATIONS_EXPIRE_DAYS = envInt(
+  'BRIDGE_CLEANUP_CONVERSATIONS_EXPIRE_DAYS',
+  7,
+);
+
+/** handoff/ 파일을 삭제하는 기준 (일) */
+export const CLEANUP_HANDOFF_EXPIRE_DAYS = envInt(
+  'BRIDGE_CLEANUP_HANDOFF_EXPIRE_DAYS',
+  7,
+);
+
+/** 컨텍스트 정리 활성화 여부 */
+export const CONTEXT_CLEANUP_ENABLED =
+  process.env.BRIDGE_CONTEXT_CLEANUP_ENABLED !== '0';
