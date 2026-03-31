@@ -14,6 +14,7 @@ import { getDb } from './db.js';
 import { handleMessage } from './agent-runtime.js';
 import type { SlackEvent } from './types.js';
 import { rateLimited } from './rate-limiter.js';
+import { agentDisplayName } from './queue-processor.js';
 
 /** 프로젝트 루트 (socket-bridge의 부모) */
 const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..');
@@ -319,6 +320,9 @@ export const runCrossVerification = async (
   results.push(...verifyResults);
 
   // 결과 요약 Slack 포스팅
+  const hasFail = results.some((r) => r.result === 'FAIL');
+  const hasWarn = results.some((r) => r.result === 'WARN');
+
   const summary = results
     .map((r) => {
       const emoji =
@@ -327,23 +331,31 @@ export const runCrossVerification = async (
           : r.result === 'FAIL'
             ? '❌'
             : '⚠️';
-      return `${emoji} *${r.verifier}:* ${r.result}`;
+      const resultText =
+        r.result === 'PASS'
+          ? '이상 없음'
+          : r.result === 'FAIL'
+            ? '문제 발견'
+            : '주의 필요';
+      return `${emoji} *${agentDisplayName(r.verifier)}:* ${resultText}`;
     })
     .join('\n');
+
+  const overallEmoji = hasFail ? '❌' : hasWarn ? '⚠️' : '✅';
+  const overallStatus = hasFail ? '문제 발견' : hasWarn ? '주의 필요' : '이상 없음';
 
   try {
     await rateLimited(() =>
       slackApp.client.chat.postMessage({
         channel: event.channel,
         thread_ts: event.thread_ts ?? event.ts,
-        text: `*[Cross-Verification] ${producerAgent} 작업 검증 결과*\n${summary}`,
+        text: `${overallEmoji} *${agentDisplayName(producerAgent)} 작업 동료 검토 — ${overallStatus}*\n${summary}`,
       }),
     );
   } catch {
     // 포스팅 실패 무시
   }
 
-  const hasFail = results.some((r) => r.result === 'FAIL');
   if (hasFail) {
     console.log(
       `[cross-verify] ${producerAgent}: FAIL 감지 — 에스컬레이션 필요`,
