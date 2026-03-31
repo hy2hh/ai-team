@@ -1120,10 +1120,8 @@ export const handleMessage = async (
     `[runtime] ${agentName} 처리 시작 (${routingMethod}): "${event.text.slice(0, 50)}..."`,
   );
 
-  // 에이전트 메시지 여부 확인: 사람(사용자) 메시지에는 리액션 추가 불가
-  // 에이전트는 다른 에이전트 메시지에만 리액션 가능 (봇 user ID 기준)
-  const isAgentMessage = Array.from(agentBotUserIds.values()).includes(event.user);
-  const canReact = !skipReaction && isAgentMessage;
+  // 리액션 관리 여부: 사람/에이전트 메시지 모두 리액션으로 처리 상태 표시
+  const canReact = !skipReaction;
 
   // 🔍 단계에서 이미 취소된 메시지인지 확인
   if (pendingCancellations.has(event.ts)) {
