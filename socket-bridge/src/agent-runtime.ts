@@ -1137,8 +1137,8 @@ export const handleMessage = async (
           timestamp: event.ts,
           name: 'black_square_for_stop',
         });
-      } catch {
-        // 리액션 실패는 무시
+      } catch (err) {
+        console.error(`[reaction] ⛔ 취소 리액션 추가 실패:`, err);
       }
     }
     return { text: '', delegationTargets: [] };
@@ -1765,8 +1765,8 @@ export const handleMessage = async (
           timestamp: event.ts,
           name: 'white_check_mark',
         });
-      } catch {
-        // 리액션 실패는 무시
+      } catch (err) {
+        console.error(`[reaction] ✅ 완료 리액션 전환 실패:`, err);
       }
     }
     activeAgents.delete(event.ts);
@@ -1924,8 +1924,8 @@ export const handleMessage = async (
             timestamp: event.ts,
             name: 'black_square_for_stop',
           });
-        } catch {
-          // 리액션 실패는 무시
+        } catch (err) {
+          console.error(`[reaction] ⛔ 중단 리액션 전환 실패:`, err);
         }
       }
       return { text: '', delegationTargets: [] };
@@ -1958,8 +1958,8 @@ export const handleMessage = async (
           timestamp: event.ts,
           name: 'x',
         });
-      } catch {
-        // 리액션 실패는 무시
+      } catch (err) {
+        console.error(`[reaction] ❌ 에러 리액션 전환 실패:`, err);
       }
     }
 

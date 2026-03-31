@@ -566,32 +566,35 @@ export const routeMessage = async (
     };
   }
 
-  // 복수 키워드 매칭 → LLM에 후보 목록 제공하여 분류
+  // 복수 키워드 매칭 → classifyComplexTask로 위임 (PM 라우팅 포함)
+  // 여러 도메인에 걸치는 요청은 PM이 계획 후 위임해야 하므로
+  // 단순 후보 1개 선택(classifyWithLlm)이 아닌 복합 분류 사용
   if (keywordMatches.length > 1) {
-    // 스레드 컨텍스트면 참여자와 키워드 교집합으로 LLM 후보 제한
-    const candidates = isInThread
-      ? restrictToThread(keywordMatches)
-      : keywordMatches;
     console.log(
-      `[router] 복수 키워드 매칭: [${candidates.join(', ')}] → LLM 분류`,
+      `[router] 복수 키워드 매칭: [${keywordMatches.join(', ')}] → classifyComplexTask`,
     );
     const llmStart = Date.now();
-    const llmDisambiguated = await classifyWithLlm(
-      text,
-      candidates,
-    );
+    const complexResult = await classifyComplexTask(text);
     console.log(
-      `[perf] stage=keyword+llm elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
+      `[perf] stage=keyword+complex elapsed=${Date.now() - routeStart}ms llm=${Date.now() - llmStart}ms`,
     );
-    if (llmDisambiguated) {
-      return {
-        agents: [toRoutingAgent(llmDisambiguated)],
-        execution: 'single',
-        method: 'keyword',
-      };
+    if (complexResult) {
+      if (isInThread) {
+        const filteredAgents = restrictToThread(
+          complexResult.agents.map((a) => a.name),
+        );
+        return {
+          agents: filteredAgents.map(toRoutingAgent),
+          execution:
+            filteredAgents.length > 1 ? 'parallel' : 'single',
+          method: complexResult.method,
+        };
+      }
+      return complexResult;
     }
+    // LLM 실패 시 PM fallback (복수 도메인이므로 PM이 조율)
     return {
-      agents: [toRoutingAgent(candidates[0])],
+      agents: [toRoutingAgent('pm')],
       execution: 'single',
       method: 'keyword',
     };
