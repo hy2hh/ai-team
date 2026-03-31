@@ -3,6 +3,8 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   DndContext,
   DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
   closestCorners,
   PointerSensor,
   useSensor,
@@ -15,6 +17,61 @@ import FilterBar, { FilterState } from './filter-bar';
 
 const BOARD_ID = Number(process.env.NEXT_PUBLIC_BOARD_ID ?? 1);
 
+const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  high:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', label: '높음' },
+  medium: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.25)',  label: '보통' },
+  low:    { color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.25)',  label: '낮음' },
+};
+
+const AGENT_COLORS: Record<string, string> = {
+  homer: '#f59e0b', bart: '#3b82f6', marge: '#8b5cf6',
+  lisa: '#10b981', krusty: '#ef4444', sid: '#06b6d4',
+};
+
+/** 드래그 중 포탈에 표시되는 카드 미리보기 */
+function DragOverlayCard({ card }: { card: CardType }) {
+  const p = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
+  const agentColor = AGENT_COLORS[card.assignee?.toLowerCase() ?? ''] ?? '#7a90b8';
+  return (
+    <div
+      style={{
+        background: 'var(--color-bg-card)',
+        border: `1px solid ${p.color}60`,
+        borderRadius: 10,
+        padding: '10px 12px',
+        width: 260,
+        cursor: 'grabbing',
+        boxShadow: '0 12px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)',
+        transform: 'rotate(2deg) scale(1.03)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* 왼쪽 우선순위 바 */}
+      <div style={{ position: 'absolute', left: 0, top: 8, bottom: 8, width: 3, background: p.color, borderRadius: '0 3px 3px 0', opacity: 0.8 }} />
+      {/* 제목 */}
+      <p style={{ color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, lineHeight: 1.45, margin: 0, paddingLeft: 8 }}>
+        {card.title}
+      </p>
+      {/* 하단: 배지 + 담당자 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, paddingLeft: 8 }}>
+        <span style={{ background: p.bg, color: p.color, border: `1px solid ${p.border}`, padding: '1px 7px', fontSize: 11, borderRadius: 20, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: p.color, display: 'inline-block' }} />
+          {p.label}
+        </span>
+        {card.assignee && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ width: 22, height: 22, borderRadius: '50%', background: agentColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', boxShadow: `0 0 6px ${agentColor}50` }}>
+              {card.assignee.charAt(0).toUpperCase()}
+            </span>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{card.assignee}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const EMPTY_FILTER: FilterState = {
   assignees: new Set<string>(),
   priorities: new Set<string>(),
@@ -26,6 +83,7 @@ export default function Board() {
   const [error, setError] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER);
+  const [activeCard, setActiveCard] = useState<CardType | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -49,7 +107,24 @@ export default function Board() {
     return () => clearInterval(interval);
   }, [load]);
 
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    const { active } = event;
+    const activeId = String(active.id);
+    if (!activeId.startsWith('card-') || !board) {
+      return;
+    }
+    const cardId = parseInt(activeId.replace('card-', ''));
+    for (const col of board.columns) {
+      const found = col.cards.find((c: CardType) => c.id === cardId);
+      if (found) {
+        setActiveCard(found);
+        break;
+      }
+    }
+  }, [board]);
+
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    setActiveCard(null);
     const { active, over } = event;
     if (!over || !board) return;
 
@@ -241,7 +316,7 @@ export default function Board() {
       />
 
       {/* Phase 3 — 반응형 보드 컨테이너 */}
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <div
           className="board-container"
           role="region"
@@ -257,6 +332,9 @@ export default function Board() {
             />
           ))}
         </div>
+        <DragOverlay dropAnimation={null} zIndex={9999}>
+          {activeCard ? <DragOverlayCard card={activeCard} /> : null}
+        </DragOverlay>
       </DndContext>
     </main>
   );
