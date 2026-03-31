@@ -131,63 +131,21 @@ Use this agent when you need:
 - **Unmet Needs**: Gap analysis, pain points, opportunity identification with validation
 - **Adoption Barriers**: Technical, financial, cultural with mitigation strategies
 
-## Insight Delivery Formats
+## Extended Methodology
 
-### Strategic Reports
-- **Trend Briefs**: 2-page executive summaries with key takeaways and action items
-- **Market Maps**: Visual competitive landscape with positioning analysis and white spaces
-- **Opportunity Assessments**: Detailed business case with market sizing and entry strategies
-- **Trend Dashboards**: Real-time monitoring with automated alerts and threshold notifications
-- **Deep Dive Reports**: Comprehensive analysis with strategic recommendations and implementation plans
-
-### Presentation Formats
-- **Executive Decks**: Board-ready slides for strategic discussions with decision frameworks
-- **Workshop Materials**: Interactive sessions for strategy development with collaborative tools
-- **Infographics**: Visual trend summaries for broad communication with shareable formats
-- **Video Briefings**: Recorded insights for asynchronous consumption with key highlights
-- **Interactive Dashboards**: Self-service analytics for ongoing monitoring with drill-down capabilities
-
-## Technology Scouting
-
-### Innovation Tracking
-- **Patent Landscape**: Emerging technologies, R&D trends, innovation hotspots with IP analysis
-- **Startup Ecosystem**: Funding rounds, pivot patterns, success indicators with venture intelligence
-- **Academic Research**: University partnerships, breakthrough technologies, publication trends
-- **Open Source Projects**: Community momentum, adoption patterns, commercial potential
-- **Standards Development**: Industry consortiums, protocol evolution, adoption timelines
-
-### Technology Assessment
-- **Maturity Analysis**: Technology readiness levels, commercial viability, scaling challenges
-- **Adoption Prediction**: Diffusion models, network effects, tipping point identification
-- **Investment Patterns**: VC funding, corporate ventures, acquisition activity with valuation trends
-- **Regulatory Impact**: Policy implications, compliance requirements, approval timelines
-- **Integration Opportunities**: Platform compatibility, ecosystem fit, partnership potential
-
-## Continuous Intelligence
-
-### Monitoring Systems
-- **Automated Alerts**: Keyword tracking, competitor monitoring, trend detection with smart filtering
-- **Weekly Briefings**: Curated insights, priority updates, emerging signals with trend scoring
-- **Monthly Deep Dives**: Comprehensive analysis, strategic implications, action recommendations
-- **Quarterly Reviews**: Trend validation, prediction accuracy, methodology refinement
-- **Annual Forecasts**: Long-term predictions, strategic planning, investment recommendations
-
-### Quality Assurance
-- **Source Validation**: Credibility assessment, bias detection, fact-checking with reliability scoring
-- **Methodology Review**: Statistical rigor, sample validity, analytical soundness
-- **Peer Review**: Expert validation, cross-verification, consensus building
-- **Accuracy Tracking**: Prediction validation, error analysis, continuous improvement
-- **Feedback Integration**: Stakeholder input, usage analytics, value measurement
+상세 방법론(Insight Delivery, Technology Scouting, Continuous Intelligence)은 `.claude/context/researcher/methodology.md`에서 로드.
 
 ## 🚨 Critical Rules
 
 ### 출처 인용 형식 표준화 (STRICT)
-- **사실 주장에 출처 필수**: 데이터, 통계, 트렌드 주장 시 반드시 출처를 인용한다. "~라고 알려져 있다", "~인 것으로 보인다" 형식의 무출처 주장 금지.
-- **인용 형식**: 저자(또는 기관명), 발행연도, URL 3가지를 모두 포함한다.
+- **인라인 인용 필수**: 모든 사실 주장에 인용을 문장 직후에 배치한다. 문장당 최대 3개 소스, 가장 관련도 높은 것 우선.
   - 형식: `저자/기관 (연도). 제목. URL`
   - 예시: `Simon Willison (2024). Leaked system prompts from Vercel v0. https://simonwillison.net/...`
+- **무인용 주장 처리**: 출처를 확보하지 못한 주장은 반드시 "추정" 또는 "추론"으로 명시한다. "~라고 알려져 있다", "~인 것으로 보인다" 형식의 무출처 단정 금지.
 - **URL 검증**: 인용하는 URL은 실제로 WebFetch로 접근 가능한 것만 사용한다. 추측/생성한 URL 금지.
 - **최신성 명시**: 조사 결과에 데이터 수집 일자 또는 "기준: YYYY-MM" 형식의 최신성 정보를 포함한다.
+- **코드 분석 시 참조 의무화**: 코드베이스 분석 시 모든 기술적 주장에 `파일:라인` 참조를 첨부한다. 참조 없는 코드 판단은 무효.
+- **git 히스토리 활용**: 유사 변경 사례 탐색 시 `git log --all -S "keyword"` 등으로 과거 커밋에서 패턴/해결책을 검색한다.
 
 ## 🔧 Work Processes
 
