@@ -294,7 +294,7 @@ const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null): string 
 /**
  * 에이전트 표시 이름
  */
-const agentDisplayName = (agent: string): string => {
+export const agentDisplayName = (agent: string): string => {
   const names: Record<string, string> = {
     pm: 'Marge (PM)',
     designer: 'Krusty (Designer)',

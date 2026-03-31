@@ -62,6 +62,7 @@ import {
 import {
   startQueueProcessor,
   stopQueueProcessor,
+  agentDisplayName,
 } from './queue-processor.js';
 import { cancelQueueByThread } from './queue-manager.js';
 import { resolvePermissionRequest } from './permission-request.js';
@@ -2307,7 +2308,7 @@ const main = async () => {
                 await apps[0].client.chat.postMessage({
                   channel: orphan.channel!,
                   thread_ts: orphan.messageTs,
-                  text: `🔄 *${orphan.agent} 미응답 작업 재시도 중 (${newVersion}/${MAX_REQUEUE_ATTEMPTS}회)* — 다른 에이전트에게 재배정했습니다`,
+                  text: `🔄 *${agentDisplayName(orphan.agent)} 미응답 작업 재시도 중 (${newVersion}/${MAX_REQUEUE_ATTEMPTS}회)* — 다른 에이전트에게 재배정했습니다`,
                 });
               } catch {
                 // 알림 실패 무시
@@ -2337,8 +2338,8 @@ const main = async () => {
           await apps[0].client.chat.postMessage({
             channel: notifyChannel,
             text: isMaxReached
-              ? `⚠️ *미처리 작업 자동 복구 실패* — ${msgLink}\n• 처리 에이전트: ${orphan.agent}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS}회 모두 실패\n• 조치 필요: 해당 메시지를 재전송하거나 해당 에이전트를 직접 호출해주세요`
-              : `⚠️ *미처리 작업 감지* — ${msgLink}\n• 처리 에이전트: ${orphan.agent}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재배정 시도 중`,
+              ? `⚠️ *미처리 작업 자동 복구 실패* — ${msgLink}\n• 처리 에이전트: ${agentDisplayName(orphan.agent)}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS}회 모두 실패\n• 조치 필요: 해당 메시지를 재전송하거나 해당 에이전트를 직접 호출해주세요`
+              : `⚠️ *미처리 작업 감지* — ${msgLink}\n• 처리 에이전트: ${agentDisplayName(orphan.agent)}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재배정 시도 중`,
           });
         } catch {
           // 알림 실패 무시
