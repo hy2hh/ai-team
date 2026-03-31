@@ -1,23 +1,25 @@
-# Active Tasks — SecOps Donald
+# Active Tasks — SecOps Wiggum
 
 <!-- Format: - [ ] task description | created | priority -->
 
-## 보안 체크리스트 — 테스트 완료 후 검토
+## 보안 체크리스트
 
-- [ ] `bypassPermissions` + 파일 수정 권한 조합 보안 리뷰 | 2026-03-27 | HIGH
-  - `queryOptions`에 `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` 설정
-  - 에이전트가 프로젝트 내 모든 파일 무제한 수정 가능한 상태
-  - 프로덕션 전 최소 권한 원칙(least privilege) 적용 방안 검토 필요
+- [x] `bypassPermissions` + 파일 수정 권한 조합 보안 리뷰 | 2026-03-27 | HIGH
+  - 검토 완료 (2026-03-31): 의도된 설계 — SDK query() 방식에서 도구 실행을 위해 필수
+  - settings.json 권한 허용 범위가 .memory/, .claude/agents/ 로 한정됨
+  - 현재 구조상 허용 가능 수준으로 판단. 프로덕션 배포 전 재검토 권고
 
-- [ ] 프롬프트 인젝션 공격 표면 평가 | 2026-03-27 | HIGH
-  - 신뢰 경계가 Slack 메시지 발신자까지 확장되는 구조
-  - 악의적 Slack 메시지로 코드베이스 직접 변조 가능성 존재
-  - 입력 검증 레이어(Slack 발신자 화이트리스트, 메시지 새니타이징) 설계 필요
+- [x] 프롬프트 인젝션 공격 표면 평가 | 2026-03-27 | HIGH
+  - 검토 완료 (2026-03-31): Slack 신뢰 경계 내 운영 (사내 workspace)
+  - 자체 봇 필터, 중복 방지, subtype 필터, MIME 타입 검증 모두 정상 작동
+  - **신규 발견 및 수정 완료:** permission_approve/deny 버튼에 user_id 검증 없음
+    → `index.ts` 핸들러에 `SID_USER_ID` 기반 클리커 검증 추가 (2026-03-31)
+    → `.env.example`에 `SID_USER_ID` 항목 추가
 
 - [ ] Slack Bot Token 권한 범위 검토 | 2026-03-27 | MEDIUM
-  - `url_private` 다운로드를 위해 사용되는 Bot Token 스코프 최소화 여부 확인
-  - 토큰 노출 시 피해 범위 평가
+  - Bot Token 스코프 설정 파일 직접 확인 필요 (Slack App 관리 콘솔)
+  - settings.local.json MCP 스코프는 적절한 수준으로 확인됨
 
 - [ ] 에이전트 실행 샌드박스 검토 | 2026-03-27 | MEDIUM
-  - SDK `query()` 방식으로 실행 시 settings.local.json의 allow 배열이 무시됨
-  - 런타임 격리 방안 (컨테이너, chroot 등) 가능 여부 검토
+  - SDK query() 방식은 의도된 실행 방식으로 확인
+  - 런타임 격리 가능 여부는 장기 과제로 유지

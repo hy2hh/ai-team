@@ -1,7 +1,7 @@
 # Feature Spec: Task Queue System
 Date: 2026-03-30
 Author: Marge (PM)
-Status: approved
+Status: completed
 
 ## 배경 & 문제
 
