@@ -132,6 +132,12 @@ const VERIFY_MATRIX: Record<
       checkItems: '구현 가능성: 디자인 스펙이 현재 기술 스택으로 구현 가능한지, 성능 이슈가 없는지 확인',
     },
   ],
+  pm: [
+    {
+      verifier: 'researcher',
+      checkItems: '사실 주장 근거, 파일 확인 여부, 항목 수 정확성',
+    },
+  ],
 };
 
 /**

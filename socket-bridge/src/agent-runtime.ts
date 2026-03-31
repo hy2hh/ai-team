@@ -1187,6 +1187,7 @@ export const handleMessage = async (
     let resultText = '';
     let usedModel = '';
     let costUsd = 0;
+    const toolUses: Array<{ name: string }> = [];
 
     // 스레드 내 연속 대화 시 이전 세션 재사용 (히스토리 + 시스템 프롬프트 캐싱)
     // threadTopic이 있으면 bridge가 맥락을 프리프로세싱했으므로 새 세션 강제
@@ -1688,6 +1689,16 @@ export const handleMessage = async (
     }
 
     for await (const message of query({ prompt, options: queryOptions })) {
+      // 도구 사용 기록 수집 (사실 주장 감사에 활용)
+      if (message.type === 'assistant') {
+        const assistantMsg = message as { type: 'assistant'; message: { content: Array<{ type: string; name?: string }> } };
+        for (const block of assistantMsg.message.content) {
+          if (block.type === 'tool_use' && block.name) {
+            toolUses.push({ name: block.name });
+          }
+        }
+      }
+
       // ResultMessage (success/error 모두) → result 추출 + session_id 캡처
       if (message.type === 'result') {
         const resultMsg = message as SDKResultMessage;
@@ -1803,6 +1814,26 @@ export const handleMessage = async (
         `[enforcement] ${agentName} 완료 보고에 DoD 증거 누락`,
       );
       resultText += '\n\n> ⚠️ _[bridge 자동 경고] 완료 보고에 DoD 체크리스트가 없습니다. `shared/processes/definition-of-done.md` 기준으로 증거를 첨부하세요._';
+    }
+
+    // ── 사실 주장 패턴 감지 (도구 미사용 시 경고) ──────────────────────
+    const FACTUAL_CLAIM_PATTERNS = [
+      /\d+개\s*(항목|파일|TODO|미완료)/,
+      /존재(합니다|하지 않습니다|함|없음)/,
+      /확인(됩니다|됐습니다|했습니다)/,
+      /(완료|미완료|처리|미처리)됩니다/,
+      /하드코딩.*되어 있/,
+    ];
+
+    const usedSearchTools = toolUses.some((t) =>
+      ['Read', 'Grep', 'Glob', 'Bash'].includes(t.name)
+    );
+
+    if (resultText && !usedSearchTools && FACTUAL_CLAIM_PATTERNS.some(p => p.test(resultText))) {
+      console.warn(
+        `[enforcement] ${agentName} 사실 주장에 도구 사용 기록 없음`,
+      );
+      resultText += '\n\n> ⚠️ _[bridge 자동 경고] 프로젝트 내부 사실을 주장했으나 Read/Grep/Glob/Bash 사용 기록이 없습니다. 코드/파일을 직접 확인 후 답변하세요._';
     }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
