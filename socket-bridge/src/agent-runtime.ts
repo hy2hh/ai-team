@@ -905,6 +905,24 @@ const loadPersona = (agentName: string): string => {
     const persona = readFileSync(fullPath, 'utf-8');
     const sharedMemory = loadSharedMemory();
     const agentMemory = loadAgentMemory(agentName);
+
+    // PM 전용: 순차 계획 강제 지시 주입
+    const pmPlanningEnforcement =
+      agentName === 'pm'
+        ? [
+            '',
+            '## ⛔ 계획 수립 순차 강제 (HARD GATE)',
+            '계획/설계/개선/구현 요청을 받으면 반드시 다음 순서를 따르세요:',
+            '1. **첫 응답**: 맥락 탐색(코드/스펙 확인) + 관련 에이전트 소집(@mention으로 의견 요청)',
+            '2. **에이전트 입력 수신 후**: 관점 종합 + 접근 방식 2~3개 제안 + sid 승인 요청',
+            '3. **sid 승인 후**: 구현 계획서 작성 + 담당 에이전트 위임',
+            '',
+            '**절대 금지**: 첫 응답에서 전체 계획(Phase 1~5 등)을 한 번에 작성하는 것.',
+            '에이전트 의견 없이 혼자 세운 계획은 전문가 관점이 빠진 단독 판단입니다.',
+            '',
+          ].join('\n')
+        : '';
+
     console.log(
       `[memory] ${agentName}: shared=${sharedMemory.length}c agent=${agentMemory.length}c persona=${persona.length}c`,
     );
@@ -913,6 +931,7 @@ const loadPersona = (agentName: string): string => {
       sharedMemory,
       agentMemory,
       persona,
+      pmPlanningEnforcement,
     ].join('\n');
   } catch (err) {
     console.error(
