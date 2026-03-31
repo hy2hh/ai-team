@@ -530,7 +530,7 @@ const buildContextRulesPrefix = (): string => {
     '',
     '## 에이전트 간 위임',
     '- 다른 에이전트에게 작업을 맡기려면 반드시 `mcp__delegation__delegate` 도구를 사용하세요.',
-    '- delegate 도구에 에이전트 이름(pm/designer/frontend/backend/researcher/secops)과 이유를 전달하면 bridge가 해당 에이전트를 실행합니다.',
+    '- delegate 도구에 에이전트 이름(pm/designer/frontend/backend/researcher/secops/qa)과 이유를 전달하면 bridge가 해당 에이전트를 실행합니다.',
     '- 지금 즉시 실행해야 할 에이전트만 delegate하세요. 향후 계획은 delegate하지 마세요.',
     '- 순차 실행이 필요하면 먼저 할 에이전트만 delegate하세요. 나중 에이전트는 리뷰 시 delegate합니다.',
     '- 텍스트에서 에이전트를 언급할 때는 이름(Krusty, Bart 등)만 사용하세요. <@USER_ID> 멘션은 위임 트리거가 아닙니다.',
@@ -1225,7 +1225,7 @@ export const handleMessage = async (
             },
             async ({ agents, reason, tier }) => {
               const valid = agents.filter((a: string) =>
-                ['designer', 'frontend', 'backend', 'researcher', 'secops'].includes(a),
+                ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
               );
 
               // 2+ 구현 에이전트 위임 시 스펙 파일 + 에러 케이스 AC 검증
@@ -1290,7 +1290,7 @@ export const handleMessage = async (
             async ({ steps, reason: _reason }) => {
               const validSteps = steps.map((step: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }) => ({
                 agents: step.agents.filter((a: string) =>
-                  ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
+                  ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
                 ),
                 task: step.task,
                 tier: step.tier,
@@ -1351,7 +1351,7 @@ export const handleMessage = async (
             '복잡한 작업을 Task 단위로 분해하여 큐에 등록합니다. 각 Task는 독립 에이전트 세션에서 순차 실행되어 max_turns 초과 문제를 방지합니다. 3개 이상의 분석/조사 작업, 31턴 초과 위험이 있는 복잡한 작업에 사용하세요. 단순 단일 태스크는 delegate를 사용하세요.',
             {
               tasks: z.array(z.object({
-                agent: z.string().describe('태스크를 실행할 에이전트 (pm/designer/frontend/backend/researcher/secops)'),
+                agent: z.string().describe('태스크를 실행할 에이전트 (pm/designer/frontend/backend/researcher/secops/qa)'),
                 task: z.string().describe('태스크 설명 (구체적일수록 좋음)'),
                 tier: z.enum(['high', 'standard', 'fast']).optional().describe('모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
                 dependsOn: z.number().optional().describe('선행 태스크의 인덱스 (0-based). 해당 태스크 완료 후 실행됨'),
@@ -1359,7 +1359,7 @@ export const handleMessage = async (
               reason: z.string().describe('큐 등록 이유'),
             },
             async ({ tasks, reason }) => {
-              const validAgents = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops'];
+              const validAgents = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'];
               const validTasks: QueueTask[] = tasks
                 .filter((t: { agent: string }) => validAgents.includes(t.agent))
                 .map((t: { agent: string; task: string; tier?: 'high' | 'standard' | 'fast'; dependsOn?: number }) => ({
@@ -1373,7 +1373,7 @@ export const handleMessage = async (
                 return {
                   content: [{
                     type: 'text' as const,
-                    text: '⛔ 유효한 태스크가 없습니다. agent는 pm/designer/frontend/backend/researcher/secops 중 하나여야 합니다.',
+                    text: '⛔ 유효한 태스크가 없습니다. agent는 pm/designer/frontend/backend/researcher/secops/qa 중 하나여야 합니다.',
                   }],
                 };
               }
@@ -1543,7 +1543,7 @@ export const handleMessage = async (
             },
             async ({ type, topic, participants, context }) => {
               const valid = participants.filter((a: string) =>
-                ['designer', 'frontend', 'backend', 'researcher', 'secops', 'pm'].includes(a),
+                ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
               );
               try {
                 const { meetingId, decision } = await runMeeting(

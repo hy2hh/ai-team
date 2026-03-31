@@ -74,12 +74,16 @@ import {
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
-  const teamId = process.env.SLACK_TEAM_ID;
-  if (!teamId) {
+  const workspaceDomain =
+    process.env.SLACK_WORKSPACE_DOMAIN ?? process.env.SLACK_TEAM_ID;
+  if (!workspaceDomain) {
     return `\`${ts}\``;
   }
   const tsNoDot = ts.replace('.', '');
-  return `<https://app.slack.com/archives/${channel}/p${tsNoDot}|원본 메시지>`;
+  const baseUrl = workspaceDomain.includes('.slack.com')
+    ? `https://${workspaceDomain}`
+    : `https://slack.com`;
+  return `<${baseUrl}/archives/${channel}/p${tsNoDot}|원본 메시지>`;
 };
 
 // ─── 설정 ───────────────────────────────────────────────
