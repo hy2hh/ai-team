@@ -12,6 +12,7 @@ import {
   skipDependentTasks,
   getPreviousTaskResult,
   recoverOrphanTasks,
+  requeueForRetry,
   type TaskQueueRow,
   type QueueStatusSummary,
 } from './queue-manager.js';
@@ -193,21 +194,37 @@ const processNextTask = async (): Promise<void> => {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error(`[queue-processor] 태스크 실패: ${task.id}`, err);
 
-    // 실패 처리
-    markFailed(task.id, errorMsg);
-    await postTaskProgress(slackAppRef, task, 'failed', undefined, errorMsg);
-
-    // 의존하는 후속 태스크 스킵
-    const skipped = skipDependentTasks(task.parent_queue_id, task.sequence);
-    if (skipped > 0) {
+    // error_max_turns 감지 시 재시도 (max_retries 내)
+    const isMaxTurnsError = errorMsg.includes('error_max_turns') || errorMsg.includes('max_turns');
+    if (isMaxTurnsError && task.retry_count < task.max_retries) {
+      console.log(`[queue-processor] error_max_turns 재시도: ${task.id} (${task.retry_count + 1}/${task.max_retries})`);
+      requeueForRetry(task.id);
       try {
         await slackAppRef.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
-          text: `:fast_forward: ${skipped}개 후속 태스크 스킵됨 (의존성 실패)`,
+          text: `:arrows_counterclockwise: *[Queue 재시도]* ${agentDisplayName(task.agent)} — max_turns 도달, 재시도 중 (${task.retry_count + 1}/${task.max_retries})`,
         });
       } catch {
         // 알림 실패 무시
+      }
+    } else {
+      // 실패 처리
+      markFailed(task.id, errorMsg);
+      await postTaskProgress(slackAppRef, task, 'failed', undefined, errorMsg);
+
+      // 의존하는 후속 태스크 스킵
+      const skipped = skipDependentTasks(task.parent_queue_id, task.sequence);
+      if (skipped > 0) {
+        try {
+          await slackAppRef.client.chat.postMessage({
+            channel: task.channel,
+            thread_ts: task.thread_ts,
+            text: `:fast_forward: ${skipped}개 후속 태스크 스킵됨 (의존성 실패)`,
+          });
+        } catch {
+          // 알림 실패 무시
+        }
       }
     }
   } finally {
