@@ -12,7 +12,7 @@ const AGENT_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  onAdd: (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => void;
+  onAdd: (data: { title: string; description: string; priority: string; assignee: string; progress: number; due_date: string | null; tags: string[] }) => void;
   onClose: () => void;
 }
 
@@ -22,7 +22,19 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
   const [priority, setPriority] = useState('medium');
   const [assignee, setAssignee] = useState('');
   const [progress, setProgress] = useState(0);
+  const [dueDate, setDueDate] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const titleRef = useRef<HTMLInputElement>(null);
+
+  const addTag = () => {
+    const tag = tagInput.trim();
+    if (!tag || tags.includes(tag) || tags.length >= 10) return;
+    setTags((prev) => [...prev, tag]);
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag));
 
   useEffect(() => {
     titleRef.current?.focus();
@@ -34,7 +46,7 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title: title.trim(), description, priority, assignee, progress });
+    onAdd({ title: title.trim(), description, priority, assignee, progress, due_date: dueDate || null, tags });
   };
 
   const progressColor =
@@ -51,6 +63,9 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
   return (
     <div
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-card-modal-title"
       style={{
         position: 'fixed',
         inset: 0,
@@ -85,7 +100,7 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
             justifyContent: 'space-between',
           }}
         >
-          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          <h2 id="add-card-modal-title" style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             새 카드 추가
           </h2>
           <button
@@ -291,6 +306,80 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
                   );
                 })}
               </div>
+            </div>
+
+            {/* 마감일 */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                마감일 (선택)
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                aria-label="마감일"
+                style={{
+                  width: '100%', background: 'var(--color-bg-input)', color: 'var(--color-text-primary)',
+                  border: '1px solid var(--color-border)', borderRadius: 8, padding: '9px 12px',
+                  fontSize: 13, outline: 'none', cursor: 'pointer', transition: 'border-color 150ms',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-action-primary)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+              />
+            </div>
+
+            {/* 태그 */}
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-muted)', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                태그 (선택)
+              </label>
+              {tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                  {tags.map((tag) => (
+                    <span key={tag} style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 500,
+                      padding: '2px 8px', borderRadius: 12, background: 'rgba(79,126,240,0.12)',
+                      color: '#4f7ef0', border: '1px solid rgba(79,126,240,0.25)',
+                    }}>
+                      {tag}
+                      <button onClick={() => removeTag(tag)} aria-label={`태그 ${tag} 삭제`} type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f7ef0', padding: 0, fontSize: 12, lineHeight: 1 }}>×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              {tags.length < 10 && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                    placeholder="태그 입력 후 Enter"
+                    aria-label="새 태그 입력"
+                    maxLength={50}
+                    style={{
+                      flex: 1, background: 'var(--color-bg-input)', color: 'var(--color-text-primary)',
+                      border: '1px solid var(--color-border)', borderRadius: 8, padding: '7px 10px',
+                      fontSize: 13, outline: 'none', transition: 'border-color 150ms',
+                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = 'var(--color-action-primary)'; }}
+                    onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--color-border)'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={addTag}
+                    disabled={!tagInput.trim()}
+                    style={{
+                      padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                      background: tagInput.trim() ? 'rgba(79,126,240,0.15)' : 'var(--color-bg-input)',
+                      color: tagInput.trim() ? '#4f7ef0' : 'var(--color-text-muted)',
+                      border: '1px solid var(--color-border)', cursor: tagInput.trim() ? 'pointer' : 'default',
+                    }}
+                  >
+                    추가
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 진행률 */}

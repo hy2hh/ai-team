@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ColumnWithCards, Card as CardType } from '@/lib/types';
+import { FilterState } from './filter-bar';
 import Card from './Card';
 import AddCardModal from './AddCardModal';
 import CardDetailModal from './CardDetailModal';
@@ -23,9 +24,17 @@ interface Props {
   column: ColumnWithCards;
   onRefresh: () => void;
   columnIndex: number;
+  filter: FilterState | null;
 }
 
-export default function Column({ column, onRefresh, columnIndex }: Props) {
+function isCardFiltered(card: CardType, filter: FilterState | null): boolean {
+  if (!filter) return false;
+  if (filter.assignees.size > 0 && !filter.assignees.has(card.assignee ?? '')) return true;
+  if (filter.priorities.size > 0 && !filter.priorities.has(card.priority)) return true;
+  return false;
+}
+
+export default function Column({ column, onRefresh, columnIndex, filter }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [colError, setColError] = useState<string | null>(null);
@@ -37,7 +46,13 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
   const isWipExceeded = column.wip_limit != null && column.cards.length >= column.wip_limit;
   const wipPercent = column.wip_limit ? Math.min((column.cards.length / column.wip_limit) * 100, 100) : 0;
 
-  const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string; progress: number }) => {
+  const visibleCount = useMemo(
+    () => column.cards.filter((c) => !isCardFiltered(c, filter)).length,
+    [column.cards, filter]
+  );
+  const allFiltered = filter && column.cards.length > 0 && visibleCount === 0;
+
+  const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string; progress: number; due_date: string | null; tags: string[] }) => {
     if (isWipExceeded) {
       setColError(`WIP 한도(${column.wip_limit})에 도달했습니다.`);
       setTimeout(() => setColError(null), 3000);
@@ -52,6 +67,14 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
       setColError('카드 생성에 실패했습니다. 다시 시도해주세요.');
       setTimeout(() => setColError(null), 3000);
     }
+  };
+
+  const handleUpdate = async (
+    id: number,
+    data: Partial<Pick<CardType, 'title' | 'description' | 'priority' | 'assignee' | 'progress' | 'due_date' | 'tags'>>
+  ) => {
+    await api.updateCard(id, data as Parameters<typeof api.updateCard>[1]);
+    onRefresh();
   };
 
   const handleDelete = async (cardId: number) => {
@@ -73,11 +96,12 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
   return (
     <>
       <div
+        className="column-container"
+        role="region"
+        aria-label={`${column.name} 컬럼, 카드 ${column.cards.length}개${column.wip_limit ? `, WIP 한도 ${column.wip_limit}` : ''}`}
         style={{
           display: 'flex',
           flexDirection: 'column',
-          width: 288,
-          flexShrink: 0,
           borderRadius: 14,
           background: isOver ? `${accentBg}` : 'var(--color-bg-elevated)',
           border: `1px solid ${isOver ? accentColor : 'var(--color-border)'}`,
@@ -90,6 +114,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
       >
         {/* 상단 accent 바 */}
         <div
+          aria-hidden="true"
           style={{
             height: 3,
             background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor}60 100%)`,
@@ -111,6 +136,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             <span
+              aria-hidden="true"
               style={{
                 width: 8,
                 height: 8,
@@ -136,6 +162,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
             </h3>
           </div>
           <span
+            aria-label={`카드 수 ${column.cards.length}${column.wip_limit ? ` / WIP 한도 ${column.wip_limit}` : ''}`}
             style={{
               background: isWipExceeded ? 'rgba(248,113,113,0.12)' : 'var(--color-bg-card)',
               color: isWipExceeded ? '#f87171' : 'var(--color-text-secondary)',
@@ -155,6 +182,11 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
         {/* WIP 진행 바 */}
         {column.wip_limit != null && (
           <div
+            role="progressbar"
+            aria-valuenow={column.cards.length}
+            aria-valuemin={0}
+            aria-valuemax={column.wip_limit}
+            aria-label={`WIP 진행률 ${column.cards.length}/${column.wip_limit}`}
             style={{
               height: 2,
               background: 'var(--color-border)',
@@ -175,6 +207,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
         {/* 에러 메시지 */}
         {colError && (
           <div
+            role="alert"
             style={{
               margin: '8px 12px 0',
               fontSize: 12,
@@ -209,24 +242,27 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
                 onDelete={handleDelete}
                 onCardClick={setSelectedCard}
                 accentColor={accentColor}
+                isFiltered={isCardFiltered(card, filter)}
               />
             ))}
           </SortableContext>
+
           {column.cards.length === 0 && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: 80,
-                color: 'var(--color-text-muted)',
-                fontSize: 12,
-                borderRadius: 8,
-                border: `1px dashed var(--color-border)`,
-                transition: 'border-color 150ms',
-              }}
-            >
+            <div className="empty-state">
               카드 없음
+            </div>
+          )}
+
+          {/* 필터 후 빈 상태 */}
+          {allFiltered && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="empty-state"
+              style={{ marginTop: 8 }}
+            >
+              <span aria-hidden="true">🔍</span>
+              <span>필터 조건에 맞는 카드 없음</span>
             </div>
           )}
         </div>
@@ -236,6 +272,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
           <button
             onClick={() => setShowAddModal(true)}
             disabled={isWipExceeded}
+            aria-label={`${column.name} 컬럼에 카드 추가${isWipExceeded ? ' (WIP 한도 도달)' : ''}`}
             style={{
               width: '100%',
               color: isWipExceeded ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
@@ -249,6 +286,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
               textAlign: 'left',
               transition: 'all 150ms',
               opacity: isWipExceeded ? 0.4 : 1,
+              minHeight: 44,
             }}
             onMouseEnter={(e) => {
               if (!isWipExceeded) {
@@ -276,6 +314,7 @@ export default function Column({ column, onRefresh, columnIndex }: Props) {
           card={selectedCard}
           columnName={column.name}
           onClose={() => setSelectedCard(null)}
+          onUpdate={handleUpdate}
         />
       )}
     </>

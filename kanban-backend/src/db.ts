@@ -42,6 +42,8 @@ function initSchema(): void {
       assignee TEXT,
       progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100),
       position INTEGER NOT NULL DEFAULT 0,
+      due_date TEXT,
+      tags TEXT NOT NULL DEFAULT '[]',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -52,6 +54,14 @@ function initSchema(): void {
   const hasProgress = cols.some(c => c.name === 'progress');
   if (!hasProgress) {
     database.exec("ALTER TABLE cards ADD COLUMN progress INTEGER NOT NULL DEFAULT 0 CHECK(progress >= 0 AND progress <= 100)");
+  }
+  const hasDueDate = cols.some(c => c.name === 'due_date');
+  if (!hasDueDate) {
+    database.exec("ALTER TABLE cards ADD COLUMN due_date TEXT");
+  }
+  const hasTags = cols.some(c => c.name === 'tags');
+  if (!hasTags) {
+    database.exec("ALTER TABLE cards ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
   }
 }
 

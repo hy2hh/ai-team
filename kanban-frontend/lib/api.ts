@@ -22,9 +22,9 @@ async function fetchJson<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   getBoard: (id: number) => fetchJson<Board>(`/boards/${id}`),
-  createCard: (data: { column_id: number; title: string; description?: string; priority?: string; assignee?: string; progress?: number }) =>
+  createCard: (data: { column_id: number; title: string; description?: string; priority?: string; assignee?: string; progress?: number; due_date?: string | null; tags?: string[] }) =>
     fetchJson<Card>('/cards', { method: 'POST', body: JSON.stringify(data) }),
-  updateCard: (id: number, data: { title?: string; description?: string; priority?: string; assignee?: string | null; progress?: number }) =>
+  updateCard: (id: number, data: { title?: string; description?: string; priority?: string; assignee?: string | null; progress?: number; due_date?: string | null; tags?: string[] }) =>
     fetchJson<Card>(`/cards/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   moveCard: (id: number, column_id: number, position?: number) =>
     fetchJson<Card>(`/cards/${id}/move`, {

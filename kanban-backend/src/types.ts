@@ -21,8 +21,15 @@ export interface Card {
   assignee: string | null;
   progress: number;
   position: number;
+  due_date: string | null;
+  tags: string[];
   created_at: string;
   updated_at: string;
+}
+
+// SQLite raw row — tags stored as JSON string
+export interface CardRow extends Omit<Card, 'tags'> {
+  tags: string;
 }
 
 export interface BoardSummary extends Board {
