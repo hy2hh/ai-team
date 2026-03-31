@@ -44,10 +44,10 @@ export const postQueueStarted = async (
   tasks: Array<{ sequence: number; agent: string; task: string }>,
 ): Promise<void> => {
   const taskList = tasks
-    .map((t) => `  • Task ${t.sequence + 1}: ${agentDisplayName(t.agent)} — ${truncate(t.task, 50)}`)
+    .map((t) => `  • ${t.sequence + 1}번: ${agentDisplayName(t.agent)} — ${truncate(t.task, 100)}`)
     .join('\n');
 
-  const message = `:clipboard: *[큐 등록] ${tasks.length}개 태스크 순차 실행 시작*\n${taskList}`;
+  const message = `📋 *작업 예약* — ${tasks.length}개 작업을 순서대로 전달합니다\n${taskList}`;
 
   try {
     await slackApp.client.chat.postMessage({
@@ -77,17 +77,17 @@ const postTaskProgress = async (
 
   switch (status) {
     case 'running':
-      message = `:arrows_counterclockwise: *[Queue ${taskNum}/${totalCount}]* ${displayName} — ${truncate(task.task, 50)} 진행 중...`;
+      message = `🔄 *작업 진행 중 [${taskNum}/${totalCount}]* — ${displayName}\n  • ${truncate(task.task, 100)}`;
       break;
     case 'completed': {
       const duration = task.started_at
         ? Math.round((Date.now() - task.started_at) / 1000)
         : 0;
-      message = `:white_check_mark: *[Queue ${taskNum}/${totalCount} 완료]* ${displayName} — ${truncate(task.task, 50)} (${duration}초)`;
+      message = `✅ *작업 완료 [${taskNum}/${totalCount}]* — ${displayName} (${duration}초 소요)\n  • ${truncate(task.task, 100)}`;
       break;
     }
     case 'failed':
-      message = `:x: *[Queue ${taskNum}/${totalCount} 실패]* ${displayName} — ${truncate(task.task, 50)}\n오류: ${truncate(error ?? '알 수 없음', 100)}`;
+      message = `❌ *작업 실패 [${taskNum}/${totalCount}]* — ${displayName}\n  • ${truncate(task.task, 100)}\n  • 오류: ${truncate(error ?? '알 수 없음', 100)}`;
       break;
   }
 
@@ -203,7 +203,7 @@ const processNextTask = async (): Promise<void> => {
         await slackAppRef.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
-          text: `:arrows_counterclockwise: *[Queue 재시도]* ${agentDisplayName(task.agent)} — max_turns 도달, 재시도 중 (${task.retry_count + 1}/${task.max_retries})`,
+          text: `🔄 *${agentDisplayName(task.agent)} 작업 재시도 중 [${task.retry_count + 1}/${task.max_retries}]* — 대화 한도 초과로 이어서 계속합니다`,
         });
       } catch {
         // 알림 실패 무시
