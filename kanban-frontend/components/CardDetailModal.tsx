@@ -20,31 +20,34 @@ interface Props {
 
 // ─── 헬퍼 ────────────────────────────────────────────────────────────────────
 
-const agentColorMap: Record<string, string> = {
-  homer:  '#3b82f6',
-  bart:   '#06b6d4',
-  marge:  '#a855f7',
-  lisa:   '#22c55e',
-  krusty: '#f97316',
-  sid:    '#ec4899',
+const AGENT_COLORS: Record<string, string> = {
+  homer:  '#4f7ef0',
+  bart:   '#22d3ee',
+  marge:  '#c084fc',
+  lisa:   '#4ade80',
+  krusty: '#fb923c',
+  sid:    '#f472b6',
+};
+
+const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
+  high:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', label: '높음' },
+  medium: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.25)',  label: '보통' },
+  low:    { color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.25)',  label: '낮음' },
 };
 
 function getAgentColor(name: string): string {
-  return agentColorMap[name.toLowerCase()] ?? '#64748b';
+  return AGENT_COLORS[name.toLowerCase()] ?? '#7a90b8';
 }
 
 function getProgressColor(progress: number): string {
-  if (progress >= 67) return '#22c55e';
-  if (progress >= 34) return '#eab308';
-  return '#ef4444';
+  if (progress >= 67) return '#4ade80';
+  if (progress >= 34) return '#fbbf24';
+  return '#f87171';
 }
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}.${m}.${day}`;
+  return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
 function getActivityIcon(action: CardActivity['action']): string {
@@ -58,7 +61,6 @@ function getActivityIcon(action: CardActivity['action']): string {
   return icons[action];
 }
 
-// 더미 활동 데이터 (백엔드 API 확장 전 임시)
 function getDummyActivities(card: Card): CardActivity[] {
   return [
     {
@@ -75,7 +77,6 @@ function getDummyActivities(card: Card): CardActivity[] {
 
 function AgentAvatar({ name, size = 36 }: { name: string; size?: number }) {
   const color = getAgentColor(name);
-  const fontSize = size <= 28 ? '11px' : '14px';
   return (
     <span
       style={{
@@ -86,42 +87,15 @@ function AgentAvatar({ name, size = 36 }: { name: string; size?: number }) {
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize,
+        fontSize: size <= 28 ? 10 : 14,
         fontWeight: 700,
         color: '#ffffff',
         flexShrink: 0,
         border: '2px solid var(--color-bg-surface)',
+        boxShadow: `0 0 10px ${color}40`,
       }}
     >
       {name.charAt(0).toUpperCase()}
-    </span>
-  );
-}
-
-function PriorityBadge({ priority }: { priority: 'low' | 'medium' | 'high' }) {
-  const styles: Record<string, { bg: string; color: string; border: string; dot: string; label: string }> = {
-    high:   { bg: 'rgba(239,68,68,0.12)',   color: '#ef4444', border: 'rgba(239,68,68,0.3)',   dot: '#ef4444', label: '높음' },
-    medium: { bg: 'rgba(234,179,8,0.12)',   color: '#ca8a04', border: 'rgba(234,179,8,0.3)',   dot: '#eab308', label: '보통' },
-    low:    { bg: 'rgba(34,197,94,0.12)',   color: '#16a34a', border: 'rgba(34,197,94,0.3)',   dot: '#22c55e', label: '낮음' },
-  };
-  const s = styles[priority];
-  return (
-    <span
-      style={{
-        padding: '4px 10px',
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 600,
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: s.bg,
-        color: s.color,
-        border: `1px solid ${s.border}`,
-      }}
-    >
-      <span style={{ width: 6, height: 6, borderRadius: '50%', background: s.dot, display: 'inline-block' }} />
-      {s.label}
     </span>
   );
 }
@@ -134,9 +108,9 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const progress = card.progress ?? 0;
   const progressColor = getProgressColor(progress);
+  const priorityCfg = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
   const activities = getDummyActivities(card);
 
-  // 포커스 트랩
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose();
@@ -170,54 +144,49 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
   }, [onClose]);
 
   useEffect(() => {
-    // 모달 열릴 때 닫기 버튼으로 포커스
     closeBtnRef.current?.focus();
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) onClose();
-  };
-
   return (
     <div
       ref={overlayRef}
-      onClick={handleOverlayClick}
+      onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      className="detail-modal-overlay"
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'var(--color-bg-overlay)',
+        background: 'rgba(0,0,0,0.72)',
         zIndex: 50,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '0 24px',
-        // 모바일: 하단 정렬
+        padding: '0 20px',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
       }}
-      className="modal-overlay"
     >
-      {/* 모달 컨테이너 */}
       <div
         ref={modalRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="modal-title"
+        aria-labelledby="detail-modal-title"
+        className="detail-modal-container"
+        onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--color-bg-surface)',
           border: '1px solid var(--color-border)',
-          borderRadius: 16,
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          borderRadius: 18,
+          boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)',
           width: '100%',
           maxWidth: 560,
-          maxHeight: '85vh',
+          maxHeight: '88vh',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          animation: 'modalFadeIn 200ms ease-out',
+          animation: 'detailFadeIn 200ms cubic-bezier(0.16,1,0.3,1)',
         }}
-        className="card-detail-modal"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* ── 헤더 ── */}
         <div
@@ -230,19 +199,26 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
             borderBottom: '1px solid var(--color-border)',
           }}
         >
-          <h2
-            id="modal-title"
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              lineHeight: 1.4,
-              color: 'var(--color-text-primary)',
-              flex: 1,
-              margin: 0,
-            }}
-          >
-            {card.title}
-          </h2>
+          <div style={{ flex: 1 }}>
+            {/* 컬럼 breadcrumb */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>📋</span>
+              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>{columnName}</span>
+            </div>
+            <h2
+              id="detail-modal-title"
+              style={{
+                fontSize: 17,
+                fontWeight: 600,
+                lineHeight: 1.4,
+                color: 'var(--color-text-primary)',
+                margin: 0,
+                letterSpacing: '-0.01em',
+              }}
+            >
+              {card.title}
+            </h2>
+          </div>
           <button
             ref={closeBtnRef}
             onClick={onClose}
@@ -286,63 +262,67 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
             gap: 20,
           }}
         >
-          {/* 담당자 + 날짜 메타 행 */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          {/* 메타 정보 행 */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
             {/* 담당자 */}
-            {card.assignee ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <AgentAvatar name={card.assignee} size={36} />
-                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                  {card.assignee}
-                </span>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: 'var(--color-border-strong)',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 16,
-                    flexShrink: 0,
-                  }}
-                >
-                  👤
-                </span>
-                <span style={{ fontSize: 14, color: 'var(--color-text-muted)' }}>미배정</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {card.assignee ? (
+                <>
+                  <AgentAvatar name={card.assignee} size={36} />
+                  <div>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>담당자</p>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{card.assignee}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>👤</span>
+                  <div>
+                    <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 2px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>담당자</p>
+                    <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0, fontStyle: 'italic' }}>미배정</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 우선순위 */}
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>우선순위</p>
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 10px',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: 600,
+                background: priorityCfg.bg,
+                color: priorityCfg.color,
+                border: `1px solid ${priorityCfg.border}`,
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: priorityCfg.color, display: 'inline-block' }} />
+                {priorityCfg.label}
+              </span>
+            </div>
 
             {/* 날짜 */}
-            <div style={{ display: 'flex', gap: 16 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)' }}>
-                  생성일
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-                  {formatDate(card.created_at)}
-                </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 20 }}>
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>생성일</p>
+                <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0, fontWeight: 500 }}>{formatDate(card.created_at)}</p>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <span style={{ fontSize: 11, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-muted)' }}>
-                  수정일
-                </span>
-                <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-                  {formatDate(card.updated_at)}
-                </span>
+              <div>
+                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>수정일</p>
+                <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0, fontWeight: 500 }}>{formatDate(card.updated_at)}</p>
               </div>
             </div>
           </div>
 
           {/* 진행률 */}
           <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>진행률</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: progressColor }}>{progress}%</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>진행률</p>
+              <span style={{ fontSize: 15, fontWeight: 700, color: progressColor }}>{progress}%</span>
             </div>
             <div
               role="progressbar"
@@ -361,63 +341,37 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
                 style={{
                   height: '100%',
                   borderRadius: 4,
-                  background: progressColor,
+                  background: `linear-gradient(90deg, ${progressColor}80 0%, ${progressColor} 100%)`,
                   width: `${progress}%`,
-                  transition: 'width 400ms ease-out',
+                  transition: 'width 500ms cubic-bezier(0.34,1.56,0.64,1)',
+                  boxShadow: `0 0 8px ${progressColor}60`,
                 }}
               />
             </div>
           </div>
 
-          {/* 태그 (우선순위) */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            <PriorityBadge priority={card.priority} />
-          </div>
-
           {/* 설명 */}
           <div>
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--color-text-muted)',
-                marginBottom: 8,
-                margin: '0 0 8px 0',
-              }}
-            >
-              설명
-            </p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>설명</p>
             <div
               style={{
                 fontSize: 14,
-                lineHeight: 1.6,
+                lineHeight: 1.65,
                 color: card.description ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
                 fontStyle: card.description ? 'normal' : 'italic',
                 background: 'var(--color-bg-elevated)',
-                borderRadius: 8,
-                padding: 12,
+                border: '1px solid var(--color-border)',
+                borderRadius: 10,
+                padding: '12px 14px',
               }}
             >
               {card.description ?? '설명이 없습니다.'}
             </div>
           </div>
 
-          {/* 활동 */}
+          {/* 활동 로그 */}
           <div>
-            <p
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--color-text-muted)',
-                margin: '0 0 12px 0',
-              }}
-            >
-              활동
-            </p>
+            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>활동</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 200, overflowY: 'auto' }}>
               {activities.length === 0 ? (
                 <p style={{ fontSize: 13, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '12px 0', margin: 0 }}>
@@ -425,14 +379,25 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
                 </p>
               ) : (
                 activities.map((act) => (
-                  <div key={act.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                  <div
+                    key={act.id}
+                    style={{
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'flex-start',
+                      background: 'var(--color-bg-elevated)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 8,
+                      padding: '10px 12px',
+                    }}
+                  >
                     <AgentAvatar name={act.agent} size={28} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap' }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 3 }}>
                         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{act.agent}</span>
                         <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{formatDate(act.created_at)}</span>
                       </div>
-                      <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-secondary)', margin: '2px 0 0 0' }}>
+                      <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-secondary)', margin: 0 }}>
                         {getActivityIcon(act.action)} {act.detail}
                       </p>
                     </div>
@@ -446,68 +411,66 @@ export default function CardDetailModal({ card, columnName, onClose }: Props) {
         {/* ── 푸터 ── */}
         <div
           style={{
-            padding: '16px 24px',
+            padding: '14px 24px',
             borderTop: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
+            background: 'var(--color-bg-elevated)',
           }}
         >
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>📋 {columnName}</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 8,
-                background: 'var(--color-action-secondary)',
-                color: 'var(--color-text-primary)',
-                fontSize: 14,
-                fontWeight: 500,
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background 150ms',
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary-hover)';
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary)';
-              }}
-            >
-              닫기
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '8px 20px',
+              borderRadius: 8,
+              background: 'var(--color-action-secondary)',
+              color: 'var(--color-text-primary)',
+              fontSize: 14,
+              fontWeight: 500,
+              border: '1px solid var(--color-border-strong)',
+              cursor: 'pointer',
+              transition: 'background 150ms',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary-hover)';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary)';
+            }}
+          >
+            닫기
+          </button>
         </div>
       </div>
 
-      {/* 애니메이션 + 반응형 CSS */}
+      {/* 애니메이션 + 반응형 */}
       <style>{`
-        @keyframes modalFadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to   { opacity: 1; transform: scale(1); }
-        }
-        @keyframes modalSlideUp {
-          from { opacity: 0; transform: translateY(100%); }
-          to   { opacity: 1; transform: translateY(0); }
+        @keyframes detailFadeIn {
+          from { opacity: 0; transform: scale(0.96) translateY(12px); }
+          to   { opacity: 1; transform: scale(1) translateY(0); }
         }
         @media (max-width: 479px) {
-          .modal-overlay {
+          .detail-modal-overlay {
             align-items: flex-end !important;
             padding: 0 !important;
           }
-          .card-detail-modal {
+          .detail-modal-container {
             max-width: 100vw !important;
             width: 100vw !important;
-            max-height: 100dvh !important;
-            border-radius: 16px 16px 0 0 !important;
-            animation: modalSlideUp 250ms ease-out !important;
+            max-height: 95dvh !important;
+            border-radius: 18px 18px 0 0 !important;
+            animation: slideUp 280ms cubic-bezier(0.16,1,0.3,1) !important;
           }
         }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(100%); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
         @media (min-width: 480px) and (max-width: 767px) {
-          .card-detail-modal {
-            width: calc(100vw - 48px) !important;
-            max-height: 90vh !important;
+          .detail-modal-container {
+            width: calc(100vw - 40px) !important;
+            max-height: 92vh !important;
           }
         }
       `}</style>

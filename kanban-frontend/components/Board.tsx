@@ -68,7 +68,6 @@ export default function Board() {
 
     if (targetColumnId === null) return;
 
-    // Find source column and moving card
     let sourceColumnId: number | null = null;
     let movingCard: CardType | null = null;
     for (const col of board.columns) {
@@ -82,7 +81,6 @@ export default function Board() {
 
     if (sourceColumnId === targetColumnId || !movingCard) return;
 
-    // WIP limit 체크
     const targetCol = board.columns.find(col => col.id === targetColumnId);
     if (targetCol?.wip_limit && targetCol.cards.length >= targetCol.wip_limit) {
       setDragError(`"${targetCol.name}" 컬럼이 WIP 한도(${targetCol.wip_limit})에 도달했습니다.`);
@@ -90,7 +88,6 @@ export default function Board() {
       return;
     }
 
-    // 낙관적 UI 업데이트: API 응답 전 즉시 상태 반영
     const optimisticBoard = {
       ...board,
       columns: board.columns.map(col => {
@@ -107,24 +104,72 @@ export default function Board() {
 
     try {
       await api.moveCard(cardId, targetColumnId);
-      await load(); // 서버 상태와 최종 동기화
+      await load();
     } catch (e) {
       console.error('Failed to move card', e);
       setDragError('카드 이동에 실패했습니다. 잠시 후 다시 시도해주세요.');
       setTimeout(() => setDragError(null), 3000);
-      await load(); // 실패 시 서버 상태로 롤백
+      await load();
     }
   }, [board, load]);
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="text-[var(--color-text-secondary)] text-sm animate-pulse">보드 로딩 중...</div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 320,
+        gap: 16,
+      }}
+    >
+      <div
+        style={{
+          width: 40,
+          height: 40,
+          border: '3px solid var(--color-border-strong)',
+          borderTopColor: 'var(--color-action-primary)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }}
+      />
+      <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: 0 }}>보드 로딩 중...</p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 
   if (error) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="text-red-400 text-sm text-center">{error}</div>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 320,
+        gap: 12,
+      }}
+    >
+      <div style={{ fontSize: 32 }}>⚠️</div>
+      <p style={{ color: '#f87171', fontSize: 14, textAlign: 'center', margin: 0, maxWidth: 360 }}>
+        {error}
+      </p>
+      <button
+        onClick={() => void load()}
+        style={{
+          marginTop: 8,
+          padding: '8px 20px',
+          background: 'var(--color-action-primary)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: 'pointer',
+        }}
+      >
+        다시 시도
+      </button>
     </div>
   );
 
@@ -132,15 +177,51 @@ export default function Board() {
 
   return (
     <>
+      {/* 드래그 에러 토스트 */}
       {dragError && (
-        <div className="fixed top-4 right-4 z-50 bg-red-500 text-white text-sm px-4 py-2 rounded-lg shadow-lg">
+        <div
+          style={{
+            position: 'fixed',
+            top: 72,
+            right: 24,
+            zIndex: 100,
+            background: 'rgba(248,113,113,0.12)',
+            border: '1px solid rgba(248,113,113,0.3)',
+            color: '#f87171',
+            fontSize: 13,
+            fontWeight: 500,
+            padding: '10px 16px',
+            borderRadius: 10,
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            animation: 'toastIn 200ms ease-out',
+          }}
+        >
+          <span>⚠️</span>
           {dragError}
         </div>
       )}
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateY(-8px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-          {board.columns.map((col) => (
-            <Column key={col.id} column={col} onRefresh={load} />
+        <div
+          style={{
+            display: 'flex',
+            gap: 16,
+            overflowX: 'auto',
+            paddingBottom: 16,
+            alignItems: 'flex-start',
+          }}
+        >
+          {board.columns.map((col, idx) => (
+            <Column key={col.id} column={col} onRefresh={load} columnIndex={idx} />
           ))}
         </div>
       </DndContext>

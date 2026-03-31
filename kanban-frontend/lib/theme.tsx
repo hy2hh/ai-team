@@ -1,39 +1,21 @@
 'use client';
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect } from 'react';
 
-type Theme = 'light' | 'dark';
-
+// 다크 모드 전용 — 라이트 모드 미지원
 interface ThemeContextValue {
-  theme: Theme;
-  toggle: () => void;
+  theme: 'dark';
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'dark',
-  toggle: () => {},
-});
-
-function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'dark';
-  return (localStorage.getItem('kanban-theme') as Theme) ?? 'dark';
-}
+const ThemeContext = createContext<ThemeContextValue>({ theme: 'dark' });
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme);
-
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
-  const toggle = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    localStorage.setItem('kanban-theme', next);
-    document.documentElement.setAttribute('data-theme', next);
-  };
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('kanban-theme', 'dark');
+  }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, toggle }}>
+    <ThemeContext.Provider value={{ theme: 'dark' }}>
       {children}
     </ThemeContext.Provider>
   );

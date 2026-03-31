@@ -1,106 +1,62 @@
 @import "tailwindcss";
 
 /* =============================================
-   라이트 모드 (기본값)
+   다크 모드 전용 (라이트 모드 미지원)
    ============================================= */
 :root,
-[data-theme="light"] {
-  /* 배경 레이어 */
-  --color-bg-base:        #f8fafc;
-  --color-bg-surface:     #ffffff;
-  --color-bg-elevated:    #f1f5f9;
-  --color-bg-card:        #ffffff;
-  --color-bg-input:       #f8fafc;
-  --color-bg-overlay:     rgba(0, 0, 0, 0.4);
+[data-theme="dark"] {
+  /* 배경 레이어 — 깊은 네이비 다크 팔레트 */
+  --color-bg-base:        #080d17;
+  --color-bg-surface:     #0d1526;
+  --color-bg-elevated:    #111d33;
+  --color-bg-card:        #172039;
+  --color-bg-input:       #111d33;
+  --color-bg-overlay:     rgba(0, 0, 0, 0.7);
 
   /* 테두리 */
-  --color-border:         #e2e8f0;
-  --color-border-strong:  #cbd5e1;
+  --color-border:         #1e2d47;
+  --color-border-strong:  #253550;
 
   /* 텍스트 */
-  --color-text-primary:   #0f172a;
-  --color-text-secondary: #475569;
-  --color-text-muted:     #94a3b8;
+  --color-text-primary:   #e2e8f5;
+  --color-text-secondary: #7a90b8;
+  --color-text-muted:     #3d506e;
   --color-text-inverse:   #ffffff;
 
-  /* 액션 */
-  --color-action-primary:         #2563eb;
-  --color-action-primary-hover:   #1d4ed8;
-  --color-action-secondary:       #e2e8f0;
-  --color-action-secondary-hover: #cbd5e1;
+  /* 액션 — 브라이트 인디고/블루 계열 */
+  --color-action-primary:         #4f7ef0;
+  --color-action-primary-hover:   #6b95f5;
+  --color-action-secondary:       #172039;
+  --color-action-secondary-hover: #1e2d47;
 
   /* 포커스 */
-  --color-focus-ring: #3b82f6;
+  --color-focus-ring: #4f7ef0;
 
   /* 드래그/드롭 */
-  --color-drag-over: #3b82f6;
+  --color-drag-over: #4f7ef0;
 
   /* 상태 색상 */
-  --color-priority-high:    #ef4444;
-  --color-priority-medium:  #eab308;
-  --color-priority-low:     #22c55e;
-  --color-progress-high:    #22c55e;
-  --color-progress-medium:  #eab308;
-  --color-progress-low:     #ef4444;
+  --color-priority-high:    #f87171;
+  --color-priority-medium:  #fbbf24;
+  --color-priority-low:     #4ade80;
+  --color-progress-high:    #4ade80;
+  --color-progress-medium:  #fbbf24;
+  --color-progress-low:     #f87171;
 
   /* 에이전트 아바타 */
-  --color-agent-homer:  #3b82f6;
-  --color-agent-bart:   #06b6d4;
-  --color-agent-marge:  #a855f7;
-  --color-agent-lisa:   #22c55e;
-  --color-agent-krusty: #f97316;
-  --color-agent-sid:    #ec4899;
-}
+  --color-agent-homer:  #4f7ef0;
+  --color-agent-bart:   #22d3ee;
+  --color-agent-marge:  #c084fc;
+  --color-agent-lisa:   #4ade80;
+  --color-agent-krusty: #fb923c;
+  --color-agent-sid:    #f472b6;
 
-/* =============================================
-   다크 모드
-   ============================================= */
-[data-theme="dark"] {
-  /* 배경 레이어 */
-  --color-bg-base:        #0f172a;
-  --color-bg-surface:     #1e293b;
-  --color-bg-elevated:    #1e293b;
-  --color-bg-card:        #334155;
-  --color-bg-input:       #334155;
-  --color-bg-overlay:     rgba(0, 0, 0, 0.6);
-
-  /* 테두리 */
-  --color-border:         #334155;
-  --color-border-strong:  #475569;
-
-  /* 텍스트 */
-  --color-text-primary:   #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-text-muted:     #64748b;
-  --color-text-inverse:   #ffffff;
-
-  /* 액션 */
-  --color-action-primary:         #2563eb;
-  --color-action-primary-hover:   #1d4ed8;
-  --color-action-secondary:       #334155;
-  --color-action-secondary-hover: #475569;
-
-  /* 포커스 */
-  --color-focus-ring: #60a5fa;
-
-  /* 드래그/드롭 */
-  --color-drag-over: #60a5fa;
-
-  /* 상태 색상 — 다크에서 동일 유지 */
-  --color-priority-high:    #ef4444;
-  --color-priority-medium:  #eab308;
-  --color-priority-low:     #22c55e;
-  --color-progress-high:    #22c55e;
-  --color-progress-medium:  #eab308;
-  --color-progress-low:     #ef4444;
-
-  /* 에이전트 아바타 — 다크에서 동일 유지 */
-  --color-agent-homer:  #3b82f6;
-  --color-agent-bart:   #06b6d4;
-  --color-agent-marge:  #a855f7;
-  --color-agent-lisa:   #22c55e;
-  --color-agent-krusty: #f97316;
-  --color-agent-sid:    #ec4899;
+  /* 컬럼 accent */
+  --color-col-todo:       #4f7ef0;
+  --color-col-inprogress: #fbbf24;
+  --color-col-review:     #c084fc;
+  --color-col-done:       #4ade80;
+  --color-col-default:    #7a90b8;
 }
 
 @theme inline {
@@ -124,8 +80,40 @@
   --font-mono: var(--font-geist-mono);
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+}
+
 body {
   background: var(--color-bg-base);
   color: var(--color-text-primary);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 커스텀 스크롤바 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* 셀렉트/옵션 다크 모드 강제 */
+select option {
+  background: var(--color-bg-surface);
+  color: var(--color-text-primary);
 }
