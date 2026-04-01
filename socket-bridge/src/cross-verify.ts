@@ -116,6 +116,10 @@ const VERIFY_MATRIX: Record<
       verifier: 'secops',
       checkItems: '보안 검토: 인증/인가, 입력 검증, SQL 인젝션 방지, 민감 데이터 노출 확인',
     },
+    {
+      verifier: 'qa',
+      checkItems: 'AC 검증: Happy Path + 에러 케이스 + 엣지 케이스 실제 동작, 명세 일치 여부',
+    },
   ],
   frontend: [
     {
@@ -126,11 +130,19 @@ const VERIFY_MATRIX: Record<
       verifier: 'backend',
       checkItems: 'API 통합: 프론트엔드가 호출하는 API 엔드포인트, 파라미터, 에러 처리가 백엔드 구현과 일치하는지 확인',
     },
+    {
+      verifier: 'qa',
+      checkItems: 'AC 검증: UI 상태(로딩/에러/빈), 접근성, 반응형, Happy Path + 에러 케이스',
+    },
   ],
   designer: [
     {
       verifier: 'frontend',
       checkItems: '구현 가능성: 디자인 스펙이 현재 기술 스택으로 구현 가능한지, 성능 이슈가 없는지 확인',
+    },
+    {
+      verifier: 'qa',
+      checkItems: '사용자 요구사항 + 접근성 기준 충족 여부',
     },
   ],
   pm: [
