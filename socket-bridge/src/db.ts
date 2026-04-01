@@ -165,6 +165,12 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ON task_queue(parent_queue_id);
     `,
   },
+  {
+    version: 4,
+    sql: `
+      ALTER TABLE task_queue ADD COLUMN kanban_card_id INTEGER;
+    `,
+  },
 ];
 
 /**

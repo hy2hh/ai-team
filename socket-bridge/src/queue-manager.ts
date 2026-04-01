@@ -4,6 +4,7 @@
  */
 import { randomUUID } from 'crypto';
 import { getDb } from './db.js';
+import { createCard, cleanSlackText } from './kanban-sync.js';
 
 // ─── 타입 정의 ────────────────────────────────────────
 
@@ -39,6 +40,7 @@ export interface TaskQueueRow {
   completed_at: number | null;
   retry_count: number;
   max_retries: number;
+  kanban_card_id: number | null;
 }
 
 export interface QueueStatusSummary {
@@ -235,6 +237,41 @@ export const markSkipped = (id: string, reason: string): void => {
     WHERE id = ?
   `).run(reason.slice(0, 500), Date.now(), id);
   console.log(`[queue] skipped: ${id}`);
+};
+
+// ─── 칸반 카드 ID 관리 ────────────────────────────────
+
+/**
+ * 태스크에 칸반 카드 ID 저장
+ */
+export const setKanbanCardId = (taskId: string, cardId: number): void => {
+  const db = getDb();
+  db.prepare('UPDATE task_queue SET kanban_card_id = ? WHERE id = ?').run(cardId, taskId);
+};
+
+/**
+ * 태스크의 칸반 카드 ID 조회
+ */
+export const getKanbanCardId = (taskId: string): number | null => {
+  const db = getDb();
+  const row = db
+    .prepare('SELECT kanban_card_id FROM task_queue WHERE id = ?')
+    .get(taskId) as { kanban_card_id: number | null } | undefined;
+  return row?.kanban_card_id ?? null;
+};
+
+/**
+ * enqueue 결과의 각 태스크를 칸반 Backlog에 카드로 생성
+ */
+export const syncEnqueuedTasksToKanban = async (result: EnqueueResult): Promise<void> => {
+  for (const task of result.tasks) {
+    const cleanTask = cleanSlackText(task.task);
+    const title = `[Q${task.sequence + 1}] ${cleanTask.slice(0, 400)}`;
+    const cardId = await createCard(title, task.agent, cleanTask);
+    if (cardId !== null) {
+      setKanbanCardId(task.id, cardId);
+    }
+  }
 };
 
 // ─── 의존 태스크 스킵 처리 ─────────────────────────────

@@ -13,9 +13,11 @@ import {
   getPreviousTaskResult,
   recoverOrphanTasks,
   requeueForRetry,
+  getKanbanCardId,
   type TaskQueueRow,
   type QueueStatusSummary,
 } from './queue-manager.js';
+import { moveToInProgress, moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
 
 // ─── 상수 ─────────────────────────────────────────────
@@ -131,6 +133,14 @@ const processNextTask = async (): Promise<void> => {
     markRunning(task.id);
     task.started_at = Date.now(); // in-memory 스냅샷 동기화 (duration 계산 오류 방지)
 
+    // 칸반 In Progress 이동 (fire-and-forget)
+    const kanbanCardId = getKanbanCardId(task.id);
+    if (kanbanCardId !== null) {
+      moveToInProgress(kanbanCardId).catch((err) =>
+        console.warn('[kanban-sync] moveToInProgress 실패:', err),
+      );
+    }
+
     // Slack 진행 알림
     await postTaskProgress(slackAppRef, task, 'running');
 
@@ -173,6 +183,14 @@ const processNextTask = async (): Promise<void> => {
 
     // 완료 처리
     markCompleted(task.id, result.text);
+
+    // 칸반 Done 이동 (fire-and-forget)
+    if (kanbanCardId !== null) {
+      moveToDone(kanbanCardId).catch((err) =>
+        console.warn('[kanban-sync] moveToDone 실패:', err),
+      );
+    }
+
     await postTaskProgress(slackAppRef, task, 'completed', result.text);
 
     // 에이전트 실제 응답을 스레드에 게시
@@ -211,6 +229,15 @@ const processNextTask = async (): Promise<void> => {
     } else {
       // 실패 처리
       markFailed(task.id, errorMsg);
+
+      // 칸반 Blocked 이동 (fire-and-forget)
+      const failedCardId = getKanbanCardId(task.id);
+      if (failedCardId !== null) {
+        moveToBlocked(failedCardId).catch((err) =>
+          console.warn('[kanban-sync] moveToBlocked 실패:', err),
+        );
+      }
+
       await postTaskProgress(slackAppRef, task, 'failed', undefined, errorMsg);
 
       // 의존하는 후속 태스크 스킵
@@ -302,6 +329,7 @@ export const agentDisplayName = (agent: string): string => {
     backend: 'Homer (Backend)',
     researcher: 'Lisa (Researcher)',
     secops: 'Wiggum (SecOps)',
+    qa: 'Chalmers (QA)',
   };
   return names[agent] ?? agent;
 };

@@ -29,6 +29,7 @@ import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
 import { enqueue, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
+import { createCard, moveToInProgress, updateCard } from './kanban-sync.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -514,15 +515,6 @@ const buildContextRulesPrefix = (): string => {
     '- 작업 완료 후 "다음 뭐하지?" 대기 금지. 반드시 다음 단계를 추천하세요.',
     '- 판단이 필요하면 스스로 판단하고 실행하세요. 확신이 없는 경우에만 에스컬레이션.',
     '',
-    '## Definition of Done (구현 작업 필수)',
-    '- 모든 async 함수에 에러 핸들링 (try-catch + 사용자 에러 메시지)',
-    '- 매직 넘버/문자열 → 상수 또는 환경변수 분리 (하드코딩 금지)',
-    '- 스펙의 AC 전부 통과 (Happy Path + 에러 케이스 + 엣지 케이스)',
-    '- 빌드 + 린트 통과 + 런타임 실행 확인',
-    '- Frontend: 접근성(aria-label), 로딩/에러/빈 상태 UI, 반응형',
-    '- Backend: 입력 검증, 일관된 에러 응답, N+1 쿼리 방지',
-    '- 완료 보고에 완료 조건 체크리스트 포함 필수 (shared/processes/definition-of-done.md 참조)',
-    '',
     '## 파일 수정 권한',
     '- Write/Edit 도구로 프로젝트 파일을 직접 수정할 수 있습니다.',
     '- `.claude/agents/shared/`, `.memory/`, 프로젝트 코드 파일 모두 수정 가능합니다.',
@@ -763,6 +755,7 @@ const BASH_LIMITED_TOOLS = [
 /** 모든 에이전트 공통 기반 도구 */
 const BASE_TOOLS = [
   'Read',
+  'Skill',
   ...SLACK_TOOLS,
   ...ATLASSIAN_READ_TOOLS,
   ...ATLASSIAN_COMMON_WRITE_TOOLS,
@@ -926,12 +919,23 @@ const loadPersona = (agentName: string): string => {
     console.log(
       `[memory] ${agentName}: shared=${sharedMemory.length}c agent=${agentMemory.length}c persona=${persona.length}c`,
     );
+    const kanbanInstruction = [
+      '',
+      '## 칸반 카드 관리 (필수 — 최우선)',
+      '**모든 작업에서 가장 먼저 `create_kanban_card`를 호출하세요.** 분석, 조사, 회의 소집, 코드 작성, 리뷰 등 어떤 작업이든 예외 없이 호출합니다.',
+      '- **title**: 수행할 작업의 핵심 요약 (사용자 원문 그대로 넣지 말 것. 예: "에이전트 컨텍스트 스킬화 전략 분석")',
+      '- **description**: 구체적 실행 내용이나 작업 범위',
+      '- **예외 없음**: "안녕"도, "1+1=?"도, 단답형 답변도 모두 카드를 먼저 생성합니다.',
+      '',
+    ].join('\n');
+
     return [
       buildContextRulesPrefix(),
       sharedMemory,
       agentMemory,
       persona,
       pmPlanningEnforcement,
+      kanbanInstruction,
     ].join('\n');
   } catch (err) {
     console.error(
@@ -1130,6 +1134,8 @@ export interface HandleMessageResult {
   delegationSteps?: DelegationStep[];
   /** 에이전트가 escalate_to_pm 도구를 호출한 경우 이유 (PM 재라우팅 트리거) */
   escalationReason?: string;
+  /** 에이전트가 create_kanban_card 도구로 생성한 칸반 카드 ID */
+  kanbanCardId?: number;
 }
 
 export const handleMessage = async (
@@ -1718,6 +1724,66 @@ export const handleMessage = async (
     baseMcpServers.permission = permissionServer;
     baseTools.push('mcp__permission__request_permission');
 
+    // 모든 에이전트: 칸반 카드 생성/업데이트 도구
+    let kanbanCardId: number | undefined;
+    const kanbanServer = createSdkMcpServer({
+      name: 'kanban',
+      tools: [
+        tool(
+          'create_kanban_card',
+          '현재 작업의 칸반 카드를 생성합니다. 작업을 이해한 후 호출하세요. title은 실제 수행할 작업의 요약(예: "Slack 라우팅 키워드 테이블 리팩토링"), description은 구체적 실행 내용을 적습니다. 사용자의 원문 메시지를 그대로 넣지 마세요.',
+          {
+            title: z.string().max(200).describe('작업 제목 — 에이전트가 수행할 작업의 핵심 요약'),
+            description: z.string().max(500).optional().describe('구체적 실행 내용 또는 작업 범위'),
+            priority: z.enum(['low', 'medium', 'high']).optional().describe('우선순위. 기본값: medium'),
+          },
+          async ({ title, description, priority }) => {
+            const cardId = await createCard(
+              title,
+              agentName,
+              description,
+            );
+            if (cardId === null) {
+              return { content: [{ type: 'text' as const, text: '칸반 카드 생성 실패 (백엔드 응답 없음). 작업은 계속 진행하세요.' }] };
+            }
+            kanbanCardId = cardId;
+            // 카드 생성 직후 In Progress 이동
+            await moveToInProgress(cardId).catch(() => {});
+            // priority 업데이트 (medium이 아닌 경우)
+            if (priority && priority !== 'medium') {
+              await updateCard(cardId, { priority }).catch(() => {});
+            }
+            return { content: [{ type: 'text' as const, text: `칸반 카드 #${cardId} 생성 완료 (In Progress). 작업을 진행하세요.` }] };
+          },
+        ),
+        tool(
+          'update_kanban_card',
+          '현재 작업의 칸반 카드를 업데이트합니다. 진행률 변경, 설명 보강 등에 사용합니다.',
+          {
+            progress: z.number().min(0).max(100).optional().describe('진행률 (0-100)'),
+            description: z.string().max(500).optional().describe('업데이트할 설명'),
+            title: z.string().max(200).optional().describe('업데이트할 제목'),
+          },
+          async ({ progress, description: desc, title }) => {
+            if (kanbanCardId === undefined) {
+              return { content: [{ type: 'text' as const, text: '칸반 카드가 아직 생성되지 않았습니다. 먼저 create_kanban_card를 호출하세요.' }] };
+            }
+            const fields: Record<string, unknown> = {};
+            if (progress !== undefined) { fields.progress = progress; }
+            if (desc !== undefined) { fields.description = desc; }
+            if (title !== undefined) { fields.title = title; }
+            if (Object.keys(fields).length === 0) {
+              return { content: [{ type: 'text' as const, text: '업데이트할 필드가 없습니다.' }] };
+            }
+            await updateCard(kanbanCardId, fields as { title?: string; description?: string; progress?: number });
+            return { content: [{ type: 'text' as const, text: `칸반 카드 #${kanbanCardId} 업데이트 완료.` }] };
+          },
+        ),
+      ],
+    });
+    baseMcpServers.kanban = kanbanServer;
+    baseTools.push('mcp__kanban__create_kanban_card', 'mcp__kanban__update_kanban_card');
+
     const selectedModel = modelTier === 'high'
       ? MODEL_HIGH
       : modelTier === 'fast'
@@ -1944,6 +2010,7 @@ export const handleMessage = async (
       delegationTargets: [...delegationQueue],
       delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,
       escalationReason,
+      kanbanCardId,
     };
   } catch (err) {
     // AbortError: 이모지로 의도적 중단

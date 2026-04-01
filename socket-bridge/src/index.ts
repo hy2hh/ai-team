@@ -66,6 +66,7 @@ import {
   agentDisplayName,
 } from './queue-processor.js';
 import { cancelQueueByThread } from './queue-manager.js';
+import { moveToDone } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
 import {
   initQaLoopTable,
@@ -635,6 +636,13 @@ const executeSingle = async (
     app,
   );
 
+  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
+  if (result.kanbanCardId) {
+    moveToDone(result.kanbanCardId).catch((err) =>
+      console.warn('[kanban-sync] executeSingle moveToDone 실패:', err),
+    );
+  }
+
   // 비PM 에이전트가 escalate_to_pm을 호출한 경우 → PM으로 재라우팅
   if (
     agentName !== 'pm' &&
@@ -745,6 +753,15 @@ const executeSingle = async (
             : `[실패: ${(r as PromiseRejectedResult).reason}]`,
           changedFiles: stepChangedFiles,
         });
+
+        // 에이전트가 create_kanban_card로 생성한 카드 → Done/Blocked 전환
+        if (r.status === 'fulfilled' && r.value.kanbanCardId) {
+          moveToDone(r.value.kanbanCardId).catch((err) =>
+            console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
+          );
+        } else if (r.status === 'rejected') {
+          // 실패 시에는 에이전트가 카드를 생성하지 못했을 수 있으므로 무시
+        }
       }
 
       // 중간 step 완료 Slack 알림
@@ -924,6 +941,13 @@ const executeSingle = async (
       const afterSingle = snapshotChangedFiles();
       const singleChangedFiles = diffSnapshots(beforeSingle, afterSingle);
 
+      // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
+      if (delegationResult.kanbanCardId) {
+        moveToDone(delegationResult.kanbanCardId).catch((err) =>
+          console.warn('[kanban-sync] 위임 moveToDone 실패:', err),
+        );
+      }
+
       // ✅ 완료 전환
       if (currentPmTs) {
         await safeSwapReaction(
@@ -1010,6 +1034,14 @@ const executeSingle = async (
               : `[실패: ${(r as PromiseRejectedResult).reason}]`,
           changedFiles: batchChangedFiles,
         });
+
+        // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
+        if (r.status === 'fulfilled' && r.value.kanbanCardId) {
+          moveToDone(r.value.kanbanCardId).catch((err) =>
+            console.warn('[kanban-sync] 병렬 위임 moveToDone 실패:', err),
+          );
+        }
+
         // ✅ 각 에이전트 완료 전환
         if (currentPmTs) {
           await safeSwapReaction(
