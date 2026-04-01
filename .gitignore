@@ -12,6 +12,10 @@ socket-bridge/node_modules/
 
 # Build output
 dist/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
 
 # Runtime state
 socket-bridge/bridge.log
