@@ -142,6 +142,57 @@ export const cleanupOrphanClaims = (): OrphanClaimInfo[] => {
   return orphans;
 };
 
+/** 재시작 복구 윈도우: 10분 이내 failed claim을 재처리 대상으로 간주 */
+const RESTART_RECOVERY_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * 브리지 재시작 복구용: 최근 RESTART_RECOVERY_WINDOW_MS 이내에 failed된 claim 복구
+ * 브리지 불안정 구간에서 재시도를 모두 소진한 항목을 재처리 대상에 포함시키기 위함
+ * version을 MAX_REQUEUE_ATTEMPTS - 1로 재설정하여 1회 재시도 허용
+ * @returns 발견된 claim 목록 (재라우팅용)
+ */
+export const recoverRecentFailedClaimsOnStartup = (): OrphanClaimInfo[] => {
+  const db = getDb();
+  const now = Date.now();
+  const cutoff = now - RESTART_RECOVERY_WINDOW_MS;
+
+  const rows = db.prepare(`
+    SELECT * FROM claims
+    WHERE status = 'failed'
+      AND updated_at > ?
+  `).all(cutoff) as ClaimRow[];
+
+  if (rows.length === 0) {
+    return [];
+  }
+
+  // version을 MAX_REQUEUE_ATTEMPTS - 1로 재설정 → 1회 재시도 허용
+  const resetVersion = Math.max(MAX_REQUEUE_ATTEMPTS - 1, 1);
+  db.prepare(`
+    UPDATE claims SET status = 'processing', version = ?, updated_at = ?
+    WHERE status = 'failed'
+      AND updated_at > ?
+  `).run(resetVersion, now, cutoff);
+
+  const recovered: OrphanClaimInfo[] = rows.map((row) => {
+    const ageMs = now - row.updated_at;
+    console.warn(
+      `[claim] 재시작 실패 복구 → processing: ${row.message_ts} (agent=${row.agent}, age=${Math.round(ageMs / 60000)}min)`,
+    );
+    return {
+      messageTs: row.message_ts,
+      agent: row.agent,
+      timestamp: new Date(row.created_at).toISOString(),
+      channel: row.channel ?? undefined,
+      ageMs,
+      version: resetVersion,
+    };
+  });
+
+  console.log(`[claim] 재시작 실패 복구: ${recovered.length}개 최근 failed claim 재처리 대상`);
+  return recovered;
+};
+
 /**
  * 브리지 재시작 복구용: 처리 중이던 모든 claim을 failed로 전환하고 반환
  * age 제한 없음 — 브리지 재시작 자체가 모든 processing claim 중단을 의미함

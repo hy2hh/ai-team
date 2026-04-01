@@ -30,6 +30,7 @@ import {
   cleanupExpiredClaims,
   cleanupOrphanClaims,
   recoverProcessingClaimsOnStartup,
+  recoverRecentFailedClaimsOnStartup,
   requeueClaim,
   MAX_REQUEUE_ATTEMPTS,
 } from './claim-db.js';
@@ -685,6 +686,73 @@ const executeSingle = async (
   let targets = result.delegationTargets.filter(
     (t) => t.agent !== 'pm' && isValidAgent(t.agent),
   );
+
+  // ─── UI/UX 체인 검증 (Designer → Frontend 순서 강제) ──────────────
+  // UI/UX 작업을 Designer 없이 Frontend에 직접 위임하면 경고 + 차단
+  const UI_UX_KEYWORDS = /UI|UX|화면|레이아웃|컴포넌트|디자인|CSS|스타일|칸반|보드|카드|배너|모달|폼|페이지/i;
+  const taskText = event.text ?? '';
+
+  const checkUiUxChain = (
+    targetAgents: string[],
+    designerIncluded: boolean,
+  ): boolean => {
+    const hasFrontend = targetAgents.includes('frontend');
+    const hasDesigner = designerIncluded || targetAgents.includes('designer');
+    return hasFrontend && !hasDesigner && UI_UX_KEYWORDS.test(taskText);
+  };
+
+  // 병렬 위임 체인 검증
+  const parallelViolation = checkUiUxChain(
+    targets.map((t) => t.agent),
+    false,
+  );
+
+  // 순차 위임 체인 검증: Designer가 선행 step에 없는데 Frontend가 등장하면 위반
+  let sequentialViolation = false;
+  if (result.delegationSteps && result.delegationSteps.length > 0 && UI_UX_KEYWORDS.test(taskText)) {
+    let designerSeenSoFar = false;
+    for (const step of result.delegationSteps) {
+      if (step.agents.includes('designer')) {
+        designerSeenSoFar = true;
+      }
+      if (step.agents.includes('frontend') && !designerSeenSoFar) {
+        sequentialViolation = true;
+        break;
+      }
+    }
+  }
+
+  if (parallelViolation || sequentialViolation) {
+    const pmApp = findAgentApp('pm', apps);
+    console.warn('[chain-guard] UI/UX 체인 위반 감지 — Designer 없이 Frontend 직접 위임 차단');
+    try {
+      await pmApp.client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: event.thread_ts ?? event.ts,
+        text: [
+          ':no_entry: *[체인 가드] UI/UX 위임 순서 위반 — 자동 차단*',
+          '',
+          '위임 규칙: *Designer → Frontend* 순서가 필수입니다.',
+          '현재 위임에 *Designer 없이 Frontend*가 포함되어 있고, UI/UX 관련 작업으로 감지되었습니다.',
+          '',
+          '*차단된 이유:*',
+          '• UI/UX 키워드 감지: `' + (taskText.match(UI_UX_KEYWORDS)?.[0] ?? '') + '`',
+          '• Designer 선행 없이 Frontend 직접 위임',
+          '',
+          '*올바른 순서:*',
+          '1. Designer에게 먼저 UX 스펙/디자인 위임',
+          '2. Designer 완료 후 Frontend에게 구현 위임',
+          '',
+          'Marge(PM): Designer를 먼저 위임하도록 수정 후 재시도하세요.',
+        ].join('\n'),
+      });
+    } catch (e) {
+      console.error('[chain-guard] 경고 메시지 전송 실패:', e);
+    }
+    // 위반 시 위임 차단 — 진행하지 않음
+    return;
+  }
+  // ─── UI/UX 체인 검증 끝 ───────────────────────────────────────────
 
   // 순차 위임 또는 병렬 위임이 없으면 종료
   const hasSequential = result.delegationSteps && result.delegationSteps.length > 0;
@@ -2423,6 +2491,15 @@ const main = async () => {
   cleanupOrphanCards().catch((err) =>
     console.warn('[startup-recovery] 칸반 고아 카드 정리 실패:', err),
   );
+
+  // 재시작 직전 10분 이내에 실패한 claim 복구 (브리지 불안정 구간에서 재시도 소진된 항목)
+  const recentFailed = recoverRecentFailedClaimsOnStartup();
+  if (recentFailed.length > 0) {
+    console.log(
+      `[startup-recovery] ${recentFailed.length}개 최근 failed claim 재처리 대상 — 재라우팅 시작`,
+    );
+    void processOrphanList(recentFailed, 'failed-recovery');
+  }
 
   // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행 (2시간 이상 고착 감지)
   const orphanCheckInterval = setInterval(async () => {

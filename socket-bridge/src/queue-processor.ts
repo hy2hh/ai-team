@@ -28,6 +28,9 @@ const POLL_INTERVAL_MS = 5000;
 /** 태스크 타임아웃 (ms) — 10분 */
 const TASK_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** 재시도 backoff 대기 시간 (ms) — 30초 후 재시도 (브리지 안정화 대기) */
+const RETRY_BACKOFF_MS = 30_000;
+
 // ─── 상태 ─────────────────────────────────────────────
 
 let pollingIntervalId: NodeJS.Timeout | null = null;
@@ -209,16 +212,32 @@ const processNextTask = async (): Promise<void> => {
     const errorMsg = err instanceof Error ? err.message : String(err);
     console.error(`[queue-processor] 태스크 실패: ${task.id}`, err);
 
-    // error_max_turns 감지 시 재시도 (max_retries 내)
-    const isMaxTurnsError = errorMsg.includes('error_max_turns') || errorMsg.includes('max_turns');
-    if (isMaxTurnsError && task.retry_count < task.max_retries) {
-      console.log(`[queue-processor] error_max_turns 재시도: ${task.id} (${task.retry_count + 1}/${task.max_retries})`);
-      requeueForRetry(task.id);
+    // 재시도 대상 에러: error_max_turns + 타임아웃 + 연결 오류 (브리지 불안정 포함)
+    const isRetryableError =
+      errorMsg.includes('error_max_turns') ||
+      errorMsg.includes('max_turns') ||
+      errorMsg.includes('타임아웃') ||
+      errorMsg.includes('ECONNRESET') ||
+      errorMsg.includes('ECONNREFUSED') ||
+      errorMsg.includes('ETIMEDOUT') ||
+      errorMsg.includes('socket hang up');
+
+    if (isRetryableError && task.retry_count < task.max_retries) {
+      console.log(
+        `[queue-processor] 재시도 예약: ${task.id} (${task.retry_count + 1}/${task.max_retries}, ${RETRY_BACKOFF_MS / 1000}초 후) — 원인: ${errorMsg.slice(0, 80)}`,
+      );
+      // backoff: 즉시 재시도하지 않고 대기 후 재큐잉 (브리지 안정화 구간 회피)
+      setTimeout(() => {
+        requeueForRetry(task.id);
+        console.log(`[queue-processor] backoff 완료, 재큐잉: ${task.id}`);
+      }, RETRY_BACKOFF_MS);
       try {
+        const isMaxTurns = errorMsg.includes('max_turns');
+        const reason = isMaxTurns ? '대화 한도 초과로 이어서 계속합니다' : '일시적 오류 — 잠시 후 재시도합니다';
         await slackAppRef.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
-          text: `🔄 *${agentDisplayName(task.agent)} 작업 재시도 중 [${task.retry_count + 1}/${task.max_retries}]* — 대화 한도 초과로 이어서 계속합니다`,
+          text: `🔄 *${agentDisplayName(task.agent)} 작업 재시도 대기 중 [${task.retry_count + 1}/${task.max_retries}]* — ${reason}`,
         });
       } catch {
         // 알림 실패 무시
