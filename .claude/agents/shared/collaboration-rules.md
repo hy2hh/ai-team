@@ -90,6 +90,11 @@
 - 리스크: LOW=자동 진행 / MEDIUM=알림+자동 / HIGH=sid 승인 필수
 - Ralph Loop: 검증 통과 후에만 커밋 + 추천. 3회 실패 → sid 에스컬레이션
 
+## 체인 위임 규칙 (PM 전용)
+- **A→B 순서가 있는 모든 작업은 `delegate_sequential`로만 등록** — 개별 `delegate` 후 수동 핸드오프 의존 금지
+- **UI/UX 체인 표준**: Designer(`delegate_sequential` step 1) → Frontend(`delegate_sequential` step 2)
+- 이유: PM 컨텍스트 단절 시 수동 핸드오프 체인이 영구 중단됨. bridge 자동 체인이 유일한 신뢰할 수 있는 보장 메커니즘
+
 ## Auto-Commit Rule (코드 수정 에이전트)
 - 코드/설정 수정 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)
 - "커밋할까요?" 질문 금지. 직접 실행
