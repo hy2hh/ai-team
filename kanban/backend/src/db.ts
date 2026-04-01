@@ -71,7 +71,7 @@ function seedData(): void {
   if (boardCount > 0) return;
 
   const insertBoard = database.prepare('INSERT INTO boards (name) VALUES (?)');
-  const board = insertBoard.run('AI Team Board');
+  const board = insertBoard.run('Team Board');
   const boardId = board.lastInsertRowid as number;
 
   const insertColumn = database.prepare('INSERT INTO columns (board_id, name, position, wip_limit) VALUES (?, ?, ?, ?)');

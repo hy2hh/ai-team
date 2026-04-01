@@ -26,7 +26,7 @@ router.get('/:id', (req: Request, res: Response) => {
     FROM columns col
     LEFT JOIN cards c ON c.column_id = col.id
     WHERE col.board_id = ?
-    ORDER BY col.position, c.position
+    ORDER BY col.position, c.position DESC
   `).all(req.params.id) as Array<Record<string, unknown>>;
 
   const colMap = new Map<number, Column & { cards: Card[] }>();

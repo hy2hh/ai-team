@@ -1,5 +1,6 @@
 'use client';
 import Board from '@/components/Board';
+import { useTheme } from '@/lib/theme';
 
 const AGENTS = [
   { name: 'Homer',    color: '#4f7ef0' },
@@ -13,6 +14,7 @@ const AGENTS = [
 ];
 
 export default function Home() {
+  const { theme, toggleTheme } = useTheme();
   const today = new Date().toLocaleDateString('ko-KR', {
     year: 'numeric',
     month: 'long',
@@ -67,7 +69,7 @@ export default function Home() {
                 letterSpacing: '-0.02em',
               }}
             >
-              AI Team Kanban
+              Team Kanban
             </h1>
             <p
               style={{
@@ -125,6 +127,30 @@ export default function Home() {
           >
             {AGENTS.length}명
           </span>
+
+          {/* 테마 토글 버튼 */}
+          <button
+            onClick={toggleTheme}
+            title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            style={{
+              marginLeft: 12,
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-bg-elevated)',
+              color: 'var(--color-text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              transition: 'background 150ms, border-color 150ms',
+              flexShrink: 0,
+            }}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
         </div>
       </header>
 

@@ -3,8 +3,8 @@ import './globals.css';
 import { ThemeProvider } from '@/lib/theme';
 
 export const metadata: Metadata = {
-  title: 'AI Team Kanban',
-  description: 'AI Team Kanban Board',
+  title: 'Team Kanban',
+  description: 'Team Kanban Board',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

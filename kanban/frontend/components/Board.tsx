@@ -104,8 +104,31 @@ export default function Board() {
 
   useEffect(() => {
     void load();
-    const interval = setInterval(() => void load(), 5000);
-    return () => clearInterval(interval);
+
+    // WebSocket 실시간 업데이트
+    const wsUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001').replace(/^http/, 'ws');
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = () => void load();
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+      }
+      if (ws) {
+        ws.onclose = null;
+        ws.close();
+      }
+    };
   }, [load]);
 
   const handleDragStart = useCallback((event: DragStartEvent) => {

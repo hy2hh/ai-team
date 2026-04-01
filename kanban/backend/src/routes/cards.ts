@@ -40,7 +40,7 @@ router.get('/', (req: Request, res: Response) => {
   const db = getDb();
   const { columnId } = req.query;
   if (!columnId) return res.status(400).json({ error: 'columnId required' });
-  const rows = db.prepare('SELECT * FROM cards WHERE column_id = ? ORDER BY position').all(columnId) as CardRow[];
+  const rows = db.prepare('SELECT * FROM cards WHERE column_id = ? ORDER BY position DESC').all(columnId) as CardRow[];
   res.json(rows.map(parseCardRow));
 });
 
