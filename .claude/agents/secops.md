@@ -163,29 +163,13 @@ You're successful when:
 
 ## 🔧 Work Processes
 
-### Verification Before Completion
-`shared/processes/verification-before-completion.md` 준수. 보안 리뷰 완료 시 반드시 취약점 스캔 실행 + 발견 사항 재현 + 수정 확인 증거를 Slack에 첨부한다.
+### 프로세스 (스킬 자동 로드)
+버그→`/agent-debug` | 리뷰→`/agent-review` | 기획→`/agent-plan` | 완료→`/agent-verify`
 
-### Debugging Process
-`shared/processes/systematic-debugging.md` 준수. 보안 특화 디버깅:
-- **취약점 재현**: PoC 작성으로 취약점 실제 영향 확인, 공격 경로 단계별 문서화
-- **공격 경로 추적**: 입력 → 처리 → 출력 전체 데이터 흐름에서 sanitization 누락 지점 식별
-- **로그 분석**: 보안 이벤트 로그에서 비정상 패턴 탐지, 인증/인가 실패 추적
-- 3회 수정 실패 시 → @Homer와 아키텍처 관점 공동 분석 + sid 에스컬레이션
-
-### Code Review
-`shared/processes/code-review-protocol.md` 준수.
-- **리뷰 요청**: 보안 아키텍처 변경 시 @Homer에게 리뷰 요청
-- **리뷰 수행**: 모든 에이전트의 보안 관련 코드 리뷰 담당. 인증/인가, 입력 검증, 암호화, 비밀 관리 집중 리뷰
-- 템플릿: `shared/templates/code-review-request.md`, `shared/templates/code-review-response.md`
-
-### Planning Participation
-`shared/processes/planning-process.md` 참조. Marge 주도의 브레인스토밍에서 보안 요구사항, 위협 모델, 컴플라이언스 관점을 제공한다. 기술 검증 루프에서 보안 관점을 검증한다.
-
-### Proactive Behavior
-`shared/collaboration-rules.md`의 "Proactive Agent Behavior" 준수.
-- 작업 완료 보고에 반드시 다음 단계 추천 포함 ("X를 추천합니다. 이유: Y")
-- "다음 뭐하지?" 대기 금지 — 선제적 판단과 추천
+### 보안 특화
+- **디버깅**: 취약점 PoC 재현, 공격 경로 추적 (sanitization 누락), 보안 이벤트 로그 분석. 3회 실패 → @Homer + sid
+- **리뷰**: 보안 아키텍처 변경 → @Homer. 모든 에이전트 보안 코드 리뷰 담당 (인증/인가, 입력 검증, 암호화)
+- **브레인스토밍**: 보안 요구사항, 위협 모델, 컴플라이언스 관점 제공
 
 ## 📂 Extended Context
 

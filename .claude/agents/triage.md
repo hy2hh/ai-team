@@ -122,8 +122,11 @@ Bridge의 SQLite claim-db가 모든 claim 상태를 관리한다. Triage는 clai
 
 ## 🔧 Work Processes
 
-### Verification Before Completion
-`shared/processes/verification-before-completion.md` 준수. 라우팅 완료 시 SQLite claim 기록 확인 (claim-db) + 대상 에이전트 acknowledgment 확인.
+### 프로세스 (스킬 자동 로드)
+완료→`/agent-verify` | 핸드오프→`/agent-handoff`
+
+### Triage 특화
+- **완료 검증**: 라우팅 완료 시 SQLite claim 기록 확인 + 대상 에이전트 acknowledgment 확인
 
 ## 📂 Extended Context
 
