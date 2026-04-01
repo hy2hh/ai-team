@@ -111,6 +111,10 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
     ? `마감일 ${card.due_date}${dueDateStatus === 'overdue' ? ' — 기한 초과' : dueDateStatus === 'soon' ? ' — 임박' : ''}`
     : '';
 
+  // CSS custom property 기반 hover (JS onMouseEnter/Leave 제거)
+  const cardAccentShadow = accentColor ? `${accentColor}40` : 'var(--color-border-strong)';
+  const cardAccentBorder = accentColor ? `${accentColor}50` : 'var(--color-border-strong)';
+
   return (
     <div
       ref={setNodeRef}
@@ -128,34 +132,23 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
     >
       <div
         onClick={() => onCardClick(card)}
-        className={`card-item${isFiltered ? ' card-base--filtered-out' : ''}`}
+        className={`card-item${isFiltered ? ' card-base--filtered-out' : ''}${isDragging ? ' card-item--dragging' : ''}`}
         style={{
           background: 'var(--color-bg-card)',
           border: '1px solid var(--color-border)',
           borderRadius: 10,
           padding: '10px 12px',
           cursor: isDragging ? 'grabbing' : 'grab',
-          opacity: isDragging ? 0.4 : 1,
+          opacity: isDragging ? 0.6 : 1,
           position: 'relative',
           overflow: 'hidden',
-          transition: 'transform 150ms, box-shadow 150ms, border-color 150ms',
           boxShadow: isDragging
             ? '0 8px 32px rgba(0,0,0,0.4)'
             : '0 1px 4px rgba(0,0,0,0.2)',
-        }}
-        onMouseEnter={(e) => {
-          if (isFiltered) return;
-          const el = e.currentTarget as HTMLDivElement;
-          el.style.transform = 'translateY(-1px)';
-          el.style.boxShadow = `0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px ${accentColor ?? 'var(--color-border-strong)'}40`;
-          el.style.borderColor = accentColor ? `${accentColor}50` : 'var(--color-border-strong)';
-        }}
-        onMouseLeave={(e) => {
-          const el = e.currentTarget as HTMLDivElement;
-          el.style.transform = '';
-          el.style.boxShadow = '0 1px 4px rgba(0,0,0,0.2)';
-          el.style.borderColor = 'var(--color-border)';
-        }}
+          // CSS custom properties for hover effects (globals.css에서 사용)
+          '--card-accent-shadow': cardAccentShadow,
+          '--card-accent-border': cardAccentBorder,
+        } as React.CSSProperties}
       >
         {/* 우선순위 왼쪽 바 */}
         <div
@@ -203,16 +196,8 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
               justifyContent: 'center',
               fontSize: 12,
               opacity: 0,
-              transition: 'opacity 150ms, color 150ms, background 150ms',
+              transition: 'opacity var(--duration-fast), color var(--duration-fast), background var(--duration-fast)',
               flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = '#f87171';
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(248,113,113,0.1)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
             }}
           >
             ✕
@@ -237,37 +222,47 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
           </p>
         )}
 
-        {/* 진행률 바 */}
-        {progress > 0 && (
-          <div style={{ marginTop: 8, paddingLeft: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>진행률</span>
-              <span style={{ fontSize: 11, fontWeight: 600, color: progressColor }}>{progress}%</span>
-            </div>
-            <div className="progress-bar-track">
+        {/* 진행률 바 — 0%도 트랙 표시 */}
+        <div style={{ marginTop: 8, paddingLeft: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>진행률</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: progress === 0 ? 'var(--color-text-muted)' : progressColor }}>
+              {progress === 0 ? '시작 전' : `${progress}%`}
+            </span>
+          </div>
+          <div className="progress-bar-track">
+            {progress > 0 && (
               <div
                 style={{
                   height: '100%',
                   width: `${progress}%`,
                   background: `linear-gradient(90deg, ${progressColor}90 0%, ${progressColor} 100%)`,
                   borderRadius: 2,
-                  transition: 'width 300ms ease-out',
+                  transition: `width var(--duration-slow) ease-out`,
                 }}
               />
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* 태그 pills */}
+        {/* 태그 pills — tooltip으로 전체 내용 확인 가능 */}
         {tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, paddingLeft: 8 }}>
             {tags.slice(0, 3).map((tag) => (
-              <span key={tag} className="tag-pill" style={{ fontSize: 10, padding: '1px 6px', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <span
+                key={tag}
+                className="tag-pill"
+                title={tag}
+                style={{ fontSize: 10, padding: '1px 6px', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
                 {tag}
               </span>
             ))}
             {tags.length > 3 && (
-              <span style={{ fontSize: 10, color: 'var(--color-text-muted)', padding: '1px 4px' }}>
+              <span
+                title={tags.slice(3).join(', ')}
+                style={{ fontSize: 10, color: 'var(--color-text-muted)', padding: '1px 4px', cursor: 'default' }}
+              >
                 +{tags.length - 3}
               </span>
             )}
@@ -349,12 +344,6 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
         </div>
       </div>
 
-      {/* hover 시 삭제 버튼 표시 */}
-      <style>{`
-        .card-item:hover .delete-btn {
-          opacity: 1 !important;
-        }
-      `}</style>
     </div>
   );
 }

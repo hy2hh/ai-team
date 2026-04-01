@@ -96,7 +96,7 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
   return (
     <>
       <div
-        className="column-container"
+        className={`column-container${isWipExceeded ? ' column-wip-exceeded' : ''}`}
         role="region"
         aria-label={`${column.name} 컬럼, 카드 ${column.cards.length}개${column.wip_limit ? `, WIP 한도 ${column.wip_limit}` : ''}`}
         style={{
@@ -104,11 +104,13 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
           flexDirection: 'column',
           borderRadius: 14,
           background: isOver ? `${accentBg}` : 'var(--color-bg-elevated)',
-          border: `1px solid ${isOver ? accentColor : 'var(--color-border)'}`,
+          border: `1px solid ${isOver ? accentColor : isWipExceeded ? 'rgba(248,113,113,0.45)' : 'var(--color-border)'}`,
           boxShadow: isOver
             ? `0 0 0 1px ${accentColor}40, 0 4px 24px rgba(0,0,0,0.2)`
-            : '0 2px 12px rgba(0,0,0,0.15)',
-          transition: 'border-color 150ms, box-shadow 150ms, background 150ms',
+            : isWipExceeded
+              ? '0 0 0 1px rgba(248,113,113,0.25), 0 2px 12px rgba(0,0,0,0.15)'
+              : '0 2px 12px rgba(0,0,0,0.15)',
+          transition: 'border-color var(--duration-fast), box-shadow var(--duration-fast), background var(--duration-fast)',
           overflow: 'hidden',
         }}
       >
@@ -267,12 +269,13 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
           )}
         </div>
 
-        {/* 카드 추가 버튼 */}
+        {/* 카드 추가 버튼 — CSS custom property 기반 hover */}
         <div style={{ padding: '0 12px 12px' }}>
           <button
             onClick={() => setShowAddModal(true)}
             disabled={isWipExceeded}
             aria-label={`${column.name} 컬럼에 카드 추가${isWipExceeded ? ' (WIP 한도 도달)' : ''}`}
+            className="add-card-btn"
             style={{
               width: '100%',
               color: isWipExceeded ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
@@ -284,22 +287,13 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
               fontWeight: 500,
               cursor: isWipExceeded ? 'not-allowed' : 'pointer',
               textAlign: 'left',
-              transition: 'all 150ms',
+              transition: 'all var(--duration-fast)',
               opacity: isWipExceeded ? 0.4 : 1,
               minHeight: 44,
-            }}
-            onMouseEnter={(e) => {
-              if (!isWipExceeded) {
-                (e.currentTarget as HTMLButtonElement).style.color = accentColor;
-                (e.currentTarget as HTMLButtonElement).style.borderColor = accentColor;
-                (e.currentTarget as HTMLButtonElement).style.background = accentBg;
-              }
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-secondary)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--color-border-strong)';
-              (e.currentTarget as HTMLButtonElement).style.background = 'transparent';
-            }}
+              // CSS custom properties for hover (globals.css .add-card-btn:not(:disabled):hover)
+              '--col-accent': accentColor,
+              '--col-accent-bg': accentBg,
+            } as React.CSSProperties}
           >
             + 카드 추가
           </button>

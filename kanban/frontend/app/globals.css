@@ -72,6 +72,14 @@
   --color-tag-bg:     rgba(79, 126, 240, 0.15);
   --color-tag-border: rgba(79, 126, 240, 0.3);
   --color-tag-text:   #6b95f5;
+
+  /* accent alias — CardDetailModal 등에서 사용 */
+  --color-accent: var(--color-action-primary);
+
+  /* 애니메이션 duration 통일 */
+  --duration-fast:   150ms;
+  --duration-normal: 200ms;
+  --duration-slow:   300ms;
 }
 
 /* =============================================
@@ -375,6 +383,70 @@ select option {
   background: var(--color-tag-bg);
   color: var(--color-tag-text);
   border: 1px solid var(--color-tag-border);
+}
+
+/* =============================================
+   카드 hover — CSS custom property 기반
+   --card-accent-shadow, --card-accent-border 는 Card.tsx에서 인라인 주입
+   ============================================= */
+.card-item {
+  transition:
+    transform var(--duration-fast),
+    box-shadow var(--duration-fast),
+    border-color var(--duration-fast);
+}
+.card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--card-accent-shadow, var(--color-border-strong));
+  border-color: var(--card-accent-border, var(--color-border-strong)) !important;
+}
+/* 카드 삭제 버튼 — hover 시 표시 */
+.card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover .delete-btn {
+  opacity: 1 !important;
+}
+.delete-btn:hover {
+  color: #f87171 !important;
+  background: rgba(248,113,113,0.1) !important;
+}
+
+/* =============================================
+   카드 추가 버튼 hover — CSS custom property 기반
+   --col-accent, --col-accent-bg 는 Column.tsx에서 인라인 주입
+   ============================================= */
+.add-card-btn:not(:disabled):hover {
+  color: var(--col-accent, var(--color-text-secondary)) !important;
+  border-color: var(--col-accent, var(--color-border-strong)) !important;
+  background: var(--col-accent-bg, transparent) !important;
+}
+
+/* =============================================
+   WIP 초과 컬럼 강조
+   ============================================= */
+.column-wip-exceeded {
+  border-color: rgba(248,113,113,0.45) !important;
+  box-shadow: 0 0 0 1px rgba(248,113,113,0.25), 0 2px 12px rgba(0,0,0,0.15) !important;
+}
+
+/* =============================================
+   필터 바 — 모바일 가로 스크롤
+   ============================================= */
+.filter-bar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 14px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.filter-bar-scroll::-webkit-scrollbar {
+  display: none;
+}
+/* 데스크탑에서는 flex-wrap */
+@media (min-width: 768px) {
+  .filter-bar-scroll {
+    flex-wrap: wrap;
+  }
 }
 
 /* =============================================

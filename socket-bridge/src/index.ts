@@ -2084,6 +2084,16 @@ const main = async () => {
       const threadTs =
         (msg.thread_ts as string) ?? null;
 
+      // 허용 사용자 필터: ALLOWED_USER_IDS에 없는 사용자 메시지 무시
+      const allowedUserIds = (process.env.ALLOWED_USER_IDS ?? 'U0AJ3T423RU')
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (user && !allowedUserIds.includes(user)) {
+        console.log(`[filter] 비허용 사용자 메시지 무시: user=${user} ts=${ts}`);
+        return;
+      }
+
       // 1차 필터: 인메모리 중복 방지 (빠른 체크)
       if (processingMessages.has(ts)) {
         console.log(`[filter] 중복 메시지 무시: ${ts}`);

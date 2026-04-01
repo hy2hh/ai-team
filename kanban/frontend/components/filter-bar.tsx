@@ -48,13 +48,7 @@ export default function FilterBar({
     <div
       role="group"
       aria-label="카드 필터"
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: 8,
-        padding: '10px 0 14px',
-        alignItems: 'center',
-      }}
+      className="filter-bar-scroll"
     >
       {/* 담당자 필터 */}
       <span
@@ -181,29 +175,30 @@ export default function FilterBar({
         );
       })}
 
-      {/* 필터 초기화 */}
-      {isFiltering && (
-        <button
-          type="button"
-          onClick={onReset}
-          aria-label="필터 초기화"
-          style={{
-            marginLeft: 4,
-            padding: '5px 12px',
-            borderRadius: 20,
-            fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
-            background: 'rgba(248,113,113,0.1)',
-            color: '#f87171',
-            border: '1px solid rgba(248,113,113,0.25)',
-            transition: 'all 150ms',
-            minHeight: 32,
-          }}
-        >
-          ✕ 초기화
-        </button>
-      )}
+      {/* 필터 초기화 — 항상 표시, 필터 없을 때 비활성화 */}
+      <button
+        type="button"
+        onClick={isFiltering ? onReset : undefined}
+        disabled={!isFiltering}
+        aria-label={isFiltering ? '필터 초기화' : '적용된 필터 없음'}
+        style={{
+          marginLeft: 4,
+          padding: '5px 12px',
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 500,
+          cursor: isFiltering ? 'pointer' : 'default',
+          background: isFiltering ? 'rgba(248,113,113,0.1)' : 'transparent',
+          color: isFiltering ? '#f87171' : 'var(--color-text-muted)',
+          border: `1px solid ${isFiltering ? 'rgba(248,113,113,0.25)' : 'var(--color-border)'}`,
+          transition: 'all var(--duration-fast)',
+          minHeight: 32,
+          opacity: isFiltering ? 1 : 0.5,
+          flexShrink: 0,
+        }}
+      >
+        ✕ 초기화
+      </button>
 
       {/* 필터 상태 알림 (스크린리더 + 시각적 표시) */}
       <div

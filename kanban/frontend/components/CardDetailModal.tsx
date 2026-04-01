@@ -232,23 +232,40 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                 aria-label="카드 제목 편집"
                 style={{
                   fontSize: 17, fontWeight: 600, lineHeight: 1.4, color: 'var(--color-text-primary)',
-                  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)',
+                  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-action-primary)',
                   borderRadius: 6, padding: '4px 8px', width: '100%', outline: 'none',
+                  boxShadow: '0 0 0 3px rgba(79,126,240,0.15)',
                 }}
               />
             ) : (
-              <h2
-                id="detail-modal-title"
-                onClick={() => onUpdate && setEditTitle(true)}
-                title={onUpdate ? '클릭하여 편집' : undefined}
-                style={{
-                  fontSize: 17, fontWeight: 600, lineHeight: 1.4,
-                  color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.01em',
-                  cursor: onUpdate ? 'text' : 'default',
-                }}
-              >
-                {titleVal}
-              </h2>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: onUpdate ? 'text' : 'default' }}>
+                <h2
+                  id="detail-modal-title"
+                  onClick={() => onUpdate && setEditTitle(true)}
+                  style={{
+                    fontSize: 17, fontWeight: 600, lineHeight: 1.4,
+                    color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.01em',
+                    flex: 1,
+                  }}
+                >
+                  {titleVal}
+                </h2>
+                {onUpdate && (
+                  <span
+                    aria-hidden="true"
+                    onClick={() => setEditTitle(true)}
+                    title="클릭하여 제목 편집"
+                    style={{
+                      fontSize: 12, color: 'var(--color-text-muted)', cursor: 'text',
+                      padding: '3px 5px', borderRadius: 4, flexShrink: 0, marginTop: 2,
+                      background: 'var(--color-bg-card)', border: '1px solid var(--color-border)',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✎
+                  </span>
+                )}
+              </div>
             )}
           </div>
           <button
@@ -477,7 +494,23 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
 
           {/* 설명 */}
           <div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>설명</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>설명</p>
+              {onUpdate && !editDesc && (
+                <button
+                  onClick={() => setEditDesc(true)}
+                  aria-label="설명 편집"
+                  style={{
+                    fontSize: 11, color: 'var(--color-text-muted)', cursor: 'pointer',
+                    padding: '2px 7px', borderRadius: 4, background: 'var(--color-bg-card)',
+                    border: '1px solid var(--color-border)', fontWeight: 500,
+                    transition: 'color var(--duration-fast), border-color var(--duration-fast)',
+                  }}
+                >
+                  ✎ 편집
+                </button>
+              )}
+            </div>
             {editDesc ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <textarea
@@ -488,7 +521,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                   aria-label="카드 설명 편집"
                   style={{
                     fontSize: 14, lineHeight: 1.65, color: 'var(--color-text-secondary)',
-                    background: 'var(--color-bg-elevated)', border: '1px solid var(--color-accent)',
+                    background: 'var(--color-bg-elevated)', border: '1px solid var(--color-action-primary)',
                     borderRadius: 10, padding: '12px 14px', resize: 'vertical', outline: 'none',
                   }}
                 />
@@ -509,15 +542,13 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
               </div>
             ) : (
               <div
-                onClick={() => onUpdate && setEditDesc(true)}
-                title={onUpdate ? '클릭하여 편집' : undefined}
                 style={{
                   fontSize: 14, lineHeight: 1.65,
                   color: descVal ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
                   fontStyle: descVal ? 'normal' : 'italic',
                   background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
                   borderRadius: 10, padding: '12px 14px',
-                  cursor: onUpdate ? 'text' : 'default',
+                  cursor: 'default',
                 }}
               >
                 {descVal || '설명이 없습니다.'}

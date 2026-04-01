@@ -16,6 +16,7 @@ import Column from './Column';
 import FilterBar, { FilterState } from './filter-bar';
 
 const BOARD_ID = Number(process.env.NEXT_PUBLIC_BOARD_ID ?? 1);
+const FILTER_STORAGE_KEY = 'kanban-filter-v1';
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
   high:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', label: '높음' },
@@ -78,12 +79,40 @@ const EMPTY_FILTER: FilterState = {
   priorities: new Set<string>(),
 };
 
+function loadFilter(): FilterState {
+  try {
+    const raw = localStorage.getItem(FILTER_STORAGE_KEY);
+    if (!raw) return EMPTY_FILTER;
+    const parsed = JSON.parse(raw) as { assignees?: string[]; priorities?: string[] };
+    return {
+      assignees: new Set(parsed.assignees ?? []),
+      priorities: new Set(parsed.priorities ?? []),
+    };
+  } catch {
+    return EMPTY_FILTER;
+  }
+}
+
+function saveFilter(filter: FilterState): void {
+  try {
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+      assignees: Array.from(filter.assignees),
+      priorities: Array.from(filter.priorities),
+    }));
+  } catch {
+    // localStorage 불가 환경 무시
+  }
+}
+
 export default function Board() {
   const [board, setBoard] = useState<BoardType | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dragError, setDragError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterState>(EMPTY_FILTER);
+  const [filter, setFilter] = useState<FilterState>(() => {
+    if (typeof window === 'undefined') { return EMPTY_FILTER; }
+    return loadFilter();
+  });
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
 
   const sensors = useSensors(
@@ -241,6 +270,11 @@ export default function Board() {
   const handleResetFilter = useCallback(() => {
     setFilter(EMPTY_FILTER);
   }, []);
+
+  // 필터 상태 localStorage 동기화
+  useEffect(() => {
+    saveFilter(filter);
+  }, [filter]);
 
   // ── 필터 통계 ─────────────────────────────────────────────────────────────
   const isFiltering = filter.assignees.size > 0 || filter.priorities.size > 0;
