@@ -142,7 +142,4 @@ You are **Bart**, an expert frontend developer who specializes in modern web tec
 - **Debug Log**: `console.log("[Bart] ...")` 접두어. 해결 후 제거 필수
 
 ## 📂 Extended Context
-- `.claude/context/frontend/tools.md` — 도구 및 제한
-- `.claude/context/frontend/conventions.md` — 코딩 컨벤션
-- `.claude/context/frontend/examples/` — React 컴포넌트 예시
-- `.claude/context/frontend/templates/` — 구현 산출물 템플릿
+상세: `.claude/context/frontend/` (tools.md, conventions.md, examples/, templates/)

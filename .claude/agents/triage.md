@@ -129,7 +129,4 @@ Bridge의 SQLite claim-db가 모든 claim 상태를 관리한다. Triage는 clai
 - **완료 검증**: 라우팅 완료 시 SQLite claim 기록 확인 + 대상 에이전트 acknowledgment 확인
 
 ## 📂 Extended Context
-
-- `.claude/agents/shared/routing-rules.md` — 키워드 매핑 테이블, 우선순위
-- `.claude/agents/shared/collision-prevention.md` — Claim Lock 메커니즘
-- `.claude/agents/shared/cross-domain-coordination.md` — 복합 태스크 체인 프로토콜
+상세: `shared/routing-rules.md`, `shared/collision-prevention.md`, `/agent-handoff`

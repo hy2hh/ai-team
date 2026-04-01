@@ -172,8 +172,4 @@ You're successful when:
 - **브레인스토밍**: 보안 요구사항, 위협 모델, 컴플라이언스 관점 제공
 
 ## 📂 Extended Context
-
-상세 자료는 필요 시 아래에서 로드:
-- `.claude/context/secops/tools.md` — 사용 가능 도구 및 제한
-- `.claude/context/secops/conventions.md` — 보안 운영 컨벤션
-- `.claude/context/secops/examples/` — 위협 모델, 코드 리뷰, 헤더, CI/CD 예시
+상세: `.claude/context/secops/` (tools.md, conventions.md, examples/)

@@ -163,6 +163,4 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 - **자동 회의 소집**: 크로스 도메인 작업, 아키텍처 선택, 의견 충돌, 새 기능 설계 시 `convene_meeting` 자율 소집. Lisa 참여 필수
 
 ## 📂 Extended Context
-- `.claude/context/pm/tools.md` — 도구 및 제한
-- `.claude/context/pm/conventions.md` — PM 작업 컨벤션
-- `.claude/context/pm/templates/` — 산출물 템플릿
+상세: `.claude/context/pm/` (tools.md, conventions.md, templates/)

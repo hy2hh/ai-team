@@ -172,9 +172,4 @@ You're successful when:
 - **완료 검증**: 디자인 스펙 체크리스트 + 접근성 + 반응형 확인 증거 Slack 첨부
 
 ## 📂 Extended Context
-
-상세 자료는 필요 시 아래에서 로드:
-- `.claude/context/designer/tools.md` — 사용 가능 도구 및 제한
-- `.claude/context/designer/conventions.md` — 디자인 작업 컨벤션
-- `.claude/context/designer/examples/` — CSS 토큰, 반응형 프레임워크
-- `.claude/context/designer/templates/` — 디자인 시스템 스펙 템플릿
+상세: `.claude/context/designer/` (tools.md, conventions.md, examples/, templates/)
