@@ -27,9 +27,9 @@ import {
 import { classifyRisk } from './risk-matrix.js';
 import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
-import { enqueue, type QueueTask, type EnqueueResult } from './queue-manager.js';
+import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
-import { createCard, moveToInProgress, updateCard } from './kanban-sync.js';
+import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -923,8 +923,10 @@ const loadPersona = (agentName: string): string => {
       '',
       '## 칸반 카드 관리 (필수 — 최우선)',
       '**모든 작업에서 가장 먼저 `create_kanban_card`를 호출하세요.** 분석, 조사, 회의 소집, 코드 작성, 리뷰 등 어떤 작업이든 예외 없이 호출합니다.',
-      '- **title**: 수행할 작업의 핵심 요약 (사용자 원문 그대로 넣지 말 것. 예: "에이전트 컨텍스트 스킬화 전략 분석")',
-      '- **description**: 구체적 실행 내용이나 작업 범위',
+      '- **title**: 사용자가 요청한 작업의 핵심 내용을 사용자 관점에서 요약. 에이전트 내부 프로세스(라우팅, 전달, 위임)가 아니라 실제 수행될 작업을 적을 것.',
+      '  - 좋은 예: "socket-bridge 코드 디버깅", "Slack 라우팅 키워드 테이블 리팩토링"',
+      '  - 나쁜 예: "Homer에게 디버깅 요청 전달", "사용자 요청 수신 및 라우팅"',
+      '- **description**: 구체적 실행 내용이나 작업 범위. 정보가 부족하면 비워두기',
       '- **예외 없음**: "안녕"도, "1+1=?"도, 단답형 답변도 모두 카드를 먼저 생성합니다.',
       '',
     ].join('\n');
@@ -1115,6 +1117,8 @@ export interface DelegationStep {
   task: string;
   /** 이 step에서 사용할 모델 tier ('high'=Opus, 'standard'=Sonnet, 'fast'=Haiku). 기본값: 'standard' */
   tier?: 'high' | 'standard' | 'fast';
+  /** PM이 생성한 Backlog 칸반 카드 ID (에이전트별) */
+  kanbanCardIds?: Record<string, number>;
 }
 
 /** 병렬 위임 대상 */
@@ -1122,6 +1126,8 @@ export interface DelegationTarget {
   agent: string;
   /** 이 에이전트 실행 시 사용할 모델 tier. 기본값: 'standard' */
   tier?: 'high' | 'standard' | 'fast';
+  /** PM이 생성한 Backlog 칸반 카드 ID */
+  kanbanCardId?: number;
 }
 
 /** handleMessage 반환 타입 */
@@ -1146,6 +1152,7 @@ export const handleMessage = async (
   skipReaction = false,
   skipPosting = false,
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
+  existingKanbanCardId?: number | null,
 ): Promise<HandleMessageResult> => {
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
@@ -1310,12 +1317,19 @@ export const handleMessage = async (
                 }
               }
 
-              const targets = valid.map((agent: string) => ({ agent, tier }));
-              delegationQueue.push(...targets);
               const tierLabel = tier ? ` (tier=${tier})` : '';
               console.log(
                 `[delegation] PM delegate 호출: [${valid.join(', ')}]${tierLabel} — ${reason}`,
               );
+
+              // 위임 대상별 Backlog 카드 생성 + 카드 ID를 target에 저장
+              const targets: DelegationTarget[] = [];
+              for (const agent of valid) {
+                const cardId = await createCard(reason.slice(0, 200), agent).catch(() => null);
+                targets.push({ agent, tier, kanbanCardId: cardId ?? undefined });
+              }
+              delegationQueue.push(...targets);
+
               return {
                 content: [
                   {
@@ -1339,13 +1353,13 @@ export const handleMessage = async (
               no_ui_changes: z.boolean().optional().describe('true로 명시하면 UI/UX 변경 없는 순수 로직 작업임을 선언 — Frontend 단독 위임 허용. 미선언 시 전체 step에 Designer 포함 필수.'),
             },
             async ({ steps, reason: _reason, no_ui_changes }) => {
-              const validSteps = steps.map((step: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }) => ({
+              const validSteps: DelegationStep[] = steps.map((step: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }) => ({
                 agents: step.agents.filter((a: string) =>
                   ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
                 ),
                 task: step.task,
                 tier: step.tier,
-              })).filter((step: { agents: string[] }) => step.agents.length > 0);
+              })).filter((step) => step.agents.length > 0);
 
               // 전체 step 중 frontend가 있고 designer가 한 번도 없으면 차단 (no_ui_changes 예외)
               const hasFrontend = validSteps.some((s: { agents: string[] }) => s.agents.includes('frontend'));
@@ -1400,6 +1414,19 @@ export const handleMessage = async (
               console.log(
                 `[delegation] PM delegate_sequential 호출 (${validSteps.length} steps):\n${summary}`,
               );
+
+              // 각 step의 에이전트별 Backlog 카드 생성 + 카드 ID를 step에 저장
+              for (const step of validSteps) {
+                const cardIds: Record<string, number> = {};
+                for (const agent of step.agents) {
+                  const cardId = await createCard(step.task.slice(0, 200), agent).catch(() => null);
+                  if (cardId !== null) {
+                    cardIds[agent] = cardId;
+                  }
+                }
+                step.kanbanCardIds = cardIds;
+              }
+
               return {
                 content: [
                   {
@@ -1448,6 +1475,11 @@ export const handleMessage = async (
                   validTasks,
                   event.thread_ts ?? event.ts,
                   event.channel,
+                );
+
+                // 칸반 Backlog에 카드 생성 (PM 플랜 기반 제목)
+                createBacklogCards(result).catch((err) =>
+                  console.warn('[kanban-sync] Backlog 카드 생성 실패:', err),
                 );
 
                 // Slack에 큐 시작 알림
@@ -1725,7 +1757,7 @@ export const handleMessage = async (
     baseTools.push('mcp__permission__request_permission');
 
     // 모든 에이전트: 칸반 카드 생성/업데이트 도구
-    let kanbanCardId: number | undefined;
+    let kanbanCardId: number | undefined = existingKanbanCardId ?? undefined;
     const kanbanServer = createSdkMcpServer({
       name: 'kanban',
       tools: [
@@ -1738,6 +1770,16 @@ export const handleMessage = async (
             priority: z.enum(['low', 'medium', 'high']).optional().describe('우선순위. 기본값: medium'),
           },
           async ({ title, description, priority }) => {
+            // 기존 Backlog 카드가 있으면 업데이트 + In Progress 이동만 수행
+            if (kanbanCardId !== undefined) {
+              await updateCard(kanbanCardId, { title, description }).catch(() => {});
+              await moveToInProgress(kanbanCardId).catch(() => {});
+              if (priority && priority !== 'medium') {
+                await updateCard(kanbanCardId, { priority }).catch(() => {});
+              }
+              return { content: [{ type: 'text' as const, text: `칸반 카드 #${kanbanCardId} 업데이트 → In Progress 이동 완료. 작업을 진행하세요.` }] };
+            }
+            // 새 카드 생성 (직접 메시지 경로)
             const cardId = await createCard(
               title,
               agentName,
@@ -1747,9 +1789,7 @@ export const handleMessage = async (
               return { content: [{ type: 'text' as const, text: '칸반 카드 생성 실패 (백엔드 응답 없음). 작업은 계속 진행하세요.' }] };
             }
             kanbanCardId = cardId;
-            // 카드 생성 직후 In Progress 이동
             await moveToInProgress(cardId).catch(() => {});
-            // priority 업데이트 (medium이 아닌 경우)
             if (priority && priority !== 'medium') {
               await updateCard(cardId, { priority }).catch(() => {});
             }
@@ -2003,6 +2043,17 @@ export const handleMessage = async (
       escalationReason,
     });
     recordAgentStat(agentName, true);
+
+    // 칸반 카드 미생성 fallback — 에이전트가 create_kanban_card를 호출하지 않은 경우 자동 생성
+    if (kanbanCardId === undefined) {
+      const fallbackTitle = cleanSlackText(event.text).slice(0, 200);
+      const fallbackCardId = await createCard(fallbackTitle, agentName).catch(() => null);
+      if (fallbackCardId !== null) {
+        kanbanCardId = fallbackCardId;
+        await moveToInProgress(fallbackCardId).catch(() => {});
+        console.log(`[kanban-sync] fallback 카드 생성: #${fallbackCardId} "${fallbackTitle.slice(0, 40)}"`);
+      }
+    }
 
     return {
       text: resultText,

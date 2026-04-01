@@ -224,3 +224,35 @@ export const moveToBlocked = async (cardId: number): Promise<void> => {
     console.warn('[kanban-sync] moveToBlocked 오류:', err);
   }
 };
+
+/**
+ * Bridge 시작 시 In Progress에 남은 고아 카드를 Blocked로 이동
+ * - 재시작으로 중단된 작업의 카드가 In Progress에 방치되는 문제 해결
+ */
+export const cleanupOrphanCards = async (): Promise<number> => {
+  try {
+    const res = await fetch(`${BASE_URL}/boards/1`);
+    if (!res.ok) {
+      console.warn('[kanban-sync] cleanupOrphanCards: 보드 조회 실패');
+      return 0;
+    }
+    const board = await res.json() as {
+      columns: Array<{ id: number; cards: Array<{ id: number; title: string }> }>;
+    };
+    const inProgressCol = board.columns.find((c) => c.id === COLUMN.IN_PROGRESS);
+    if (!inProgressCol || inProgressCol.cards.length === 0) {
+      return 0;
+    }
+
+    let moved = 0;
+    for (const card of inProgressCol.cards) {
+      await moveToBlocked(card.id);
+      moved++;
+    }
+    console.log(`[kanban-sync] 고아 카드 ${moved}개 → Blocked 이동 완료`);
+    return moved;
+  } catch (err) {
+    console.warn('[kanban-sync] cleanupOrphanCards 오류:', err);
+    return 0;
+  }
+};

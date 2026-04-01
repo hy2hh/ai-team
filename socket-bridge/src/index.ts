@@ -66,7 +66,7 @@ import {
   agentDisplayName,
 } from './queue-processor.js';
 import { cancelQueueByThread } from './queue-manager.js';
-import { moveToDone } from './kanban-sync.js';
+import { moveToDone, moveToBlocked, cleanupOrphanCards, updateCard } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
 import {
   initQaLoopTable,
@@ -728,6 +728,8 @@ const executeSingle = async (
               event.text,
             ].filter(Boolean).join('\n'),
           };
+          // PM이 생성한 Backlog 카드 ID 전달
+          const existingCardId = step.kanbanCardIds?.[target] ?? null;
           return handleMessage(
             target,
             stepEvent,
@@ -736,6 +738,7 @@ const executeSingle = async (
             true,
             false,
             step.tier ?? 'standard',
+            existingCardId,
           );
         }),
       );
@@ -761,6 +764,21 @@ const executeSingle = async (
           );
         } else if (r.status === 'rejected') {
           // 실패 시에는 에이전트가 카드를 생성하지 못했을 수 있으므로 무시
+        }
+      }
+
+      // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
+      if (si < result.delegationSteps.length - 1) {
+        const nextStep = result.delegationSteps[si + 1];
+        const prevSummary = seqResults
+          .filter((r) => step.agents.includes(r.agent))
+          .map((r) => r.text.slice(0, 200))
+          .join(' | ');
+        if (nextStep.kanbanCardIds) {
+          for (const [agent, cardId] of Object.entries(nextStep.kanbanCardIds)) {
+            updateCard(cardId, { description: `이전 단계(${step.agents.join(', ')}) 결과: ${prevSummary}`.slice(0, 500) }).catch(() => {});
+            console.log(`[kanban-sync] 다음 step 카드 #${cardId} (${agent}) description 업데이트`);
+          }
         }
       }
 
@@ -933,6 +951,7 @@ const executeSingle = async (
           true,
           false,
           targetObj.tier ?? 'standard',
+          targetObj.kanbanCardId ?? null,
         ),
         target,
         event.ts,
@@ -1017,6 +1036,7 @@ const executeSingle = async (
             true,
             false,
             targetObj.tier ?? 'standard',
+            targetObj.kanbanCardId ?? null,
           );
         }),
       );
@@ -2124,11 +2144,17 @@ const main = async () => {
               );
             }
             // 큐에 등록된 태스크도 취소 (스레드 기준)
-            const queueCancelled = cancelQueueByThread(re.item.ts);
-            if (queueCancelled > 0) {
+            const queueResult = cancelQueueByThread(re.item.ts);
+            if (queueResult.count > 0) {
               console.log(
-                `[control] ⛔ 큐 태스크 ${queueCancelled}개 취소: ${re.item.ts}`,
+                `[control] ⛔ 큐 태스크 ${queueResult.count}개 취소: ${re.item.ts}`,
               );
+              // 취소된 태스크의 칸반 카드 → Blocked 이동
+              for (const cardId of queueResult.kanbanCardIds) {
+                moveToBlocked(cardId).catch((err) =>
+                  console.warn('[kanban-sync] 취소 카드 Blocked 이동 실패:', err),
+                );
+              }
             }
             break;
           }
@@ -2392,6 +2418,11 @@ const main = async () => {
   } else {
     console.log('[startup-recovery] 미완료 태스크 없음');
   }
+
+  // 칸반 고아 카드 정리 (In Progress → Blocked)
+  cleanupOrphanCards().catch((err) =>
+    console.warn('[startup-recovery] 칸반 고아 카드 정리 실패:', err),
+  );
 
   // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행 (2시간 이상 고착 감지)
   const orphanCheckInterval = setInterval(async () => {

@@ -17,7 +17,7 @@ import {
   type TaskQueueRow,
   type QueueStatusSummary,
 } from './queue-manager.js';
-import { moveToInProgress, moveToDone, moveToBlocked } from './kanban-sync.js';
+import { moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
 
 // ─── 상수 ─────────────────────────────────────────────
@@ -128,18 +128,13 @@ const processNextTask = async (): Promise<void> => {
   isProcessing = true;
   console.log(`[queue-processor] 태스크 시작: ${task.id} (${task.agent})`);
 
+  // Backlog 카드 ID 조회 (PM이 생성한 카드) — catch 블록에서도 접근 필요
+  const kanbanCardId = getKanbanCardId(task.id);
+
   try {
     // 상태 → running
     markRunning(task.id);
     task.started_at = Date.now(); // in-memory 스냅샷 동기화 (duration 계산 오류 방지)
-
-    // 칸반 In Progress 이동 (fire-and-forget)
-    const kanbanCardId = getKanbanCardId(task.id);
-    if (kanbanCardId !== null) {
-      moveToInProgress(kanbanCardId).catch((err) =>
-        console.warn('[kanban-sync] moveToInProgress 실패:', err),
-      );
-    }
 
     // Slack 진행 알림
     await postTaskProgress(slackAppRef, task, 'running');
@@ -163,7 +158,7 @@ const processNextTask = async (): Promise<void> => {
       raw: {},
     };
 
-    // 에이전트 실행 (독립 세션)
+    // 에이전트 실행 (독립 세션, 기존 Backlog 카드 ID 전달)
     const result = await Promise.race([
       handleMessage(
         task.agent,
@@ -173,6 +168,7 @@ const processNextTask = async (): Promise<void> => {
         true,  // skipReaction
         true,  // skipPosting (결과를 직접 게시)
         task.tier as 'high' | 'standard' | 'fast',
+        kanbanCardId,
       ),
       timeout(TASK_TIMEOUT_MS),
     ]) as HandleMessageResult | 'TIMEOUT';
@@ -185,8 +181,9 @@ const processNextTask = async (): Promise<void> => {
     markCompleted(task.id, result.text);
 
     // 칸반 Done 이동 (fire-and-forget)
-    if (kanbanCardId !== null) {
-      moveToDone(kanbanCardId).catch((err) =>
+    const doneCardId = result.kanbanCardId ?? kanbanCardId;
+    if (doneCardId !== null && doneCardId !== undefined) {
+      moveToDone(doneCardId).catch((err) =>
         console.warn('[kanban-sync] moveToDone 실패:', err),
       );
     }
@@ -231,10 +228,9 @@ const processNextTask = async (): Promise<void> => {
       markFailed(task.id, errorMsg);
 
       // 칸반 Blocked 이동 (fire-and-forget)
-      const failedCardId = getKanbanCardId(task.id);
-      if (failedCardId !== null) {
-        moveToBlocked(failedCardId).catch((err) =>
-          console.warn('[kanban-sync] moveToBlocked 실패:', err),
+      if (kanbanCardId !== null) {
+        moveToBlocked(kanbanCardId).catch((blockedErr) =>
+          console.warn('[kanban-sync] moveToBlocked 실패:', blockedErr),
         );
       }
 

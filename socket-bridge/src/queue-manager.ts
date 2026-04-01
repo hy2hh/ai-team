@@ -4,7 +4,7 @@
  */
 import { randomUUID } from 'crypto';
 import { getDb } from './db.js';
-import { createCard, cleanSlackText } from './kanban-sync.js';
+import { createCard } from './kanban-sync.js';
 
 // ─── 타입 정의 ────────────────────────────────────────
 
@@ -238,7 +238,6 @@ export const markSkipped = (id: string, reason: string): void => {
   `).run(reason.slice(0, 500), Date.now(), id);
   console.log(`[queue] skipped: ${id}`);
 };
-
 // ─── 칸반 카드 ID 관리 ────────────────────────────────
 
 /**
@@ -261,13 +260,13 @@ export const getKanbanCardId = (taskId: string): number | null => {
 };
 
 /**
- * enqueue 결과의 각 태스크를 칸반 Backlog에 카드로 생성
+ * PM 플랜 기반으로 enqueue된 태스크들을 칸반 Backlog에 카드로 생성
+ * - PM이 해석한 task 설명을 제목으로 사용 (원문 텍스트 아님)
  */
-export const syncEnqueuedTasksToKanban = async (result: EnqueueResult): Promise<void> => {
+export const createBacklogCards = async (result: EnqueueResult): Promise<void> => {
   for (const task of result.tasks) {
-    const cleanTask = cleanSlackText(task.task);
-    const title = `[Q${task.sequence + 1}] ${cleanTask.slice(0, 400)}`;
-    const cardId = await createCard(title, task.agent, cleanTask);
+    const title = task.task.slice(0, 200);
+    const cardId = await createCard(title, task.agent, `큐 태스크 [${task.sequence + 1}/${result.taskCount}]`);
     if (cardId !== null) {
       setKanbanCardId(task.id, cardId);
     }
@@ -305,18 +304,31 @@ export const skipDependentTasks = (parentQueueId: string, failedSequence: number
 
 /**
  * 특정 스레드의 모든 queued 상태 태스크를 skipped 처리
+ * @returns 취소된 태스크 수와 해당 칸반 카드 ID 목록
  */
-export const cancelQueueByThread = (threadTs: string): number => {
+export const cancelQueueByThread = (threadTs: string): { count: number; kanbanCardIds: number[] } => {
   const db = getDb();
+
+  // 취소 대상의 칸반 카드 ID 먼저 조회
+  const cards = db
+    .prepare(`
+      SELECT kanban_card_id FROM task_queue
+      WHERE thread_ts = ? AND status IN ('queued', 'running') AND kanban_card_id IS NOT NULL
+    `)
+    .all(threadTs) as Array<{ kanban_card_id: number }>;
+
   const result = db
     .prepare(`
       UPDATE task_queue
       SET status = 'skipped', error = '사용자 취소 (⛔)', completed_at = ?
-      WHERE thread_ts = ? AND status = 'queued'
+      WHERE thread_ts = ? AND status IN ('queued', 'running')
     `)
     .run(Date.now(), threadTs);
   console.log(`[queue] 취소: thread ${threadTs} (${result.changes}개 태스크)`);
-  return result.changes;
+  return {
+    count: result.changes,
+    kanbanCardIds: cards.map((c) => c.kanban_card_id),
+  };
 };
 
 /**
