@@ -114,3 +114,21 @@
 - cross-verify 근본 재설계: 프롬프트 지시 대신 코드가 파일을 읽어서 검증 컨텍스트 주입
 - bridge 재시작 + E2E 테스트
 - P2-1 구조화된 로깅 (pino)
+
+### [2026-04-01] Session: 칸반 카드 품질 개선
+
+**Tried:**
+- 칸반 백엔드 미실행 (포트 3001) 확인 → 수동 시작
+- `syncEnqueuedTasksToKanban`으로 enqueue 시 raw 텍스트 카드 선생성 → 에이전트가 `create_kanban_card` 직접 호출로 변경 (단일 에이전트 경로 완료)
+- WIP limit 3 → 5 변경 (SQLite 직접 수정)
+- 기존 쓰레기 카드 19개 삭제
+
+**Learned:**
+- `create_kanban_card` 도구: 에이전트가 작업 이해 후 호출 → 의미있는 제목 보장
+- WIP limit 근거: 에이전트 수(7명) 기준이나 주요 작업자(PM+Backend) 감안해 5로 결정
+- kanban-backend는 bridge와 별도 프로세스 — 재시작 스크립트에 포함 안 됨, 수동 확인 필요
+- session resume 시 새 MCP 도구 미인식 → thread-sessions.json 초기화 필요
+
+**Next:**
+- enqueue 경로 개선: `syncEnqueuedTasksToKanban` 제거, queue-processor가 result.kanbanCardId 사용
+- 변경 파일: queue-manager.ts, agent-runtime.ts, queue-processor.ts
