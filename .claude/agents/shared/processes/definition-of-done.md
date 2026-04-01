@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-verify` 스킬로 이전되었습니다. `.claude/skills/agent-verify/SKILL.md` 참조.
+
 # Definition of Done (완료 조건)
 
 > **Iron Law**: "동작하면 완료"가 아니라 "기준을 충족하면 완료".

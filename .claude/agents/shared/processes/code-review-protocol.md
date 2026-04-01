@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-review` 스킬로 이전되었습니다. `.claude/skills/agent-review/SKILL.md` 참조.
+
 # Code Review Protocol
 
 > **Iron Law**: 리뷰 없는 코드는 프로덕션에 들어가지 않는다. 성과주의 합의 금지.

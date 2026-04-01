@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-implement` 스킬로 이전되었습니다. `.claude/skills/agent-implement/SKILL.md` 참조.
+
 # Implementation Pipeline
 
 > **Iron Law**: 계획 → 구현 → 자가 리뷰 → Spec 리뷰 → Code Quality 리뷰. 순서를 건너뛰지 않는다.

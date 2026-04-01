@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-handoff` 스킬로 이전되었습니다. `.claude/skills/agent-handoff/SKILL.md` 참조.
+
 # Cross-Domain Coordination Protocol
 
 ## 순차 핸드오프 체인

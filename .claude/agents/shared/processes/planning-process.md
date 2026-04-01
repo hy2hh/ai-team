@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-plan` 스킬로 이전되었습니다. `.claude/skills/agent-plan/SKILL.md` 참조.
+
 # Planning Process
 
 > **Iron Law**: 설계 없이 구현하지 않는다. 모든 프로젝트는 이 프로세스를 거친다.

@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-verify` 스킬로 이전되었습니다. `.claude/skills/agent-verify/SKILL.md` 참조.
+
 # Verification Before Completion
 
 > **Iron Law**: 완료 주장 전에 반드시 검증 증거를 확보하라. 예외 없음.

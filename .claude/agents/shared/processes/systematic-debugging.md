@@ -1,3 +1,5 @@
+> ⚠️ 이 파일은 `/agent-debug` 스킬로 이전되었습니다. `.claude/skills/agent-debug/SKILL.md` 참조.
+
 # Systematic Debugging
 
 > **Iron Law**: 수정 시도 전에 반드시 근본 원인을 찾아라. 증상 수정은 실패다.
