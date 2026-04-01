@@ -2,12 +2,14 @@
 import Board from '@/components/Board';
 
 const AGENTS = [
-  { name: 'Homer',  color: '#4f7ef0' },
-  { name: 'Bart',   color: '#22d3ee' },
-  { name: 'Marge',  color: '#c084fc' },
-  { name: 'Lisa',   color: '#4ade80' },
-  { name: 'Krusty', color: '#fb923c' },
-  { name: 'Sid',    color: '#f472b6' },
+  { name: 'Homer',    color: '#4f7ef0' },
+  { name: 'Bart',     color: '#22d3ee' },
+  { name: 'Marge',    color: '#c084fc' },
+  { name: 'Lisa',     color: '#4ade80' },
+  { name: 'Krusty',   color: '#fb923c' },
+  { name: 'Sid',      color: '#f472b6' },
+  { name: 'Chalmers', color: '#f59e0b' },
+  { name: 'Wiggum',   color: '#94a3b8' },
 ];
 
 export default function Home() {

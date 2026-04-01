@@ -21,16 +21,18 @@ interface Props {
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 
-const AGENTS = ['Homer', 'Bart', 'Marge', 'Lisa', 'Krusty', 'Sid'];
+const AGENTS = ['Homer', 'Bart', 'Marge', 'Lisa', 'Krusty', 'Sid', 'Chalmers', 'Wiggum'];
 const DUE_SOON_DAYS = 3;
 
 const AGENT_COLORS: Record<string, string> = {
-  homer:  '#4f7ef0',
-  bart:   '#22d3ee',
-  marge:  '#c084fc',
-  lisa:   '#4ade80',
-  krusty: '#fb923c',
-  sid:    '#f472b6',
+  homer:    '#4f7ef0',
+  bart:     '#22d3ee',
+  marge:    '#c084fc',
+  lisa:     '#4ade80',
+  krusty:   '#fb923c',
+  sid:      '#f472b6',
+  chalmers: '#f59e0b',
+  wiggum:   '#94a3b8',
 };
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {

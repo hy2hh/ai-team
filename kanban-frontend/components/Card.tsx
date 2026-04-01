@@ -10,12 +10,14 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: strin
 };
 
 const AGENT_COLORS: Record<string, string> = {
-  homer:  'var(--color-agent-homer)',
-  bart:   'var(--color-agent-bart)',
-  marge:  'var(--color-agent-marge)',
-  lisa:   'var(--color-agent-lisa)',
-  krusty: 'var(--color-agent-krusty)',
-  sid:    'var(--color-agent-sid)',
+  homer:    'var(--color-agent-homer)',
+  bart:     'var(--color-agent-bart)',
+  marge:    'var(--color-agent-marge)',
+  lisa:     'var(--color-agent-lisa)',
+  krusty:   'var(--color-agent-krusty)',
+  sid:      'var(--color-agent-sid)',
+  chalmers: 'var(--color-agent-chalmers)',
+  wiggum:   'var(--color-agent-wiggum)',
 };
 
 function getProgressColor(progress: number): string {

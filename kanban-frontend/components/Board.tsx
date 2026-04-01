@@ -26,6 +26,7 @@ const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: strin
 const AGENT_COLORS: Record<string, string> = {
   homer: '#f59e0b', bart: '#3b82f6', marge: '#8b5cf6',
   lisa: '#10b981', krusty: '#ef4444', sid: '#06b6d4',
+  chalmers: '#f59e0b', wiggum: '#94a3b8',
 };
 
 /** 드래그 중 포탈에 표시되는 카드 미리보기 */
