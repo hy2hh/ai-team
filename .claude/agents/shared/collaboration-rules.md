@@ -42,6 +42,7 @@
 | Security review | Wiggum | Homer |
 | Architecture decision | Homer | All agents |
 | Sprint planning | Marge | All agents |
+| QA / 품질 검증 | Chalmers | - |
 
 ## Permission Request Rules (권한 요청 필수)
 
@@ -50,6 +51,16 @@
 1. **도구가 훅에 의해 차단된 경우**: Edit/Write/Bash 도구가 훅에 막히면 우회 시도 금지. 즉시 `request_permission`을 호출하여 sid의 승인을 받는다.
 2. **공유 설정 파일 수정**: `.claude/agents/shared/`, `settings.json`, `.memory/` 등 팀 공통 파일 수정 시
 3. **되돌리기 어려운 작업**: DB 마이그레이션 실행, 외부 서비스 변경, 배포 등
+
+### 선언 전 실행 가능 여부 검증 의무 (핵심 규칙)
+
+**"하겠습니다"를 말하기 전에 반드시 실행 가능 여부를 검증해야 한다.**
+
+- 작업을 선언하기 전, 해당 작업이 즉시 실행 가능한지 확인한다
+- 권한이 필요한 작업이면 선언 대신 즉시 `request_permission`을 호출한다
+- 검증 순서: ① 실행 가능 여부 확인 → ② 권한 필요 시 즉시 요청 → ③ 승인 후 선언 + 실행
+- **금지 패턴**: 실행 가능 여부를 확인하지 않은 채 "XXX를 하겠습니다" 선언 후 아무것도 안 하는 것
+- **근본 원인**: 선언만 하고 실행 안 하는 패턴의 원인은 대부분 이 검증 단계 생략에서 발생한다
 
 `request_permission` 호출 형식:
 - `reason`: 왜 이 작업이 필요한지 (1-2문장)
@@ -110,6 +121,51 @@
 - Include artifacts (code snippets, specs, links) when relevant
 - Tag next responsible agent if handoff is needed
 - Use structured format for complex deliverables
+
+## Measurement Reporting Convention
+
+측정/분석 보고(SEO, SMO, Lighthouse, Agentic Readiness 등)를 작성할 때는 반드시 평가 기준 출처를 메시지 하단에 포함해야 한다.
+
+### 필수 항목
+- 각 측정 항목별 평가 기준 출처 (공식 문서 URL)
+- 출처 없는 점수는 신뢰도가 없으므로 게시 금지
+
+### 출처 표기 형식
+
+메시지 하단에 `*:books: 평가 기준 출처*` 섹션을 추가하고, 항목별로 아래 형식을 사용한다:
+
+```
+*:books: 평가 기준 출처*
+
+• *{측정 항목} ({점수})*
+  _{기준 이름}_ — <{공식 문서 URL}>
+  _{기준 이름 2}_ — <{공식 문서 URL 2}>
+```
+
+- 점수 없는 항목도 기준 출처는 반드시 포함
+- 공식 문서가 없는 자체 기준이면 `_(자체 기준 — {평가 근거 요약})_` 로 표기
+- URL은 Slack 링크 형식 `<URL>` 사용 (마크다운 `[text](url)` 금지)
+
+### 예시
+
+```
+*:books: 평가 기준 출처*
+
+• *Lighthouse SEO (100/100)*
+  _Google Lighthouse 공식 SEO 감사 항목_ — <https://developer.chrome.com/docs/lighthouse/seo>
+
+• *SMO (5/100)*
+  _Open Graph Protocol_ — <https://ogp.me>
+  _Twitter (X) Cards 공식 문서_ — <https://developer.x.com/en/docs/twitter-for-websites/cards/overview/abouts-cards>
+  _Canonical URL — Google Search Central_ — <https://developers.google.com/search/docs/crawling-indexing/consolidate-duplicate-urls>
+
+• *Agentic Readiness (58/100)*
+  _OpenAPI Specification 3.x_ — <https://swagger.io/specification>
+  _IETF RFC 7807 — Problem Details for HTTP APIs_ — <https://www.rfc-editor.org/rfc/rfc7807>
+  _Idempotency 패턴 — Stripe API 설계 가이드_ — <https://stripe.com/docs/api/idempotent_requests>
+  _WebSocket API — MDN_ — <https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API>
+```
+
 
 ## Completion Protocol
 
