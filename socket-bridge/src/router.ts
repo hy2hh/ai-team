@@ -66,10 +66,14 @@ const ALL_AGENT_NAMES = [
   'qa',
 ];
 
+/** 순차 작업 패턴 — "하고", "그리고", "후에" 등 두 작업을 연결하는 패턴 */
+const SEQUENTIAL_PATTERN =
+  /(?:하고|그리고|후에|다음에|한\s*뒤에?|완료\s*후)/i;
+
 /** 키워드 기반 라우팅 규칙 */
 const ROUTING_RULES: Record<string, RegExp> = {
   backend: /API|서버|DB|데이터베이스|엔드포인트|배포|인프라/i,
-  frontend: /UI|컴포넌트|CSS|페이지|화면|레이아웃|React/i,
+  frontend: /UI|컴포넌트|CSS|페이지|화면|레이아웃|React|SEO|성능\s*측정|Lighthouse|접근성|Core\s*Web\s*Vitals|번들\s*분석/i,
   designer: /디자인|UX|피그마|목업|와이어프레임|색상/i,
   pm: /기획|로드맵|스프린트|우선순위|PRD|일정|요구사항|계획/i,
   researcher: /조사|트렌드|경쟁사|시장 분석/i,
@@ -400,7 +404,8 @@ export const classifyComplexTask = async (
     '- parallel: 여러 에이전트가 독립적으로 동시 작업',
     '',
     '## 표준 패턴',
-    '- 코드 리뷰 → parallel: frontend + backend',
+    '- 코드 리뷰/산출물 리뷰/검증 요청 → single: qa (독립 검증 전담)',
+    '- 검증/테스트/리뷰 + 도메인 언급 → single: qa (대상 도메인은 QA가 메시지에서 파악)',
     '- API + UI 동시 작업 → parallel: backend + frontend',
     '- 의존성 있는 작업 (예: 디자인 후 구현) → single: PM (PM이 @mention으로 순차 위임)',
     '- 계획 수립/킥오프/로드맵/구현 전략 → single: PM (PM이 계획 후 필요한 에이전트에 위임)',
@@ -564,6 +569,27 @@ export const routeMessage = async (
       execution: 'single',
       method: 'keyword',
     };
+  }
+
+  // Verification tier: QA + 도메인 키워드 → QA 우선 라우팅
+  // QA는 "도메인"이 아니라 "검증 계층" — domain + qa = 검증 요청이지 복합 태스크가 아님
+  // 단, 순차 작업("구현하고 테스트해줘")은 PM 체이닝이 필요하므로 제외
+  if (keywordMatches.length > 1 && keywordMatches.includes('qa')) {
+    const nonQaMatches = keywordMatches.filter((m) => m !== 'qa');
+    const isSequential = SEQUENTIAL_PATTERN.test(text);
+
+    if (nonQaMatches.length >= 1 && !isSequential) {
+      const candidates = restrictToThread(['qa']);
+      console.log(
+        `[perf] stage=verification-tier domains=[${nonQaMatches.join(',')}] elapsed=${Date.now() - routeStart}ms`,
+      );
+      return {
+        agents: candidates.map(toRoutingAgent),
+        execution: 'single',
+        method: 'keyword',
+        isQAVerification: true,
+      };
+    }
   }
 
   // 복수 키워드 매칭 → classifyComplexTask로 위임 (PM 라우팅 포함)

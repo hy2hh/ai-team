@@ -68,6 +68,8 @@ export interface RoutingResult {
   isQACommand?: boolean;
   /** QA 명령어에서 파싱된 스펙 파일 경로 */
   specPath?: string;
+  /** 검증 계층(Verification Tier) 라우팅 여부 — specPath 없이 회귀 검증 모드 트리거 */
+  isQAVerification?: boolean;
 }
 
 /** 에이전트별 세션 정보 */
