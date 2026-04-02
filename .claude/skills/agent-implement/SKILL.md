@@ -21,6 +21,7 @@ description: Use when executing assigned implementation tasks with self-review a
 ## 3단계 검증 파이프라인
 
 ### Stage 1: 자가 리뷰 (구현 에이전트)
+- [ ] TDD 사이클을 따랐는가? (모든 프로덕션 코드에 선행 실패 테스트 존재, `/agent-tdd`)
 - [ ] 계획서의 Steps를 모두 완료했는가?
 - [ ] 테스트가 통과하는가?
 - [ ] 빌드가 성공하는가?

@@ -48,10 +48,10 @@ description: Use when encountering bugs, errors, test failures, or unexpected be
 
 ## Phase 4: Implementation
 
-1. **실패 테스트 먼저** — 수정 전에 버그를 재현하는 테스트 작성
+1. **실패 테스트 먼저** — 수정 전에 버그를 재현하는 테스트 작성 (`/agent-tdd` 사이클 적용)
 2. **단일 수정** — 근본 원인에 대한 단일 수정 구현
 3. **검증** — 실패 테스트 통과 + 기존 테스트 회귀 없음
-4. **방어적 계층** — 입력 검증, 비즈니스 로직 검증, 환경 가드, 디버그 계측
+4. **방어적 계층** — 4-Layer 검증 적용. 상세: `.claude/context/backend/examples/defense-in-depth.md`
 
 ### 3회 규칙 (3-Strike Rule)
 - 수정 시도 횟수를 추적한다
