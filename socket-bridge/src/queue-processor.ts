@@ -5,7 +5,7 @@
 import type { App } from '@slack/bolt';
 import type { SlackEvent } from './types.js';
 import {
-  getNextTask,
+  getNextTasks,
   markRunning,
   markCompleted,
   markFailed,
@@ -36,7 +36,7 @@ const RETRY_BACKOFF_MS = 30_000;
 
 let pollingIntervalId: NodeJS.Timeout | null = null;
 let slackAppRef: App | null = null;
-let isProcessing = false;
+// isProcessing 단일 플래그 → activeTaskCount + MAX_PARALLEL_TASKS로 대체
 
 // ─── Slack 알림 ───────────────────────────────────────
 
@@ -110,26 +110,55 @@ const postTaskProgress = async (
 
 // ─── 폴링 루프 ────────────────────────────────────────
 
+/** 현재 병렬 실행 중인 태스크 수 */
+let activeTaskCount = 0;
+
+/** 최대 병렬 태스크 수 */
+const MAX_PARALLEL_TASKS = 3;
+
 /**
- * 다음 태스크 처리
+ * 다음 태스크 배치 처리 — 독립 태스크는 병렬 실행
+ *
+ * Claude Code의 partitionToolCalls 패턴 적용:
+ * 서로 다른 스레드의 태스크는 독립이므로 동시 실행 가능
  */
 const processNextTask = async (): Promise<void> => {
-  if (isProcessing) {
-    console.log('[queue-processor] 이미 처리 중, 스킵');
-    return;
-  }
-
   if (!slackAppRef) {
     console.error('[queue-processor] slackApp 참조 없음');
     return;
   }
 
-  const task = getNextTask();
-  if (!task) {
-    return; // 처리할 태스크 없음
+  // 남은 슬롯만큼 태스크 가져오기
+  const availableSlots = MAX_PARALLEL_TASKS - activeTaskCount;
+  if (availableSlots <= 0) {
+    return;
   }
 
-  isProcessing = true;
+  const tasks = getNextTasks(availableSlots);
+  if (tasks.length === 0) {
+    return;
+  }
+
+  if (tasks.length > 1) {
+    console.log(
+      `[queue-processor] 병렬 실행: ${tasks.map((t) => `${t.agent}(${t.id.slice(0, 8)})`).join(', ')}`,
+    );
+  }
+
+  // 각 태스크를 독립적으로 실행 (병렬)
+  for (const task of tasks) {
+    activeTaskCount++;
+    processSingleTask(task).finally(() => {
+      activeTaskCount--;
+    });
+  }
+};
+
+/**
+ * 단일 태스크 처리 (기존 processNextTask 로직)
+ */
+const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
+  const slackApp = slackAppRef!; // processNextTask에서 null 체크 완료
   console.log(`[queue-processor] 태스크 시작: ${task.id} (${task.agent})`);
 
   // Backlog 카드 ID 조회 (PM이 생성한 카드) — catch 블록에서도 접근 필요
@@ -141,7 +170,7 @@ const processNextTask = async (): Promise<void> => {
     task.started_at = Date.now(); // in-memory 스냅샷 동기화 (duration 계산 오류 방지)
 
     // Slack 진행 알림
-    await postTaskProgress(slackAppRef, task, 'running');
+    await postTaskProgress(slackApp, task, 'running');
 
     // 이전 태스크 결과 로드 (의존성 있는 경우)
     const prevResult = getPreviousTaskResult(task.parent_queue_id, task.depends_on);
@@ -168,7 +197,7 @@ const processNextTask = async (): Promise<void> => {
         task.agent,
         pseudoEvent,
         'queue-task',
-        slackAppRef,
+        slackApp,
         true,  // skipReaction
         true,  // skipPosting (결과를 직접 게시)
         task.tier as 'high' | 'standard' | 'fast',
@@ -192,12 +221,12 @@ const processNextTask = async (): Promise<void> => {
       );
     }
 
-    await postTaskProgress(slackAppRef, task, 'completed', result.text);
+    await postTaskProgress(slackApp, task, 'completed', result.text);
 
     // 에이전트 실제 응답을 스레드에 게시
     if (result.text) {
       try {
-        await slackAppRef.client.chat.postMessage({
+        await slackApp.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
           text: result.text,
@@ -244,7 +273,7 @@ const processNextTask = async (): Promise<void> => {
       try {
         const isMaxTurns = errorMsg.includes('max_turns');
         const reason = isMaxTurns ? '대화 한도 초과로 이어서 계속합니다' : '일시적 오류 — 잠시 후 재시도합니다';
-        await slackAppRef.client.chat.postMessage({
+        await slackApp.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
           text: `🔄 *${agentDisplayName(task.agent)} 작업 재시도 대기 중 [${task.retry_count + 1}/${task.max_retries}]* — ${reason}`,
@@ -263,13 +292,13 @@ const processNextTask = async (): Promise<void> => {
         );
       }
 
-      await postTaskProgress(slackAppRef, task, 'failed', undefined, errorMsg);
+      await postTaskProgress(slackApp, task, 'failed', undefined, errorMsg);
 
       // 의존하는 후속 태스크 스킵
       const skipped = skipDependentTasks(task.parent_queue_id, task.sequence);
       if (skipped > 0) {
         try {
-          await slackAppRef.client.chat.postMessage({
+          await slackApp.client.chat.postMessage({
             channel: task.channel,
             thread_ts: task.thread_ts,
             text: `:fast_forward: ${skipped}개 후속 태스크 스킵됨 (의존성 실패)`,
@@ -279,8 +308,6 @@ const processNextTask = async (): Promise<void> => {
         }
       }
     }
-  } finally {
-    isProcessing = false;
   }
 };
 

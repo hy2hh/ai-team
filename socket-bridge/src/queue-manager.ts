@@ -137,6 +137,22 @@ export const enqueue = (
  * - 동일 스레드에서 이미 running 상태인 큐가 있으면 null 반환
  */
 export const getNextTask = (): TaskQueueRow | null => {
+  const tasks = getNextTasks(1);
+  return tasks.length > 0 ? tasks[0] : null;
+};
+
+/**
+ * 실행 가능한 독립 태스크 목록 반환 (최대 maxCount개)
+ *
+ * Claude Code의 partitionToolCalls 패턴 적용:
+ * - 서로 다른 스레드의 태스크는 독립 → 병렬 실행 가능
+ * - 같은 큐에서 depends_on이 없는 태스크는 독립 → 병렬 실행 가능
+ * - 같은 스레드에서 이미 실행 중이면 제외
+ *
+ * @param maxCount - 최대 반환 수 (기본 3)
+ * @returns 실행 가능한 태스크 배열
+ */
+export const getNextTasks = (maxCount = 3): TaskQueueRow[] => {
   const db = getDb();
 
   // 현재 running 상태인 큐가 있는 스레드 목록 (동시 실행 제한)
@@ -155,9 +171,17 @@ export const getNextTask = (): TaskQueueRow | null => {
     `)
     .all() as TaskQueueRow[];
 
+  const result: TaskQueueRow[] = [];
+  // 이번 배치에서 선택한 스레드 추적 (같은 스레드 중복 방지)
+  const selectedThreads = new Set<string>();
+
   for (const task of candidates) {
-    // 동일 스레드에서 이미 실행 중인 태스크가 있으면 스킵
-    if (runningThreadSet.has(task.thread_ts)) {
+    if (result.length >= maxCount) {
+      break;
+    }
+
+    // 동일 스레드에서 이미 실행 중이거나 이번 배치에서 선택됨 → 스킵
+    if (runningThreadSet.has(task.thread_ts) || selectedThreads.has(task.thread_ts)) {
       continue;
     }
 
@@ -171,15 +195,15 @@ export const getNextTask = (): TaskQueueRow | null => {
         .get(task.parent_queue_id, task.depends_on) as { status: string } | undefined;
 
       if (!dependency || dependency.status !== 'completed') {
-        // 의존하는 태스크가 아직 완료되지 않음 → 스킵
         continue;
       }
     }
 
-    return task;
+    result.push(task);
+    selectedThreads.add(task.thread_ts);
   }
 
-  return null;
+  return result;
 };
 
 // ─── 상태 업데이트 ────────────────────────────────────
