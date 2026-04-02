@@ -79,6 +79,10 @@ import {
   startContextCleanupScheduler,
   formatCleanupReport,
 } from './context-cleanup.js';
+import {
+  emit,
+  emitMessageRouted,
+} from './hook-events.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
@@ -1764,6 +1768,12 @@ const flushDebounceBuffer = async (
   console.log(
     `[route] "${combinedText.slice(0, 50)}..." → [${agentNames}] (${routing.execution}, ${routing.method})`,
   );
+  emitMessageRouted(
+    channel,
+    slackEvent.ts,
+    routing.agents.map((a) => a.name),
+    routing.method,
+  );
 
   // 🧠 → 라우팅 완료, 에이전트 실행 시작 (🧠 제거)
   // 디바운스 배치 시 모든 원본 메시지의 🧠 제거
@@ -2340,6 +2350,11 @@ const main = async () => {
   console.log(
     '[start] Agent SDK 런타임 활성 — 병렬 실행 + mention 기반 에이전트 간 위임 지원',
   );
+  emit({
+    type: 'bridge.started',
+    timestamp: Date.now(),
+    source: 'bridge',
+  });
 
   // Auto-Proceed: 만료된 승인 정리 + 콜백 등록
   await cleanupExpiredApprovals(apps[0]);
@@ -2611,6 +2626,11 @@ const main = async () => {
   // 종료 시그널 처리
   const shutdown = async () => {
     console.log('\n[shutdown] Socket Mode 연결 종료 중...');
+    emit({
+      type: 'bridge.shutdown',
+      timestamp: Date.now(),
+      source: 'bridge',
+    });
 
     // 1. 모든 인터벌 정리
     clearInterval(cleanupInterval);

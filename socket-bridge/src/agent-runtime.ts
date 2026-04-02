@@ -30,6 +30,11 @@ import { runMeeting, type MeetingType } from './meeting.js';
 import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
+import {
+  emitAgentStarted,
+  emitAgentCompleted,
+  emitAgentFailed,
+} from './hook-events.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -1198,6 +1203,7 @@ export const handleMessage = async (
     routingMethod,
     timestamp: new Date().toISOString(),
   });
+  emitAgentStarted(agentName, event.channel, event.ts);
 
   // 중단 제어용 AbortController 등록
   const abortController = new AbortController();
@@ -2055,6 +2061,12 @@ export const handleMessage = async (
       escalationReason,
     });
     recordAgentStat(agentName, true);
+    emitAgentCompleted(
+      agentName,
+      event.channel,
+      event.ts,
+      Date.now() - startTime,
+    );
 
     // 칸반 카드 미생성 fallback — 에이전트가 create_kanban_card를 호출하지 않은 경우 자동 생성
     if (kanbanCardId === undefined) {
@@ -2128,6 +2140,13 @@ export const handleMessage = async (
       error: err instanceof Error ? err.message : String(err),
     });
     recordAgentStat(agentName, false);
+    emitAgentFailed(
+      agentName,
+      event.channel,
+      event.ts,
+      err instanceof Error ? err.message : String(err),
+      Date.now() - startTime,
+    );
 
     // ⚒️ → ❌ 에러 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
     if (canReact) {
