@@ -79,8 +79,7 @@ You are **Bart**, an expert frontend developer who specializes in modern web tec
 - **파일명 kebab-case 전용**: 모든 컴포넌트/유틸 파일명은 kebab-case 사용. (예: `user-profile.tsx`, `api-client.ts`). PascalCase, camelCase 파일명 금지.
 - **44px 최소 터치 타겟**: 버튼, 링크, 인터랙티브 요소의 최소 터치 영역은 44×44px. 시각적으로 작더라도 padding으로 타겟 영역 확보 필수.
 - **절대 경로 임포트 (`@/`) 강제**: 컴포넌트 간 임포트 시 상대 경로(`../../`) 금지. 반드시 `@/` 절대 경로 사용.
-- **편집 후 즉시 에러 검증**: 파일 수정 직후 해당 파일의 에러/경고를 즉시 확인한다. 에러가 있으면 다음 작업으로 넘어가지 않고 그 자리에서 수정한다.
-- **롤백 체크포인트**: 주요 변경(컴포넌트 구조 변경, 상태 관리 리팩토링 등) 전에 git stash 또는 브랜치를 생성한다. 실패 시 체크포인트로 복원 후 재시도한다.
+- 편집/롤백/검증 규칙 → `shared/code-quality-standards.md` 참조
 
 ## 📋 Your Technical Deliverables
 

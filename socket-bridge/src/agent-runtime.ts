@@ -558,11 +558,34 @@ const buildContextRulesPrefix = (): string => {
 /** decisions/ 디렉토리에서 로드할 최대 파일 수 */
 const MAX_DECISION_FILES = 5;
 
+/** 공유 메모리 캐시 엔트리 */
+interface SharedMemoryCacheEntry {
+  content: string;
+  loadedAt: number;
+}
+
+/** 공유 메모리 캐시 (모든 에이전트에 동일 → 1회 로드 후 재사용) */
+let sharedMemoryCache: SharedMemoryCacheEntry | null = null;
+
+/** 공유 메모리 캐시 TTL (5분) */
+const SHARED_MEMORY_CACHE_TTL_MS = 5 * 60 * 1000;
+
 /**
  * 프로젝트 공유 메모리 로드 — 모든 에이전트에 동일하게 주입
+ *
+ * 5분 TTL 캐시로 동일 내용 반복 로드 방지.
+ * decisions/facts는 자주 변경되지 않으므로 캐시 효과 높음.
+ *
  * @returns 공유 메모리 문자열 (project-context + 최근 decisions)
  */
 const loadSharedMemory = (): string => {
+  const now = Date.now();
+  if (
+    sharedMemoryCache &&
+    now - sharedMemoryCache.loadedAt < SHARED_MEMORY_CACHE_TTL_MS
+  ) {
+    return sharedMemoryCache.content;
+  }
   const parts: string[] = ['# 프로젝트 공유 메모리 (자동 주입)', ''];
 
   // 1. project-context.md
@@ -611,7 +634,9 @@ const loadSharedMemory = (): string => {
     }
   }
 
-  return parts.join('\n');
+  const result = parts.join('\n');
+  sharedMemoryCache = { content: result, loadedAt: Date.now() };
+  return result;
 };
 
 /**
@@ -769,6 +794,33 @@ const BASE_TOOLS = [
   ...CONTEXT7_TOOLS,
   'Agent',
 ];
+
+/** 대화형 메시지용 경량 도구 (도구 불필요한 간단 응답) */
+const CONVERSATIONAL_TOOLS = [
+  'Read',
+  'Skill',
+  ...SLACK_TOOLS,
+];
+
+/**
+ * 라우팅 방식에 따른 도구 필터링
+ *
+ * conversational/broadcast 라우팅은 간단한 응답이므로 경량 도구만 제공.
+ * 나머지는 에이전트 전체 도구 세트 사용.
+ *
+ * @param fullTools - 에이전트 전체 도구 목록
+ * @param routingMethod - 라우팅 방식
+ * @returns 필터링된 도구 목록
+ */
+const filterToolsByRouting = (
+  fullTools: string[],
+  routingMethod: string,
+): string[] => {
+  if (routingMethod === 'conversational') {
+    return CONVERSATIONAL_TOOLS;
+  }
+  return fullTools;
+};
 
 /**
  * 에이전트별 허용 도구 목록 반환
@@ -1266,7 +1318,8 @@ export const handleMessage = async (
       agentName,
       botToken,
     );
-    const baseTools = getToolsForAgent(agentName);
+    const fullTools = getToolsForAgent(agentName);
+    const baseTools = filterToolsByRouting(fullTools, routingMethod);
 
     if (agentName === 'pm') {
       const delegationServer = createSdkMcpServer({
