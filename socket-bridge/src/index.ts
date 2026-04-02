@@ -1766,14 +1766,17 @@ const flushDebounceBuffer = async (
   );
 
   // 🧠 → 라우팅 완료, 에이전트 실행 시작 (🧠 제거)
-  try {
-    await apps[0].client.reactions.remove({
-      channel,
-      timestamp: lastMessage.ts,
-      name: 'brain',
-    });
-  } catch {
-    // 리액션 제거 실패 무시
+  // 디바운스 배치 시 모든 원본 메시지의 🧠 제거
+  for (const m of messages) {
+    try {
+      await apps[0].client.reactions.remove({
+        channel,
+        timestamp: m.ts,
+        name: 'brain',
+      });
+    } catch {
+      // 리액션 제거 실패 무시
+    }
   }
 
   // 실행
