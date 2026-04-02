@@ -6,6 +6,31 @@ import type {
   RoutingAgent,
   RoutingResult,
 } from './types.js';
+import {
+  withRetry,
+  createCircuitBreaker,
+  type RetryOptions,
+} from './retry.js';
+
+/**
+ * LLM API Circuit Breaker
+ *
+ * 연속 5회 실패 시 회로 열림 → 60초 후 시험 요청 허용
+ * LLM 라우팅 호출(queryLlm)에 적용하여 API 장애 시 빠른 실패 보장
+ */
+export const llmCircuitBreaker = createCircuitBreaker({
+  failureThreshold: 5,
+  resetTimeoutMs: 60_000,
+  label: 'llm-routing',
+});
+
+/** LLM 라우팅용 기본 재시도 옵션 */
+const LLM_RETRY_OPTIONS: RetryOptions = {
+  maxRetries: 2,
+  baseDelayMs: 500,
+  maxDelayMs: 5_000,
+  label: 'llm-query',
+};
 
 /** QA 직접 실행 명령어 패턴 (specPath 포함) */
 const QA_COMMAND_PATTERN =
@@ -155,7 +180,13 @@ export const queryLlm = async (
   };
 
   try {
-    return await withTimeout(run(), timeoutMs, 'LLM routing');
+    return await withRetry(
+      () =>
+        llmCircuitBreaker.wrap(() =>
+          withTimeout(run(), timeoutMs, 'LLM routing'),
+        ),
+      LLM_RETRY_OPTIONS,
+    );
   } catch (err) {
     console.warn('[router] LLM 쿼리 실패:', err);
     return null;
