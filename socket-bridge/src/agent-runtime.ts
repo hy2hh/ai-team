@@ -1219,6 +1219,8 @@ export interface HandleMessageResult {
   escalationReason?: string;
   /** 에이전트가 create_kanban_card 도구로 생성한 칸반 카드 ID */
   kanbanCardId?: number;
+  /** 사용자 ⛔ 리액션 또는 stale 타임아웃으로 중단된 경우 true */
+  aborted?: boolean;
 }
 
 export const handleMessage = async (
@@ -2178,6 +2180,13 @@ export const handleMessage = async (
         timestamp: new Date().toISOString(),
         elapsedMs: Date.now() - startTime,
       });
+      emitAgentFailed(
+        agentName,
+        event.channel,
+        event.ts,
+        'aborted by user',
+        Date.now() - startTime,
+      );
       // ⚒️ → ⛔ 중단 리액션 — 에이전트 메시지에만
       if (canReact) {
         try {
@@ -2195,7 +2204,7 @@ export const handleMessage = async (
           console.error(`[reaction] ⛔ 중단 리액션 전환 실패:`, err);
         }
       }
-      return { text: '', delegationTargets: [] };
+      return { text: '', delegationTargets: [], aborted: true };
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
