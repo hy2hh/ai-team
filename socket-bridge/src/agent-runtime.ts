@@ -518,6 +518,12 @@ const buildContextRulesPrefix = (agentName: string): string => {
     '- "없다", "안 된다", "구현되지 않았다"는 주장은 Grep/Glob/Read로 검증한 증거가 필요합니다.',
     '- 추론, 추측, 가정 기반 답변 금지. 모르면 "확인이 필요합니다"라고 하세요.',
     '',
+    '## 분석 보고 정확성 (수치/비교 주장 시 필수)',
+    '- 수치 주장(N개, N회, N건 등)에는 반드시 `파일명:라인번호`를 인용하세요. 예: "인덱스 6개 (db.ts:52-68)"',
+    '- 조건 분기가 있는 코드를 분석할 때는 최소/최대 실행 경로를 모두 명시하세요. 예: "쿼리 최소 3개(wip_limit=null) ~ 최대 5개"',
+    '- 최적화나 개선을 제안할 때는 원본 코드와 제안 코드의 차이점을 명시하세요. 특히 조건절(WHERE, AND, OR)의 변경은 반드시 강조하세요.',
+    '- 비교 목적으로 다른 엔드포인트/함수를 언급할 때도 동일한 정확성 기준을 적용하세요. 본문이 아닌 부수적 언급도 검증 대상입니다.',
+    '',
     '## 자율 실행 (AGI 행동 원칙)',
     '- 작업을 받으면 즉시 실행하세요. "시작할까요?", "진행할까요?", "어떻게 할까요?" 질문 금지.',
     '- 계획을 세웠으면 바로 구현하세요. 승인을 기다리지 마세요.',
@@ -2088,6 +2094,33 @@ export const handleMessage = async (
         `[enforcement] ${agentName} 사실 주장에 도구 사용 기록 없음`,
       );
       resultText += '\n\n> ⚠️ _[bridge 자동 경고] 프로젝트 내부 사실을 주장했으나 Read/Grep/Glob/Bash 사용 기록이 없습니다. 코드/파일을 직접 확인 후 답변하세요._';
+    }
+
+    // ── 분석 보고 정확성 경고: 수치 주장에 소스 라인 인용 누락 감지 ──────
+    const NUMERIC_CLAIM_PATTERNS = [
+      /\d+\s*개\s*(쿼리|인덱스|엔드포인트|API|파일|테이블|컬럼|필드)/,
+      /\d+\s*회\s*(실행|호출|조회)/,
+      /\d+\s*건/,
+      /최소\s*\d+\s*개/,
+      /최대\s*\d+\s*개/,
+    ];
+    const LINE_REF_PATTERNS = [
+      /\d+번?\s*줄/,
+      /line\s*\d+/i,
+      /:\d{1,4}[)~\-\s]/,
+      /\(.*\d+[-~]\d+.*\)/,
+    ];
+
+    if (
+      resultText &&
+      usedSearchTools &&
+      NUMERIC_CLAIM_PATTERNS.some((p) => p.test(resultText)) &&
+      !LINE_REF_PATTERNS.some((p) => p.test(resultText))
+    ) {
+      console.warn(
+        `[enforcement] ${agentName} 수치 주장에 소스 라인 인용 누락`,
+      );
+      resultText += '\n\n> ⚠️ _[bridge 자동 경고] 수치 주장(N개, N회 등)이 포함되어 있으나 소스 라인 번호 인용이 없습니다. 파일명:라인번호를 명시하세요._';
     }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
