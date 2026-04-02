@@ -7,9 +7,13 @@ import type {
   RoutingResult,
 } from './types.js';
 
-/** QA 직접 실행 명령어 패턴 */
+/** QA 직접 실행 명령어 패턴 (specPath 포함) */
 const QA_COMMAND_PATTERN =
   /(?:QA|qa)\s*(?:실행|검증|run)\s+(docs\/specs\/[^\s]+\.md)/i;
+
+/** QA 명령어 패턴 (specPath 없음 — 에러 안내용) */
+const QA_COMMAND_NO_SPEC_PATTERN =
+  /^[\s]*(?:QA|qa)\s*(?:실행|검증|run)[\s]*$/i;
 
 /**
  * QA 실행 명령어 파싱
@@ -26,6 +30,10 @@ export const parseQACommand = (
   const match = QA_COMMAND_PATTERN.exec(text);
   if (match) {
     return { isQACommand: true, specPath: match[1] };
+  }
+  // specPath 없는 QA 명령어 감지 → 에러 안내용 플래그
+  if (QA_COMMAND_NO_SPEC_PATTERN.test(text)) {
+    return { isQACommand: true, specPath: undefined };
   }
   return { isQACommand: false };
 };

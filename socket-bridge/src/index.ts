@@ -1752,6 +1752,22 @@ const flushDebounceBuffer = async (
 
   // 실행
   const executeTask = async () => {
+    // QA 명령어 — specPath 없으면 사용법 안내
+    if (routing.isQACommand && !routing.specPath) {
+      await apps[0].client.chat.postMessage({
+        channel: slackEvent.channel,
+        thread_ts: slackEvent.thread_ts ?? slackEvent.ts,
+        text: [
+          '❌ *스펙 경로가 필요합니다*',
+          '',
+          '사용법: `QA 실행 docs/specs/{스펙파일}.md`',
+          '예시: `QA 실행 docs/specs/2026-03-31_kanban-ux-improvement.md`',
+        ].join('\n'),
+      });
+      console.log('[qa-loop] QA 명령어 — specPath 누락, 사용법 안내 전송');
+      return;
+    }
+
     // QA 직접 실행 명령어 분기 — 재작업 루프 없이 Chalmers QA 1회 직접 호출
     if (routing.isQACommand && routing.specPath) {
       const qaApp = findAgentApp('qa', apps);
