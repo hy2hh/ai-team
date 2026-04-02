@@ -27,18 +27,18 @@ description: Use when executing assigned implementation tasks with self-review a
 - [ ] 기존 기능이 깨지지 않았는가? (회귀 테스트)
 - [ ] 코드가 의도한 대로 동작하는가? (수동 확인)
 
-### Stage 2: Spec Compliance Review (다른 에이전트)
+### Stage 2: Spec Compliance Review (PM 위임)
+**구현 에이전트는 직접 리뷰를 요청하지 않는다.** Stage 1 완료 보고 시 PM(Marge)에게 결과를 전달하면, PM이 적절한 리뷰어를 위임한다.
 - 계획서의 Verification 항목이 모두 통과하는가?
 - 누락된 요구사항이 없는가?
 - 엣지 케이스가 처리되었는가?
-- 리뷰어: `/agent-review`의 리뷰어 매트릭스 참조
 
-### Stage 3: Code Quality Review (다른 에이전트)
+### Stage 3: Code Quality Review (PM 위임)
+PM이 Stage 2 통과 확인 후 Code Quality 리뷰어를 위임한다.
 - 코드 구조와 가독성
 - 에러 처리와 엣지 케이스
 - 보안 (입력 검증, 인증/인가)
 - 성능 (불필요한 연산, 메모리 사용)
-- 테스트 커버리지와 품질
 
 **순서 중요**: Spec 리뷰 미통과 시 Code Quality 리뷰 시작 금지.
 

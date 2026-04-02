@@ -57,7 +57,7 @@ description: Use when encountering bugs, errors, test failures, or unexpected be
 - 수정 시도 횟수를 추적한다
 - **3회 실패 시**: 같은 접근 반복 금지
   1. 시도와 결과 정리
-  2. sid에게 에스컬레이션 + Slack 아키텍처 토론
+  2. `escalate_to_pm` 도구로 PM에게 에스컬레이션 (PM이 sid 판단 요청)
   3. "접근 자체가 틀렸다"를 의심
 
 ## Condition-Based Waiting
@@ -80,7 +80,7 @@ description: Use when encountering bugs, errors, test failures, or unexpected be
 
 | 상황 | 행동 |
 |------|------|
-| 3+ 수정 실패 | sid 에스컬레이션 + 아키텍처 토론 |
+| 3+ 수정 실패 | `escalate_to_pm` → PM이 sid 에스컬레이션 판단 |
 | 다른 에이전트 작업 원인 | 해당 에이전트 @mention + 공동 디버깅 |
 | 재현 불가 | 디버그 계측 추가 + 모니터링 강화 |
 | 외부 의존성 원인 | sid 보고 + 우회 방안 제시 |
