@@ -82,6 +82,10 @@ import {
 import {
   emit,
   emitMessageRouted,
+  on,
+  type HookEvent,
+  type AgentEvent,
+  type CircuitEvent,
 } from './hook-events.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
@@ -2380,6 +2384,30 @@ const main = async () => {
     source: 'bridge',
   });
 
+  // ─── Hook Event 핸들러 등록 ─────────────────────────────
+  // agent.failed 로깅: 에이전트 실패 시 상세 로그 (디버깅용)
+  on({ pattern: 'agent.failed' }, (event: HookEvent) => {
+    const e = event as AgentEvent;
+    console.warn(
+      `[hook] agent.failed: ${e.agent} (${e.elapsedMs ?? 0}ms) — ${e.error ?? 'unknown'}`,
+    );
+  });
+
+  // circuit.opened 알림: circuit breaker 열림 시 Slack 알림
+  on({ pattern: 'circuit.*' }, async (event: HookEvent) => {
+    const e = event as CircuitEvent;
+    if (e.type === 'circuit.opened') {
+      try {
+        await apps[0].client.chat.postMessage({
+          channel: process.env.SLACK_CHANNEL_ID ?? '',
+          text: `🔴 *Circuit Breaker OPEN* — \`${e.label}\` (연속 ${e.consecutiveFailures ?? 0}회 실패)\nAPI 호출이 ${60}초간 차단됩니다.`,
+        });
+      } catch {
+        // 알림 실패 무시
+      }
+    }
+  });
+
   // Auto-Proceed: 만료된 승인 정리 + 콜백 등록
   await cleanupExpiredApprovals(apps[0]);
   onApproved((_approvalId, agents, reason, channel, messageTs) => {
@@ -2698,6 +2726,16 @@ const main = async () => {
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+
+  // 예상치 못한 에러 처리 — crash 방지 + cleanup 보장
+  process.on('uncaughtException', (err) => {
+    console.error('[fatal] uncaughtException:', err);
+    shutdown().catch(() => process.exit(1));
+  });
+  process.on('unhandledRejection', (reason) => {
+    console.error('[fatal] unhandledRejection:', reason);
+    // unhandledRejection은 crash하지 않지만 로그 기록 필수
+  });
 };
 
 main().catch((err) => {
