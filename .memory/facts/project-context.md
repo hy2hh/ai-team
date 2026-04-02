@@ -20,9 +20,9 @@
 
 ### ai-team (내부 인프라)
 - *목표:* Slack 기반 멀티 에이전트 협업 시스템 구축 및 운영
-- *상태:* Phase 2.2 — LRU 캐시, 재시도 로직, perf 타임스탬프 적용 완료
-- *라우팅:* 5단계 (mention → conversational → keyword → LLM → default)
-- *에이전트:* pm, designer, frontend, backend, researcher, secops
+- *상태:* Phase 3 — Hook 이벤트 시스템, Retry+Circuit Breaker, 컨텍스트 최적화 적용
+- *라우팅:* 6단계 (qa-command → mention → conversational → keyword → LLM → default)
+- *에이전트:* pm, designer, frontend, backend, researcher, secops, qa
 - *채널:* #ai-team (`C0ANKEB4CRF`)
 - *팀 ID:* `T0AH7BUS3D4`
 - *메모리:* `.memory/` 파일시스템 공유

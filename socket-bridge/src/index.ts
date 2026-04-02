@@ -819,8 +819,13 @@ const executeSingle = async (
       const afterSnapshot = snapshotChangedFiles();
       const stepChangedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
 
+      let stepHasFailure = false;
       for (let i = 0; i < step.agents.length; i++) {
         const r = stepResults[i];
+        const isFailed = r.status === 'rejected';
+        if (isFailed) {
+          stepHasFailure = true;
+        }
         seqResults.push({
           agent: step.agents[i],
           text: r.status === 'fulfilled'
@@ -834,9 +839,28 @@ const executeSingle = async (
           moveToDone(r.value.kanbanCardId).catch((err) =>
             console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
           );
-        } else if (r.status === 'rejected') {
-          // 실패 시에는 에이전트가 카드를 생성하지 못했을 수 있으므로 무시
         }
+      }
+
+      // step 실패 시 후속 step 중단 — 선행 step 실패한 상태로 후행 step 실행하면
+      // 의존성 없는 결과물이 생성됨 (예: Designer 실패 → Frontend가 디자인 없이 구현)
+      if (stepHasFailure) {
+        const failedAgents = step.agents.filter(
+          (_, i) => stepResults[i].status === 'rejected',
+        );
+        console.warn(
+          `[hub] 순차 위임 중단: step ${si + 1} 실패 [${failedAgents.join(', ')}] — 후속 ${result.delegationSteps!.length - si - 1}개 step 스킵`,
+        );
+        try {
+          await pmApp.client.chat.postMessage({
+            channel: event.channel,
+            thread_ts: event.thread_ts ?? event.ts,
+            text: `❌ *Step ${si + 1} 실패* — [${failedAgents.join(', ')}]\n후속 step 중단됨. PM 리뷰로 전환합니다.`,
+          });
+        } catch {
+          // 알림 실패 무시
+        }
+        break;
       }
 
       // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
