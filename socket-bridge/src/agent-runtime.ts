@@ -29,6 +29,7 @@ import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
 import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
+import { extractTableBlock } from './slack-table.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
   emitAgentStarted,
@@ -504,8 +505,10 @@ const buildContextRulesPrefix = (agentName: string): string => {
     '## 응답 규칙',
     '- 반드시 한국어로 응답하세요.',
     '- Slack mrkdwn만 사용: *굵게* _기울임_ ~취소선~ `코드` ```코드블록``` • 목록',
-    '- 절대 금지: **bold**, ## 헤더, [링크](url), 테이블(| --- | 포함 모든 형태)',
-    '- 구조화된 정보는 bullet list로만 표현',
+    '- 절대 금지: **bold**, ## 헤더, [링크](url)',
+    '- 구조화된 정보는 bullet list 또는 마크다운 테이블(`| 헤더 | 헤더 |\\n| --- | --- |\\n| 값 | 값 |`)로 표현',
+    '- 마크다운 테이블은 bridge가 자동으로 Slack Block Kit Table Block으로 변환해 실제 표로 렌더링합니다',
+    '- 테이블 제약: 메시지당 1개, 최대 100행 × 20열',
     '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답을 텍스트로 출력하면 bridge가 자동으로 포스팅합니다.',
     '',
     '## 브로드캐스트 응답 규칙',
@@ -2147,12 +2150,15 @@ export const handleMessage = async (
     let postedTs: string | undefined;
     if (resultText && !skipPosting) {
       try {
+        const fullText = resultText + metaFooter;
+        const tableBlock = extractTableBlock(fullText);
         const postResult =
           await rateLimited(() =>
             slackApp.client.chat.postMessage({
               channel: event.channel,
-              text: resultText + metaFooter,
+              text: fullText,
               thread_ts: event.thread_ts ?? event.ts,
+              ...(tableBlock ? { blocks: [tableBlock] } : {}),
             }),
           );
         postedTs = postResult.ts;
