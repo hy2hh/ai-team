@@ -9,6 +9,7 @@ import type {
 import {
   withRetry,
   createCircuitBreaker,
+  CircuitOpenError,
   type RetryOptions,
 } from './retry.js';
 
@@ -30,6 +31,17 @@ const LLM_RETRY_OPTIONS: RetryOptions = {
   baseDelayMs: 500,
   maxDelayMs: 5_000,
   label: 'llm-query',
+  isRetryable: (error) => {
+    // Circuit이 열려있으면 재시도하지 않음 (즉시 실패)
+    if (error instanceof CircuitOpenError) {
+      return false;
+    }
+    // timeout 에러는 재시도
+    if (error instanceof Error && error.message.includes('timeout')) {
+      return true;
+    }
+    return true;
+  },
 };
 
 /** QA 직접 실행 명령어 패턴 (specPath 포함) */

@@ -6,6 +6,7 @@
  * - 에러 분류별 전략 (retryable / non-retryable / rate-limit)
  * - Circuit Breaker: 연속 실패 N회 시 fallback 또는 차단
  */
+import { emitCircuitStateChange } from './hook-events.js';
 
 /** 재시도 옵션 */
 export interface RetryOptions {
@@ -228,6 +229,7 @@ export const createCircuitBreaker = (
     if (state.state !== 'closed') {
       console.log(`[${label}] circuit breaker: closed (복구 성공)`);
       state.state = 'closed';
+      emitCircuitStateChange(label, false);
     }
   };
 
@@ -237,13 +239,29 @@ export const createCircuitBreaker = (
     state.totalFailures++;
     state.lastFailureAt = Date.now();
 
-    if (
+    if (state.state === 'half-open') {
+      // half-open 시험 실패 → 즉시 open 복귀
+      state.state = 'open';
+      console.warn(
+        `[${label}] circuit breaker: OPEN (half-open 시험 실패)`,
+      );
+      emitCircuitStateChange(
+        label,
+        true,
+        state.consecutiveFailures,
+      );
+    } else if (
       state.consecutiveFailures >= failureThreshold &&
       state.state === 'closed'
     ) {
       state.state = 'open';
       console.warn(
         `[${label}] circuit breaker: OPEN (연속 ${state.consecutiveFailures}회 실패)`,
+      );
+      emitCircuitStateChange(
+        label,
+        true,
+        state.consecutiveFailures,
       );
     }
   };
@@ -303,32 +321,6 @@ export class CircuitOpenError extends Error {
     this.name = 'CircuitOpenError';
   }
 }
-
-/**
- * 재시도 + Circuit Breaker 결합 헬퍼
- *
- * @param fn - 실행할 비동기 함수
- * @param circuitBreaker - Circuit Breaker 인스턴스의 wrap 함수
- * @param retryOptions - 재시도 옵션
- * @returns fn의 반환값
- */
-export const withRetryAndCircuitBreaker = async <T>(
-  fn: () => Promise<T>,
-  circuitBreaker: ReturnType<typeof createCircuitBreaker>,
-  retryOptions: RetryOptions = {},
-): Promise<T> =>
-  withRetry(() => circuitBreaker.wrap(fn), {
-    ...retryOptions,
-    isRetryable: (error) => {
-      // Circuit이 열려있으면 재시도하지 않음
-      if (error instanceof CircuitOpenError) {
-        return false;
-      }
-      const check =
-        retryOptions.isRetryable ?? defaultIsRetryable;
-      return check(error);
-    },
-  });
 
 /** Promise 기반 sleep */
 const sleep = (ms: number): Promise<void> =>

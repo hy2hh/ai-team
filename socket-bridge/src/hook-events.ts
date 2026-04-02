@@ -142,6 +142,26 @@ export interface HookMatcher {
   pattern?: string;
 }
 
+/** 패턴 → 컴파일된 RegExp 캐시 (반복 컴파일 방지) */
+const patternCache = new Map<string, RegExp>();
+
+/**
+ * 와일드카드 패턴을 RegExp로 변환 (캐싱)
+ *
+ * @param pattern - 와일드카드 패턴 (e.g., 'agent.*')
+ * @returns 컴파일된 RegExp
+ */
+const getPatternRegex = (pattern: string): RegExp => {
+  let regex = patternCache.get(pattern);
+  if (!regex) {
+    regex = new RegExp(
+      `^${pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')}$`,
+    );
+    patternCache.set(pattern, regex);
+  }
+  return regex;
+};
+
 /**
  * 이벤트가 matcher 조건에 부합하는지 확인
  *
@@ -170,10 +190,7 @@ const matchesFilter = (
 
   // 와일드카드 패턴 (e.g., 'agent.*' → agent.started, agent.completed 등)
   if (matcher.pattern) {
-    const regex = new RegExp(
-      `^${matcher.pattern.replace(/\./g, '\\.').replace(/\*/g, '.*')}$`,
-    );
-    if (!regex.test(event.type)) {
+    if (!getPatternRegex(matcher.pattern).test(event.type)) {
       return false;
     }
   }
