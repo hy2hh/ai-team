@@ -488,7 +488,7 @@ export const cleanupExpiredSessions = (): number => {
  * 강한 페르소나가 맥락 해석 규칙을 압도하는 것을 방지
  * @returns 맥락 규칙 prefix 문자열
  */
-const buildContextRulesPrefix = (): string => {
+const buildContextRulesPrefix = (agentName: string): string => {
   const agentIdList = Array.from(agentBotUserIds.entries())
     .map(([name, id]) => `  - ${name}: <@${id}>`)
     .join('\n');
@@ -503,8 +503,10 @@ const buildContextRulesPrefix = (): string => {
     '',
     '## 응답 규칙',
     '- 반드시 한국어로 응답하세요.',
-    '- Slack mrkdwn 형식만 사용하세요 (Markdown 금지).',
-    '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답 내용을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
+    '- Slack mrkdwn만 사용: *굵게* _기울임_ ~취소선~ `코드` ```코드블록``` • 목록',
+    '- 절대 금지: **bold**, ## 헤더, [링크](url), 테이블(| --- | 포함 모든 형태)',
+    '- 구조화된 정보는 bullet list로만 표현',
+    '- Slack 포스팅 도구를 직접 호출하지 마세요. 응답을 텍스트로 출력하면 bridge가 자동으로 포스팅합니다.',
     '',
     '## 브로드캐스트 응답 규칙',
     '- 여러 에이전트에게 동시에 전달된 메시지인 경우, 반드시 자신의 전문 영역에 대해서만 답변하세요.',
@@ -537,14 +539,19 @@ const buildContextRulesPrefix = (): string => {
     agentIdList,
     '- 자신이 직접 처리할 수 있는 작업은 위임하지 마세요.',
     '',
-    '### 위임 순서 — 표준 체인 패턴 (계획 수립 + 위임 모두 적용)',
-    '계획을 세우거나 위임할 때 다음 의존 관계를 반드시 따르세요.',
-    '선행 에이전트의 산출물 없이 후행 에이전트를 담당자로 지정하거나 위임하면 안 됩니다:',
-    '- UI/UX 작업: Designer → Frontend (디자인 스펙 완료 후 구현. Designer 없이 Frontend 직접 배정 금지)',
-    '- API + UI: Backend → Frontend (API 계약 확정 후 프론트 연동)',
-    '- 시장 → 기획: Researcher → PM (조사 결과로 PRD 작성)',
-    '- 구현 → 보안: Frontend/Backend → SecOps (코드 완료 후 보안 리뷰)',
-    '- 풀 사이클: PM → Designer → Frontend + Backend → SecOps',
+    // 위임 순서 규칙은 PM만 필요 (다른 에이전트는 delegate 도구 자체가 제한적)
+    ...(agentName === 'pm'
+      ? [
+          '### 위임 순서 — 표준 체인 패턴 (계획 수립 + 위임 모두 적용)',
+          '계획을 세우거나 위임할 때 다음 의존 관계를 반드시 따르세요.',
+          '선행 에이전트의 산출물 없이 후행 에이전트를 담당자로 지정하거나 위임하면 안 됩니다:',
+          '- UI/UX 작업: Designer → Frontend (디자인 스펙 완료 후 구현. Designer 없이 Frontend 직접 배정 금지)',
+          '- API + UI: Backend → Frontend (API 계약 확정 후 프론트 연동)',
+          '- 시장 → 기획: Researcher → PM (조사 결과로 PRD 작성)',
+          '- 구현 → 보안: Frontend/Backend → SecOps (코드 완료 후 보안 리뷰)',
+          '- 풀 사이클: PM → Designer → Frontend + Backend → SecOps',
+        ]
+      : []),
     '',
     '---',
     '',
@@ -816,7 +823,8 @@ const filterToolsByRouting = (
   fullTools: string[],
   routingMethod: string,
 ): string[] => {
-  if (routingMethod === 'conversational') {
+  // 간단한 응답만 필요한 라우팅: 경량 도구 세트
+  if (routingMethod === 'conversational' || routingMethod === 'broadcast') {
     return CONVERSATIONAL_TOOLS;
   }
   return fullTools;
@@ -991,7 +999,7 @@ const loadPersona = (agentName: string): string => {
     ].join('\n');
 
     return [
-      buildContextRulesPrefix(),
+      buildContextRulesPrefix(agentName),
       sharedMemory,
       agentMemory,
       persona,
@@ -1044,14 +1052,7 @@ const formatSlackEventAsPrompt = (
   if (instruction) {
     parts.push(`지시: ${instruction}`);
   }
-  parts.push('언어: 반드시 한국어로 응답하세요.');
-  parts.push(
-    '포맷 규칙 (엄격 준수):',
-    '- Slack mrkdwn만 사용: *굵게* _기울임_ ~취소선~ `코드` ```코드블록``` • 목록',
-    '- 절대 금지: **bold**, ## 헤더, [링크](url), 테이블(| --- | 포함 모든 형태), 코드블록 안 테이블도 금지',
-    '- 구조화된 정보는 bullet list로만 표현. 예: *항목명:* 설명',
-    '- 중요: Slack 포스팅 도구를 직접 호출하지 마세요. 응답을 텍스트로 출력하면 bridge가 자동으로 Slack에 포스팅합니다.',
-  );
+  // 언어/포맷 규칙은 시스템 프롬프트(buildContextRulesPrefix)에 정의 — 중복 주입 불필요
   if (event.threadTopic) {
     parts.push(
       '',
