@@ -1,4 +1,5 @@
 import { getDb } from './db.js';
+import { emit } from './hook-events.js';
 
 /** Claim 만료 시간 (24시간) */
 const CLAIM_EXPIRY_MS = 24 * 60 * 60 * 1000;
@@ -53,7 +54,18 @@ export const tryClaim = (
   `);
 
   const result = stmt.run(messageTs, agentName, channel ?? null, now, now);
-  return result.changes === 1;
+  const acquired = result.changes === 1;
+  if (acquired) {
+    emit({
+      type: 'claim.acquired',
+      timestamp: now,
+      source: agentName,
+      agent: agentName,
+      messageTs,
+      channel,
+    });
+  }
+  return acquired;
 };
 
 /**
@@ -71,6 +83,16 @@ export const updateClaim = (
   db.prepare(`
     UPDATE claims SET status = ?, updated_at = ? WHERE message_ts = ?
   `).run(status, now, messageTs);
+
+  if (status === 'completed' || status === 'failed') {
+    emit({
+      type: 'claim.released',
+      timestamp: now,
+      source: 'bridge',
+      agent: 'bridge',
+      messageTs,
+    });
+  }
 };
 
 /**
@@ -127,6 +149,14 @@ export const cleanupOrphanClaims = (): OrphanClaimInfo[] => {
     console.warn(
       `[claim] 오펀 감지 → failed: ${row.message_ts} (agent=${row.agent}, age=${Math.round(ageMs / 60000)}min)`,
     );
+    emit({
+      type: 'claim.orphaned',
+      timestamp: now,
+      source: 'bridge',
+      agent: row.agent,
+      messageTs: row.message_ts,
+      channel: row.channel ?? undefined,
+    });
     return {
       messageTs: row.message_ts,
       agent: row.agent,

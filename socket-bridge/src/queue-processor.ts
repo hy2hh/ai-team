@@ -19,6 +19,7 @@ import {
 } from './queue-manager.js';
 import { moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
+import { emit } from './hook-events.js';
 
 // ─── 상수 ─────────────────────────────────────────────
 
@@ -207,6 +208,15 @@ const processNextTask = async (): Promise<void> => {
     }
 
     console.log(`[queue-processor] 태스크 완료: ${task.id}`);
+    emit({
+      type: 'queue.step.completed',
+      timestamp: Date.now(),
+      source: task.agent,
+      queueId: task.parent_queue_id ?? task.id,
+      channel: task.channel,
+      threadTs: task.thread_ts,
+      stepSequence: task.sequence,
+    });
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);

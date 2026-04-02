@@ -48,6 +48,13 @@
 2. `.memory/facts/project-context.md` 읽기
 3. `.memory/decisions/`, `.memory/handoff/` 확인
 
+### Memory Drift 검증 (필수)
+메모리 파일의 정보는 **작성 시점의 스냅샷**이다. 참조 시 반드시 검증:
+- 파일 경로를 언급하는 메모리 → 해당 파일이 존재하는지 확인
+- 함수/API를 언급하는 메모리 → grep으로 현재 존재 여부 확인
+- 프로젝트 상태를 언급하는 메모리 → git log로 최신 변경 확인
+- **"메모리에 X가 있다 ≠ X가 지금도 존재한다"** — 현재 상태를 항상 우선
+
 ### After Completing
 1. `active-{role}.md` → `done.md` 이동
 2. 새 지식 → `facts/` 업데이트
