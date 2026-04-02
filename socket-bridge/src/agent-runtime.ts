@@ -634,7 +634,9 @@ const loadSharedMemory = (): string => {
 
       if (files.length > 0) {
         parts.push(
-          '## 최근 결정사항 (요약 — 전문은 `.memory/decisions/{파일명}`을 Read로 조회)',
+          '## 최근 결정사항 (세션 시작 시점 스냅샷)',
+          '> 이 목록은 세션 시작 시 로드된 요약입니다. 중요한 결정 전에 `.memory/decisions/`를 Read로 직접 확인하세요.',
+          '> 전문: `.memory/decisions/{파일명}`을 Read로 조회.',
           '',
         );
         for (const file of files) {

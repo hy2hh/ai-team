@@ -1432,9 +1432,22 @@ const executeParallel = async (
     (r) => r.result.status === 'rejected',
   );
 
-  // 실패한 에이전트 1회 재시도
-  if (failed.length > 0) {
-    const failedNames = failed
+  // 실패한 에이전트 1회 재시도 (타임아웃은 재시도해도 같은 결과이므로 제외)
+  const retryable = failed.filter((f) => {
+    const reason = (f.result as PromiseRejectedResult).reason;
+    const msg = reason instanceof Error ? reason.message : String(reason);
+    return !msg.includes('[timeout]');
+  });
+  const timedOut = failed.filter((f) => !retryable.includes(f));
+
+  if (timedOut.length > 0) {
+    console.warn(
+      `[exec] 타임아웃 에이전트 (재시도 제외): [${timedOut.map((f) => f.name).join(', ')}]`,
+    );
+  }
+
+  if (retryable.length > 0) {
+    const failedNames = retryable
       .map((f) => f.name)
       .join(', ');
     console.warn(
@@ -1442,7 +1455,7 @@ const executeParallel = async (
     );
 
     const retryResults = await Promise.allSettled(
-      failed.map((f) => {
+      retryable.map((f) => {
         const app = findAgentApp(f.name, apps);
         // 재시도 시 리액션 관리 건너뛰기 (이미 첫 시도에서 처리됨)
         return withAgentTimeout(
@@ -1453,29 +1466,30 @@ const executeParallel = async (
       }),
     );
 
-    const stillFailed: string[] = [];
-    for (let j = 0; j < failed.length; j++) {
+    const stillFailed: string[] = [
+      ...timedOut.map((f) => f.name), // 타임아웃은 재시도 없이 실패 확정
+    ];
+    for (let j = 0; j < retryable.length; j++) {
       if (retryResults[j].status === 'rejected') {
-        stillFailed.push(failed[j].name);
+        stillFailed.push(retryable[j].name);
         console.error(
-          `[exec]   ${failed[j].name} 재시도 실패:`,
+          `[exec]   ${retryable[j].name} 재시도 실패:`,
           (retryResults[j] as PromiseRejectedResult).reason,
         );
       } else {
         console.log(
-          `[exec]   ${failed[j].name} 재시도 성공`,
+          `[exec]   ${retryable[j].name} 재시도 성공`,
         );
       }
     }
 
     if (stillFailed.length > 0) {
-      // 재시도 후에도 실패한 에이전트 Slack 알림
       try {
         const threadTs = event.thread_ts ?? event.ts;
         await apps[0].client.chat.postMessage({
           channel: event.channel,
           thread_ts: threadTs,
-          text: `⚠️ [${stillFailed.join(', ')}] 에이전트가 응답하지 못했습니다. (재시도 포함 ${agentNames.length - stillFailed.length}/${agentNames.length} 성공)`,
+          text: `⚠️ [${stillFailed.join(', ')}] 에이전트가 응답하지 못했습니다. (${agentNames.length - stillFailed.length}/${agentNames.length} 성공)`,
         });
       } catch {
         // 알림 실패는 무시
@@ -1483,7 +1497,22 @@ const executeParallel = async (
     }
 
     console.log(
-      `[exec] 병렬 실행 완료: ${agentNames.length - stillFailed.length}/${agentNames.length} 성공 (재시도 ${failed.length - stillFailed.length}건 복구)`,
+      `[exec] 병렬 실행 완료: ${agentNames.length - stillFailed.length}/${agentNames.length} 성공 (재시도 ${retryable.length - (stillFailed.length - timedOut.length)}건 복구, 타임아웃 ${timedOut.length}건)`,
+    );
+  } else if (timedOut.length > 0) {
+    // 재시도 대상은 없지만 타임아웃 에이전트가 있는 경우
+    try {
+      const threadTs = event.thread_ts ?? event.ts;
+      await apps[0].client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: threadTs,
+        text: `⚠️ [${timedOut.map((f) => f.name).join(', ')}] 에이전트가 시간 초과되었습니다. (${agentNames.length - timedOut.length}/${agentNames.length} 성공)`,
+      });
+    } catch {
+      // 알림 실패 무시
+    }
+    console.log(
+      `[exec] 병렬 실행 완료: ${agentNames.length - timedOut.length}/${agentNames.length} 성공 (타임아웃 ${timedOut.length}건)`,
     );
   } else {
     console.log(
