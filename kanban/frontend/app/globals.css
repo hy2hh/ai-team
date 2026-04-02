@@ -5,6 +5,31 @@
    ============================================= */
 :root,
 [data-theme="dark"] {
+  /* 타이포그래피 토큰 — Bifrost 디자인 시스템 기반 */
+  --text-h3: 20px;
+  --text-h4: 17px;
+  --text-body: 14px;
+  --text-body-sm: 13px;
+  --text-caption: 12px;
+  --text-label: 11px;
+
+  --line-height-tight: 1.3;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.65;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Border Radius 토큰 */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-pill: 20px;
+  --radius-full: 50%;
+
   /* 배경 레이어 — 깊은 네이비 다크 팔레트 */
   --color-bg-base:        #080d17;
   --color-bg-surface:     #0d1526;
@@ -29,11 +54,18 @@
   --color-action-secondary:       #172039;
   --color-action-secondary-hover: #1e2d47;
 
+  /* 포인트컬러 토큰 */
+  --color-point:        #818cf8;
+  --color-point-hover:  #a5b4fc;
+  --color-point-subtle: rgba(129, 140, 248, 0.12);
+  --color-point-border: rgba(129, 140, 248, 0.30);
+  --color-point-glow:   rgba(129, 140, 248, 0.20);
+
   /* 포커스 */
-  --color-focus-ring: #4f7ef0;
+  --color-focus-ring: #818cf8;
 
   /* 드래그/드롭 */
-  --color-drag-over: #4f7ef0;
+  --color-drag-over: #818cf8;
 
   /* 상태 색상 */
   --color-priority-high:    #f87171;
@@ -69,17 +101,30 @@
   --color-due-normal:         #4ade80;
 
   /* 태그 */
-  --color-tag-bg:     rgba(79, 126, 240, 0.15);
-  --color-tag-border: rgba(79, 126, 240, 0.3);
-  --color-tag-text:   #6b95f5;
+  --color-tag-bg:     var(--color-point-subtle);
+  --color-tag-border: var(--color-point-border);
+  --color-tag-text:   var(--color-point-hover);
 
   /* accent alias — CardDetailModal 등에서 사용 */
   --color-accent: var(--color-action-primary);
+
+  /* WIP 초과 강조 */
+  --color-wip-exceeded-border: rgba(248, 113, 113, 0.45);
+  --color-wip-exceeded-shadow: rgba(248, 113, 113, 0.25);
 
   /* 애니메이션 duration 통일 */
   --duration-fast:   150ms;
   --duration-normal: 200ms;
   --duration-slow:   300ms;
+
+  /* 간격 토큰 — 4px 배수 */
+  --spacing-1:   4px;
+  --spacing-2:   8px;
+  --spacing-3:  12px;
+  --spacing-4:  16px;
+  --spacing-6:  24px;
+  --spacing-8:  32px;
+  --spacing-10: 40px;
 }
 
 /* =============================================
@@ -110,11 +155,18 @@
   --color-action-secondary:       #f1f5f9;
   --color-action-secondary-hover: #e2e8f0;
 
+  /* 포인트컬러 토큰 */
+  --color-point:        #4f46e5;
+  --color-point-hover:  #3730a3;
+  --color-point-subtle: rgba(79, 70, 229, 0.10);
+  --color-point-border: rgba(79, 70, 229, 0.25);
+  --color-point-glow:   rgba(79, 70, 229, 0.15);
+
   /* 포커스 */
-  --color-focus-ring: #3b6fd4;
+  --color-focus-ring: #4f46e5;
 
   /* 드래그/드롭 */
-  --color-drag-over: #3b6fd4;
+  --color-drag-over: #4f46e5;
 
   /* 상태 색상 — 라이트 배경에 맞게 진하게 조정 */
   --color-priority-high:    #dc2626;
@@ -153,25 +205,91 @@
   --color-tag-bg:     rgba(59, 111, 212, 0.1);
   --color-tag-border: rgba(59, 111, 212, 0.25);
   --color-tag-text:   #2d5bbf;
+
+  /* accent alias */
+  --color-accent: var(--color-action-primary);
+
+  /* WIP 초과 강조 — 라이트 배경 대비 */
+  --color-wip-exceeded-border: rgba(220, 38, 38, 0.4);
+  --color-wip-exceeded-shadow: rgba(220, 38, 38, 0.2);
 }
 
 @theme inline {
+  /* 배경 */
   --color-bg-base:              var(--color-bg-base);
   --color-bg-surface:           var(--color-bg-surface);
   --color-bg-elevated:          var(--color-bg-elevated);
   --color-bg-card:              var(--color-bg-card);
   --color-bg-input:             var(--color-bg-input);
+
+  /* 테두리 */
   --color-border:               var(--color-border);
   --color-border-strong:        var(--color-border-strong);
+
+  /* 텍스트 */
   --color-text-primary:         var(--color-text-primary);
   --color-text-secondary:       var(--color-text-secondary);
   --color-text-muted:           var(--color-text-muted);
   --color-text-inverse:         var(--color-text-inverse);
+
+  /* 액션 */
   --color-action-primary:       var(--color-action-primary);
   --color-action-primary-hover: var(--color-action-primary-hover);
   --color-action-secondary:     var(--color-action-secondary);
   --color-focus-ring:           var(--color-focus-ring);
   --color-drag-over:            var(--color-drag-over);
+  --color-accent:               var(--color-accent);
+
+  /* 포인트컬러 */
+  --color-point:                var(--color-point);
+  --color-point-hover:          var(--color-point-hover);
+  --color-point-subtle:         var(--color-point-subtle);
+  --color-point-border:         var(--color-point-border);
+  --color-point-glow:           var(--color-point-glow);
+
+  /* 우선순위 / 진행률 */
+  --color-priority-high:        var(--color-priority-high);
+  --color-priority-medium:      var(--color-priority-medium);
+  --color-priority-low:         var(--color-priority-low);
+  --color-progress-high:        var(--color-progress-high);
+  --color-progress-medium:      var(--color-progress-medium);
+  --color-progress-low:         var(--color-progress-low);
+
+  /* 에이전트 아바타 */
+  --color-agent-homer:          var(--color-agent-homer);
+  --color-agent-bart:           var(--color-agent-bart);
+  --color-agent-marge:          var(--color-agent-marge);
+  --color-agent-lisa:           var(--color-agent-lisa);
+  --color-agent-krusty:         var(--color-agent-krusty);
+  --color-agent-sid:            var(--color-agent-sid);
+  --color-agent-chalmers:       var(--color-agent-chalmers);
+  --color-agent-wiggum:         var(--color-agent-wiggum);
+
+  /* 컬럼 accent */
+  --color-col-todo:             var(--color-col-todo);
+  --color-col-inprogress:       var(--color-col-inprogress);
+  --color-col-review:           var(--color-col-review);
+  --color-col-done:             var(--color-col-done);
+  --color-col-default:          var(--color-col-default);
+
+  /* 마감일 */
+  --color-due-warning:          var(--color-due-warning);
+  --color-due-warning-bg:       var(--color-due-warning-bg);
+  --color-due-warning-border:   var(--color-due-warning-border);
+  --color-due-overdue:          var(--color-due-overdue);
+  --color-due-overdue-bg:       var(--color-due-overdue-bg);
+  --color-due-normal:           var(--color-due-normal);
+
+  /* 태그 */
+  --color-tag-bg:               var(--color-tag-bg);
+  --color-tag-border:           var(--color-tag-border);
+  --color-tag-text:             var(--color-tag-text);
+
+  /* WIP 초과 */
+  --color-wip-exceeded-border:  var(--color-wip-exceeded-border);
+  --color-wip-exceeded-shadow:  var(--color-wip-exceeded-shadow);
+
+  /* 폰트 */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -190,7 +308,7 @@ html[data-theme="light"] {
 body {
   background: var(--color-bg-base);
   color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Arial, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -309,7 +427,7 @@ select option {
   width: 40px;
   height: 40px;
   border: 3px solid var(--color-border-strong);
-  border-top-color: var(--color-action-primary);
+  border-top-color: var(--color-point, var(--color-action-primary));
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -362,13 +480,13 @@ select option {
   min-height: 44px;
 }
 .filter-chip:hover {
-  border-color: var(--color-border-strong);
+  border-color: var(--color-point-border, var(--color-border-strong));
   background: var(--color-bg-card);
 }
 .filter-chip--active {
-  background: var(--color-bg-card);
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
+  background: var(--color-point-subtle, var(--color-bg-card));
+  border-color: var(--color-point, var(--color-border-strong));
+  color: var(--color-point, var(--color-text-primary));
 }
 
 /* 태그 pill */
@@ -397,7 +515,7 @@ select option {
 }
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--card-accent-shadow, var(--color-border-strong));
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--card-accent-shadow, var(--color-border-strong)), 0 0 8px var(--color-point-glow);
   border-color: var(--card-accent-border, var(--color-border-strong)) !important;
 }
 /* 카드 삭제 버튼 — hover 시 표시 */
@@ -405,8 +523,8 @@ select option {
   opacity: 1 !important;
 }
 .delete-btn:hover {
-  color: #f87171 !important;
-  background: rgba(248,113,113,0.1) !important;
+  color: var(--color-priority-high) !important;
+  background: var(--color-due-overdue-bg) !important;
 }
 
 /* =============================================
@@ -423,8 +541,8 @@ select option {
    WIP 초과 컬럼 강조
    ============================================= */
 .column-wip-exceeded {
-  border-color: rgba(248,113,113,0.45) !important;
-  box-shadow: 0 0 0 1px rgba(248,113,113,0.25), 0 2px 12px rgba(0,0,0,0.15) !important;
+  border-color: var(--color-wip-exceeded-border) !important;
+  box-shadow: 0 0 0 1px var(--color-wip-exceeded-shadow), 0 2px 12px rgba(0,0,0,0.15) !important;
 }
 
 /* =============================================
@@ -499,4 +617,225 @@ select option {
 @keyframes modalFadeIn {
   from { opacity: 0; transform: scale(0.95) translateY(8px); }
   to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* =============================================
+   스켈레톤 로딩 애니메이션
+   ============================================= */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* 대시보드 그리드 레이아웃 */
+.dashboard-grid {
+  display: grid;
+  gap: 16px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.dashboard-grid--stats {
+  grid-template-columns: repeat(4, 1fr);
+}
+.dashboard-grid--two-col {
+  grid-template-columns: 7fr 5fr;
+}
+.dashboard-grid--half {
+  grid-template-columns: 1fr 1fr;
+}
+@media (min-width: 480px) and (max-width: 767px) {
+  .dashboard-grid--stats { grid-template-columns: 1fr 1fr; }
+  .dashboard-grid--two-col { grid-template-columns: 1fr; }
+  .dashboard-grid--half { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 479px) {
+  .dashboard-grid--stats { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dashboard-grid--two-col { grid-template-columns: 1fr; gap: 12px; }
+  .dashboard-grid--half { grid-template-columns: 1fr; gap: 12px; }
+}
+
+/* =============================================
+   Phase 6 — 모달 공통 클래스 (디자인 시스템)
+   ============================================= */
+
+/* 모달 컨테이너 — 통일 */
+.modal-container {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  width: 100%;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  overflow: hidden;
+  animation: modalFadeIn 180ms ease-out;
+}
+.modal-container--sm { max-width: 400px; }
+.modal-container--md { max-width: 480px; }
+.modal-container--lg { max-width: 560px; }
+
+/* 모달 헤더 — 통일 */
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: var(--text-h4);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  line-height: var(--line-height-tight);
+  letter-spacing: -0.01em;
+}
+
+/* 모달 바디 — 통일 */
+.modal-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.modal-body--scrollable {
+  overflow-y: auto;
+  max-height: calc(80vh - 140px);
+}
+
+/* 모달 푸터 — 통일 */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.modal-footer--split {
+  justify-content: space-between;
+}
+
+/* 닫기 버튼 — 통일 */
+.modal-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--duration-fast), color var(--duration-fast);
+}
+.modal-close-btn:hover {
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+}
+
+/* =============================================
+   Phase 6 — 버튼 공통 클래스 (디자인 시스템)
+   ============================================= */
+
+.btn-primary {
+  background: var(--color-point, var(--color-action-primary));
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background var(--duration-fast), box-shadow var(--duration-fast);
+  min-height: 44px;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-point-hover, var(--color-action-primary-hover));
+  box-shadow: 0 0 12px var(--color-point-glow);
+}
+.btn-primary:disabled {
+  background: var(--color-bg-card);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--color-action-secondary);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--duration-fast), color var(--duration-fast);
+  min-height: 44px;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-action-secondary-hover);
+  color: var(--color-text-primary);
+}
+
+/* =============================================
+   Phase 6 — 입력 필드 공통 클래스 (디자인 시스템)
+   ============================================= */
+
+.input-field {
+  width: 100%;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: var(--text-body-sm);
+  outline: none;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+.input-field:focus {
+  border-color: var(--color-point, var(--color-action-primary));
+  box-shadow: 0 0 0 3px var(--color-point-subtle, rgba(79,126,240,0.15));
+}
+.input-field::placeholder {
+  color: var(--color-text-muted);
+}
+
+.textarea-field {
+  width: 100%;
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: var(--text-body-sm);
+  line-height: var(--line-height-normal);
+  outline: none;
+  resize: vertical;
+  transition: border-color var(--duration-fast), box-shadow var(--duration-fast);
+}
+.textarea-field:focus {
+  border-color: var(--color-point, var(--color-action-primary));
+  box-shadow: 0 0 0 3px var(--color-point-subtle, rgba(79,126,240,0.15));
+}
+
+/* 라벨 공통 */
+.field-label {
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* =============================================
+   Phase 6 — 포커스 링 공통 (접근성)
+   ============================================= */
+
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
