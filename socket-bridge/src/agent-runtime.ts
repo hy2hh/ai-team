@@ -427,9 +427,9 @@ export const cancelAgent = (messageTs: string): boolean => {
 
 // ─── 메모리 관리: 주기적 정리 함수 ──────────────────────
 
-/** stale 에이전트 강제 중단 (기본 20분, 웹 검색 에이전트 고려) */
+/** stale 에이전트 강제 중단 (기본 60분) */
 const ACTIVE_AGENT_MAX_AGE_MS = Number(
-  process.env.BRIDGE_AGENT_STALE_MS ?? 20 * 60 * 1000,
+  process.env.BRIDGE_AGENT_STALE_MS ?? 60 * 60 * 1000,
 );
 
 export const cleanupStaleAgents = (): number => {
