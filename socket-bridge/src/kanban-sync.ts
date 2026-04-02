@@ -2,8 +2,17 @@
  * Kanban Sync Module
  * bridge 태스크 상태 전이 시 칸반 REST API를 fire-and-forget으로 호출
  */
+import { withRetry } from './retry.js';
 
 const BASE_URL = process.env.KANBAN_API_URL || 'http://localhost:3001';
+
+/** 칸반 API용 경량 재시도 옵션 (localhost → 짧은 backoff) */
+const KANBAN_RETRY = {
+  maxRetries: 2,
+  baseDelayMs: 200,
+  maxDelayMs: 1_000,
+  label: 'kanban-api',
+} as const;
 
 /** 컬럼 ID 매핑 */
 const COLUMN = {
@@ -105,24 +114,25 @@ export const createCard = async (
 ): Promise<number | null> => {
   try {
     const assignee = AGENT_DISPLAY_NAME[agent] ?? agent;
-    const res = await fetch(`${BASE_URL}/cards`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        column_id: COLUMN.BACKLOG,
-        title: title.slice(0, 400),
-        description: description?.slice(0, 500) ?? '',
-        assignee,
-        priority: 'medium',
-        progress: 0,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      console.warn(`[kanban-sync] createCard 실패: ${res.status} ${body.slice(0, 200)}`);
-      return null;
-    }
-    const data = await res.json();
+    const data = await withRetry(async () => {
+      const res = await fetch(`${BASE_URL}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          column_id: COLUMN.BACKLOG,
+          title: title.slice(0, 400),
+          description: description?.slice(0, 500) ?? '',
+          assignee,
+          priority: 'medium',
+          progress: 0,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`${res.status} ${body.slice(0, 200)}`);
+      }
+      return res.json();
+    }, KANBAN_RETRY);
     console.log(`[kanban-sync] 카드 생성: #${data.id} "${title.slice(0, 40)}"`);
     return data.id as number;
   } catch (err) {
@@ -160,15 +170,16 @@ export const updateCard = async (
  */
 export const moveToInProgress = async (cardId: number): Promise<void> => {
   try {
-    const res = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ column_id: COLUMN.IN_PROGRESS }),
-    });
-    if (!res.ok) {
-      console.warn(`[kanban-sync] moveToInProgress 실패: card=${cardId} ${res.status}`);
-      return;
-    }
+    await withRetry(async () => {
+      const res = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_id: COLUMN.IN_PROGRESS }),
+      });
+      if (!res.ok) {
+        throw new Error(`${res.status}`);
+      }
+    }, KANBAN_RETRY);
     console.log(`[kanban-sync] In Progress 이동: card #${cardId}`);
   } catch (err) {
     console.warn('[kanban-sync] moveToInProgress 오류:', err);
@@ -180,25 +191,25 @@ export const moveToInProgress = async (cardId: number): Promise<void> => {
  */
 export const moveToDone = async (cardId: number): Promise<void> => {
   try {
-    // 먼저 Done 컬럼으로 이동
-    const moveRes = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ column_id: COLUMN.DONE }),
-    });
-    if (!moveRes.ok) {
-      console.warn(`[kanban-sync] moveToDone 이동 실패: card=${cardId} ${moveRes.status}`);
-      return;
-    }
-    // progress=100 업데이트 (별도 PATCH)
-    const updateRes = await fetch(`${BASE_URL}/cards/${cardId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ progress: 100 }),
-    });
-    if (!updateRes.ok) {
-      console.warn(`[kanban-sync] moveToDone progress 업데이트 실패: card=${cardId} ${updateRes.status}`);
-    }
+    await withRetry(async () => {
+      const moveRes = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_id: COLUMN.DONE }),
+      });
+      if (!moveRes.ok) {
+        throw new Error(`move ${moveRes.status}`);
+      }
+      // progress=100 업데이트 (별도 PATCH)
+      const updateRes = await fetch(`${BASE_URL}/cards/${cardId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ progress: 100 }),
+      });
+      if (!updateRes.ok) {
+        console.warn(`[kanban-sync] moveToDone progress 업데이트 실패: card=${cardId} ${updateRes.status}`);
+      }
+    }, KANBAN_RETRY);
     console.log(`[kanban-sync] Done 이동: card #${cardId}`);
   } catch (err) {
     console.warn('[kanban-sync] moveToDone 오류:', err);
@@ -210,15 +221,16 @@ export const moveToDone = async (cardId: number): Promise<void> => {
  */
 export const moveToBlocked = async (cardId: number): Promise<void> => {
   try {
-    const res = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ column_id: COLUMN.BLOCKED }),
-    });
-    if (!res.ok) {
-      console.warn(`[kanban-sync] moveToBlocked 실패: card=${cardId} ${res.status}`);
-      return;
-    }
+    await withRetry(async () => {
+      const res = await fetch(`${BASE_URL}/cards/${cardId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ column_id: COLUMN.BLOCKED }),
+      });
+      if (!res.ok) {
+        throw new Error(`${res.status}`);
+      }
+    }, KANBAN_RETRY);
     console.log(`[kanban-sync] Blocked 이동: card #${cardId}`);
   } catch (err) {
     console.warn('[kanban-sync] moveToBlocked 오류:', err);
