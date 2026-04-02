@@ -287,7 +287,9 @@ export const emit = (event: HookEvent): void => {
   // once 핸들러 정리를 위한 제거 대상 수집
   const toRemove: string[] = [];
 
-  for (const entry of handlers) {
+  // 스냅샷 순회: 핸들러가 emit 중 on()으로 새 핸들러 등록해도 안전
+  const snapshot = [...handlers];
+  for (const entry of snapshot) {
     if (!matchesFilter(event, entry.matcher)) {
       continue;
     }

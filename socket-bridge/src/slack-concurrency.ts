@@ -132,8 +132,17 @@ export const partitionTasks = <T>(
   return partitions;
 };
 
-/** 최대 동시 실행 수 (read 배치) */
-const MAX_CONCURRENCY = 5;
+/** 최대 동시 실행 수 (read 배치, 환경변수로 조정 가능) */
+const MAX_CONCURRENCY = (() => {
+  const env = process.env.BRIDGE_SLACK_MAX_CONCURRENCY;
+  if (env) {
+    const parsed = parseInt(env, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return 5;
+})();
 
 /**
  * 파티셔닝된 작업 배치 실행
