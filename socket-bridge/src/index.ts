@@ -1383,6 +1383,8 @@ const executeParallel = async (
   method: string,
   apps: App[],
 ): Promise<void> => {
+  // 병렬 실행 시 각 에이전트에게 스코프 제한을 알리기 위해 method에 표식 추가
+  const parallelMethod = agentNames.length > 1 ? `${method}:parallel` : method;
   console.log(
     `[exec] 병렬 실행: [${agentNames.join(', ')}] (동시성 제한: ${MAX_PARALLEL_AGENTS})`,
   );
@@ -1413,7 +1415,7 @@ const executeParallel = async (
       batch.map((name) => {
         const app = findAgentApp(name, apps);
         return withAgentTimeout(
-          handleMessage(name, event, method, app),
+          handleMessage(name, event, parallelMethod, app),
           name,
           event.ts,
         );
@@ -1425,6 +1427,14 @@ const executeParallel = async (
         name: batch[j],
         result: batchResults[j],
       });
+
+      // 병렬 실행 완료 시 칸반 카드 → Done 이동
+      const r = batchResults[j];
+      if (r.status === 'fulfilled' && r.value.kanbanCardId) {
+        moveToDone(r.value.kanbanCardId).catch((err) =>
+          console.warn('[kanban-sync] 병렬 실행 moveToDone 실패:', err),
+        );
+      }
     }
   }
 
@@ -1459,7 +1469,7 @@ const executeParallel = async (
         const app = findAgentApp(f.name, apps);
         // 재시도 시 리액션 관리 건너뛰기 (이미 첫 시도에서 처리됨)
         return withAgentTimeout(
-          handleMessage(f.name, event, method, app, true),
+          handleMessage(f.name, event, parallelMethod, app, true),
           f.name,
           event.ts,
         );
