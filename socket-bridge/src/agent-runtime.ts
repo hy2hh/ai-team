@@ -2252,13 +2252,24 @@ export const handleMessage = async (
       }
     }
 
-    // 에러 시 Slack에 알림
+    // 에러 시 Slack에 알림 (에러 분류 포함)
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const isTimeout = errMsg.includes('timeout') || errMsg.includes('타임아웃');
+    const isNetwork = errMsg.includes('ECONNRESET') || errMsg.includes('ETIMEDOUT') || errMsg.includes('fetch failed');
+    const isMaxTurns = errMsg.includes('max_turns') || errMsg.includes('error_max_turns');
+    const errorHint = isTimeout
+      ? '(시간 초과 — 작업이 너무 복잡할 수 있습니다)'
+      : isNetwork
+        ? '(네트워크 오류 — 일시적 문제일 수 있습니다)'
+        : isMaxTurns
+          ? '(대화 한도 초과 — 작업을 더 작게 나눠주세요)'
+          : '';
     try {
       await rateLimited(() =>
         slackApp.client.chat.postMessage({
           channel: event.channel,
           thread_ts: event.thread_ts ?? event.ts,
-          text: `[${agentName}] 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.`,
+          text: `[${agentName}] 처리 중 오류가 발생했습니다. ${errorHint}\n잠시 후 다시 시도해주세요.`,
         }),
       );
     } catch (postErr) {
