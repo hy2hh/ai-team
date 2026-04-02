@@ -29,7 +29,7 @@ import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
 import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
-import { extractTableBlock } from './slack-table.js';
+import { buildMessageBlocks } from './slack-table.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
   emitAgentStarted,
@@ -2151,14 +2151,14 @@ export const handleMessage = async (
     if (resultText && !skipPosting) {
       try {
         const fullText = resultText + metaFooter;
-        const tableBlock = extractTableBlock(fullText);
+        const messageBlocks = buildMessageBlocks(fullText);
         const postResult =
           await rateLimited(() =>
             slackApp.client.chat.postMessage({
               channel: event.channel,
               text: fullText,
               thread_ts: event.thread_ts ?? event.ts,
-              ...(tableBlock ? { blocks: [tableBlock] } : {}),
+              ...(messageBlocks ? { blocks: messageBlocks } : {}),
             }),
           );
         postedTs = postResult.ts;

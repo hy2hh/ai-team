@@ -20,7 +20,7 @@ import {
 import { moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
 import { emit } from './hook-events.js';
-import { extractTableBlock } from './slack-table.js';
+import { buildMessageBlocks } from './slack-table.js';
 
 // ─── 상수 ─────────────────────────────────────────────
 
@@ -227,12 +227,12 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
     // 에이전트 실제 응답을 스레드에 게시
     if (result.text) {
       try {
-        const tableBlock = extractTableBlock(result.text);
+        const messageBlocks = buildMessageBlocks(result.text);
         await slackApp.client.chat.postMessage({
           channel: task.channel,
           thread_ts: task.thread_ts,
           text: result.text,
-          ...(tableBlock ? { blocks: [tableBlock] } : {}),
+          ...(messageBlocks ? { blocks: messageBlocks } : {}),
         });
       } catch (err) {
         console.error('[queue-processor] 에이전트 결과 게시 실패:', err);
