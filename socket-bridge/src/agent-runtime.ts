@@ -541,7 +541,15 @@ const buildContextRulesPrefix = (agentName: string): string => {
     '- 지금 즉시 실행해야 할 에이전트만 delegate하세요. 향후 계획은 delegate하지 마세요.',
     '- 순차 실행이 필요하면 먼저 할 에이전트만 delegate하세요. 나중 에이전트는 리뷰 시 delegate합니다.',
     '- 텍스트에서 에이전트를 언급할 때는 이름(Krusty, Bart 등)만 사용하세요. <@USER_ID> 멘션은 위임 트리거가 아닙니다.',
-    '- 에이전트 목록:',
+    '- 에이전트 목록 (이름 → 역할):',
+    '  - Marge(PM): 기획/로드맵/스프린트',
+    '  - Krusty(Designer): UI/UX 디자인',
+    '  - Bart(Frontend): React/TS 구현',
+    '  - Homer(Backend): API/DB/인프라',
+    '  - Lisa(Researcher): 시장조사/경쟁사 분석',
+    '  - Wiggum(SecOps): 보안 리뷰',
+    '  - Chalmers(QA): 품질 검증',
+    '- Slack ID 매핑:',
     agentIdList,
     '- 자신이 직접 처리할 수 있는 작업은 위임하지 마세요.',
     '',
@@ -846,8 +854,10 @@ const filterToolsByRouting = (
   fullTools: string[],
   routingMethod: string,
 ): string[] => {
+  // :parallel 접미사 제거 후 base method로 판단
+  const baseMethod = routingMethod.replace(':parallel', '');
   // 간단한 응답만 필요한 라우팅: 경량 도구 세트
-  if (routingMethod === 'conversational' || routingMethod === 'broadcast') {
+  if (baseMethod === 'conversational' || baseMethod === 'broadcast') {
     return CONVERSATIONAL_TOOLS;
   }
   return fullTools;
@@ -1048,10 +1058,14 @@ const formatSlackEventAsPrompt = (
   event: SlackEvent,
   routingMethod: string,
 ): string => {
+  // :parallel 접미사 분리 — 병렬 실행 감지용 (base method는 도구 필터링·지시 조회에 사용)
+  const isParallel = routingMethod.endsWith(':parallel');
+  const baseMethod = isParallel ? routingMethod.replace(':parallel', '') : routingMethod;
+
   const parts = [
     `[Slack 메시지 수신 — #${event.channel_name}]`,
     `발신자: <@${event.user}>`,
-    `라우팅: ${routingMethod}`,
+    `라우팅: ${baseMethod}${isParallel ? ' (병렬)' : ''}`,
   ];
 
   const instructions: Record<string, string> = {
@@ -1071,9 +1085,15 @@ const formatSlackEventAsPrompt = (
     default:
       '기본 담당자로 할당되었습니다. 응답 내용을 텍스트로 출력하세요. 다른 에이전트에게 실제로 작업을 위임할 때만 @멘션을 사용하세요. 단순 참고·추천 시에는 이름만 사용하세요.',
   };
-  const instruction = instructions[routingMethod];
+  const instruction = instructions[baseMethod];
   if (instruction) {
     parts.push(`지시: ${instruction}`);
+  }
+  // 병렬 실행 시 스코프 제한 — 자기 영역만 답변하도록 강제
+  if (isParallel) {
+    parts.push(
+      '⚠️ 병렬 실행 중: 다른 에이전트도 동시에 이 메시지를 처리하고 있습니다. 반드시 당신의 전문 영역에 대해서만 답변하세요. 다른 파트의 분석을 대신하지 마세요 — 해당 에이전트가 별도로 답변합니다.',
+    );
   }
   // 언어/포맷 규칙은 시스템 프롬프트(buildContextRulesPrefix)에 정의 — 중복 주입 불필요
   if (event.threadTopic) {
