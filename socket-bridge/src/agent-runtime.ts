@@ -611,12 +611,19 @@ const loadSharedMemory = (): string => {
     }
   }
 
-  // 2. decisions/ 최근 파일 (최대 5개, 파일명 역순 = 최신순)
+  // 2. decisions/ 최근 파일 — 제목 + 요약만 주입 (전문은 에이전트가 Read로 조회)
+  // 이전: 5개 전문 로드 (~22KB, ~5.5K 토큰)
+  // 개선: 제목 + 첫 5줄 요약 (~2KB, ~500 토큰) — 90% 토큰 절약
   const decisionsDir = join(
     PROJECT_DIR,
     '.memory',
     'decisions',
   );
+  /** decision 파일에서 제목 + 첫 5줄 요약 추출 */
+  const summarizeDecision = (content: string): string => {
+    const lines = content.split('\n').filter((l) => l.trim().length > 0);
+    return lines.slice(0, 5).join('\n');
+  };
   if (existsSync(decisionsDir)) {
     try {
       const files = readdirSync(decisionsDir)
@@ -626,14 +633,22 @@ const loadSharedMemory = (): string => {
         .slice(0, MAX_DECISION_FILES);
 
       if (files.length > 0) {
-        parts.push('## 최근 결정사항', '');
+        parts.push(
+          '## 최근 결정사항 (요약 — 전문은 `.memory/decisions/{파일명}`을 Read로 조회)',
+          '',
+        );
         for (const file of files) {
           const filePath = join(decisionsDir, file);
           const content = readFileSync(
             filePath,
             'utf-8',
           );
-          parts.push(`### ${file}`, '', content, '');
+          parts.push(
+            `### ${file}`,
+            '',
+            summarizeDecision(content),
+            '',
+          );
         }
       }
     } catch {
