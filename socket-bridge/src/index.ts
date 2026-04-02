@@ -1653,7 +1653,33 @@ const flushDebounceBuffer = async (
     mentions: [],
     threadTopic,
     raw: entry.raw,
+    batchTs:
+      messages.length > 1
+        ? messages.map((m) => m.ts)
+        : undefined,
   };
+
+  // 디바운스 병합 시 앞 메시지들에 리다이렉트 안내
+  // 마지막 메시지 스레드에서 응답이 이루어지므로, 앞 메시지들은 무응답으로 보임
+  if (messages.length > 1 && !threadTs) {
+    const linkTs = lastMessage.ts.replace('.', '');
+    const threadLink = `https://slack.com/archives/${channel}/p${linkTs}`;
+    const redirectText = `:arrow_right: 이 메시지는 <${threadLink}|여기>에서 함께 처리 중입니다.`;
+    for (const m of messages.slice(0, -1)) {
+      apps[0].client.chat
+        .postMessage({
+          channel,
+          thread_ts: m.ts,
+          text: redirectText,
+        })
+        .catch((err: unknown) => {
+          console.error(
+            '[debounce] 리다이렉트 메시지 전송 실패:',
+            err,
+          );
+        });
+    }
+  }
 
   // end-to-end 타이밍 시작
   const e2eStart = Date.now();

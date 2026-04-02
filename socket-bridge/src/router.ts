@@ -296,16 +296,26 @@ export const parseMentions = (text: string): string[] => {
 };
 
 /**
+ * 대괄호 태그 제거 — 키워드 매칭 전처리
+ *
+ * `[QA-A2-1]`, `[테스트]` 등 태그 안의 텍스트가
+ * 키워드 라우팅을 오염시키는 것을 방지한다.
+ */
+const stripBracketTags = (text: string): string =>
+  text.replace(/\[[^\]]*\]/g, '');
+
+/**
  * 키워드 패턴 매칭으로 모든 매칭 에이전트 반환
  * @param text - Slack 메시지 텍스트
  * @returns 매칭된 에이전트 이름 배열
  */
 export const matchKeywords = (text: string): string[] => {
+  const cleaned = stripBracketTags(text);
   const matches: string[] = [];
   for (const [agentName, pattern] of Object.entries(
     ROUTING_RULES,
   )) {
-    if (pattern.test(text)) {
+    if (pattern.test(cleaned)) {
       matches.push(agentName);
     }
   }

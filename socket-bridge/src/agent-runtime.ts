@@ -1210,16 +1210,20 @@ export const handleMessage = async (
   });
 
   // ⚒️ 리액션으로 처리 중 표시 — 에이전트 메시지에만
+  // 디바운스 배치 시 모든 원본 메시지에 리액션 추가
   if (canReact) {
-    try {
-      await slackApp.client.reactions.add({
-        channel: event.channel,
-        timestamp: event.ts,
-        name: 'hammer_and_pick',
-      });
-      console.log(`[reaction] ⚒️ 처리 중 추가: ${event.ts}`);
-    } catch (err) {
-      console.error(`[reaction] ⚒️ 추가 실패:`, err);
+    const timestamps = event.batchTs ?? [event.ts];
+    for (const ts of timestamps) {
+      try {
+        await slackApp.client.reactions.add({
+          channel: event.channel,
+          timestamp: ts,
+          name: 'hammer_and_pick',
+        });
+        console.log(`[reaction] ⚒️ 처리 중 추가: ${ts}`);
+      } catch (err) {
+        console.error(`[reaction] ⚒️ 추가 실패:`, err);
+      }
     }
   }
 
@@ -1914,21 +1918,27 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // ⚒️ → ✅ 완료 리액션 전환 — 에이전트 메시지에만
+    // ⚒️ → ✅ 완료 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
     if (canReact) {
-      try {
-        await slackApp.client.reactions.remove({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'hammer_and_pick',
-        });
-        await slackApp.client.reactions.add({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'white_check_mark',
-        });
-      } catch (err) {
-        console.error(`[reaction] ✅ 완료 리액션 전환 실패:`, err);
+      const timestamps = event.batchTs ?? [event.ts];
+      for (const ts of timestamps) {
+        try {
+          await slackApp.client.reactions.remove({
+            channel: event.channel,
+            timestamp: ts,
+            name: 'hammer_and_pick',
+          });
+          await slackApp.client.reactions.add({
+            channel: event.channel,
+            timestamp: ts,
+            name: 'white_check_mark',
+          });
+        } catch (err) {
+          console.error(
+            `[reaction] ✅ 완료 리액션 전환 실패:`,
+            err,
+          );
+        }
       }
     }
     activeAgents.delete(event.ts);
@@ -2119,21 +2129,27 @@ export const handleMessage = async (
     });
     recordAgentStat(agentName, false);
 
-    // ⚒️ → ❌ 에러 리액션 전환 — 에이전트 메시지에만
+    // ⚒️ → ❌ 에러 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
     if (canReact) {
-      try {
-        await slackApp.client.reactions.remove({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'hammer_and_pick',
-        });
-        await slackApp.client.reactions.add({
-          channel: event.channel,
-          timestamp: event.ts,
-          name: 'x',
-        });
-      } catch (err) {
-        console.error(`[reaction] ❌ 에러 리액션 전환 실패:`, err);
+      const timestamps = event.batchTs ?? [event.ts];
+      for (const ts of timestamps) {
+        try {
+          await slackApp.client.reactions.remove({
+            channel: event.channel,
+            timestamp: ts,
+            name: 'hammer_and_pick',
+          });
+          await slackApp.client.reactions.add({
+            channel: event.channel,
+            timestamp: ts,
+            name: 'x',
+          });
+        } catch (err) {
+          console.error(
+            `[reaction] ❌ 에러 리액션 전환 실패:`,
+            err,
+          );
+        }
       }
     }
 

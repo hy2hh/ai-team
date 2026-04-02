@@ -20,6 +20,8 @@ export interface SlackEvent {
   threadTopic?: string;
   /** Slack 원본 이벤트 데이터 */
   raw: Record<string, unknown>;
+  /** 디바운스 배치로 병합된 메시지들의 ts 목록 (배치 시에만 존재) */
+  batchTs?: string[];
 }
 
 /** 에이전트 설정 */
