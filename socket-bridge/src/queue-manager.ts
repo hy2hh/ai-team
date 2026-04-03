@@ -291,6 +291,21 @@ export const getKanbanCardId = (taskId: string): number | null => {
 };
 
 /**
+ * queue에서 활성(queued/running) 태스크의 칸반 카드 ID 목록 조회
+ * cleanup 시 활성 카드를 보호하기 위해 사용
+ */
+export const getActiveKanbanCardIds = (): number[] => {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT DISTINCT kanban_card_id FROM task_queue
+       WHERE status IN ('queued', 'running') AND kanban_card_id IS NOT NULL`,
+    )
+    .all() as Array<{ kanban_card_id: number }>;
+  return rows.map((r) => r.kanban_card_id);
+};
+
+/**
  * PM 플랜 기반으로 enqueue된 태스크들을 칸반 Backlog에 카드로 생성
  * - PM이 해석한 task 설명을 제목으로 사용 (원문 텍스트 아님)
  */

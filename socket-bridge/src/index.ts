@@ -787,11 +787,17 @@ const executeSingle = async (
     );
   }
 
-  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동 (max_turns 실패 시 Done 이동 방지)
-  if (result.kanbanCardId && !result.isMaxTurns) {
-    moveToDone(result.kanbanCardId).catch((err) =>
-      console.warn('[kanban-sync] executeSingle moveToDone 실패:', err),
-    );
+  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동 (max_turns 실패 시 Blocked로)
+  if (result.kanbanCardId) {
+    if (result.isMaxTurns) {
+      moveToBlocked(result.kanbanCardId).catch((err) =>
+        console.warn('[kanban-sync] executeSingle moveToBlocked 실패:', err),
+      );
+    } else {
+      moveToDone(result.kanbanCardId).catch((err) =>
+        console.warn('[kanban-sync] executeSingle moveToDone 실패:', err),
+      );
+    }
   }
 
   // 비PM 에이전트가 escalate_to_pm을 호출한 경우 → PM으로 재라우팅
@@ -2900,7 +2906,8 @@ const main = async () => {
     apps.push(app);
   }
 
-  // 앱 순차 시작 (동시 연결 시 Slack rate limit 408 방지)
+  // 앱 순차 시작 (연결 간 2초 딜레이로 Slack pong 타임아웃 방지)
+  const CONNECTION_DELAY_MS = 2000;
   console.log('[start] Socket Mode 연결 중...');
   for (let i = 0; i < apps.length; i++) {
     await apps[i].start();
@@ -2915,6 +2922,12 @@ const main = async () => {
     console.log(
       `[start] ${AGENTS[i].name} 연결 완료 (${i + 1}/${apps.length})`,
     );
+    // 다음 연결 전 딜레이 (Slack WebSocket rate limit 방지)
+    if (i < apps.length - 1) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, CONNECTION_DELAY_MS),
+      );
+    }
   }
   console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
   console.log(

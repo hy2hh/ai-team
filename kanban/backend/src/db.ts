@@ -47,6 +47,26 @@ function initSchema(): void {
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
+
+    -- 인덱스: FK 컬럼 및 자주 사용되는 WHERE/ORDER BY 대상
+    CREATE INDEX IF NOT EXISTS idx_columns_board_id
+      ON columns(board_id);
+
+    CREATE INDEX IF NOT EXISTS idx_columns_board_position
+      ON columns(board_id, position);
+
+    -- idx_cards_column_id 제거: idx_cards_column_position(column_id, position)이 prefix 커버
+    -- idx_cards_assignee 제거: cards.ts 내 WHERE assignee = ? 쿼리 없음 (미사용)
+    -- idx_cards_updated_at 제거: cards.ts 내 updated_at 조건 쿼리 없음 (미사용)
+    CREATE INDEX IF NOT EXISTS idx_cards_column_position
+      ON cards(column_id, position);
+  `);
+
+  // Migration: 중복/미사용 인덱스 제거
+  database.exec(`
+    DROP INDEX IF EXISTS idx_cards_column_id;
+    DROP INDEX IF EXISTS idx_cards_assignee;
+    DROP INDEX IF EXISTS idx_cards_updated_at;
   `);
 
   // Migration: progress 컬럼이 없는 기존 DB에 추가
@@ -62,6 +82,10 @@ function initSchema(): void {
   const hasTags = cols.some(c => c.name === 'tags');
   if (!hasTags) {
     database.exec("ALTER TABLE cards ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'");
+  }
+  const hasSessionId = cols.some(c => c.name === 'session_id');
+  if (!hasSessionId) {
+    database.exec("ALTER TABLE cards ADD COLUMN session_id TEXT");
   }
 }
 

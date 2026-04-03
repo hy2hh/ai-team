@@ -23,6 +23,7 @@ export interface Card {
   position: number;
   due_date: string | null;
   tags: string[];
+  session_id: string | null;
   created_at: string;
   updated_at: string;
 }

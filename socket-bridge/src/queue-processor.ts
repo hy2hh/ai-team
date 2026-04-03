@@ -239,12 +239,18 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
     // 완료 처리
     markCompleted(task.id, result.text);
 
-    // 칸반 Done 이동 (fire-and-forget)
+    // 칸반 카드 이동 (fire-and-forget)
     const doneCardId = result.kanbanCardId ?? kanbanCardId;
     if (doneCardId !== null && doneCardId !== undefined) {
-      moveToDone(doneCardId).catch((err) =>
-        console.warn('[kanban-sync] moveToDone 실패:', err),
-      );
+      if (result.isMaxTurns) {
+        moveToBlocked(doneCardId).catch((err) =>
+          console.warn('[kanban-sync] moveToBlocked 실패:', err),
+        );
+      } else {
+        moveToDone(doneCardId).catch((err) =>
+          console.warn('[kanban-sync] moveToDone 실패:', err),
+        );
+      }
     }
 
     await postTaskProgress(slackApp, task, 'completed', result.text);

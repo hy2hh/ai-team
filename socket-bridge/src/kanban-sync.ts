@@ -2,9 +2,13 @@
  * Kanban Sync Module
  * bridge 태스크 상태 전이 시 칸반 REST API를 fire-and-forget으로 호출
  */
+import { randomUUID } from 'crypto';
 import { withRetry } from './retry.js';
 
 const BASE_URL = process.env.KANBAN_API_URL || 'http://localhost:3001';
+
+/** bridge 세션 고유 ID — 재시작마다 새로 생성 */
+export const SESSION_ID = randomUUID();
 
 /** 칸반 API용 경량 재시도 옵션 (localhost → 짧은 backoff) */
 const KANBAN_RETRY = {
@@ -125,6 +129,7 @@ export const createCard = async (
           assignee,
           priority: 'medium',
           progress: 0,
+          session_id: SESSION_ID,
         }),
       });
       if (!res.ok) {
@@ -238,31 +243,94 @@ export const moveToBlocked = async (cardId: number): Promise<void> => {
 };
 
 /**
- * Bridge 시작 시 In Progress에 남은 고아 카드를 Blocked로 이동
- * - 재시작으로 중단된 작업의 카드가 In Progress에 방치되는 문제 해결
+ * Bridge 시작 시 전체 보드 정리
+ * 1. In Progress 카드 → Blocked 이동
+ * 2. Backlog/Review/Blocked 카드 bulk 삭제 (queue 활성 카드 제외)
+ * 3. Done 카드 중 3일(72h) 이상 된 것 삭제
  */
 export const cleanupOrphanCards = async (): Promise<number> => {
+  // 동적 import로 순환 의존성 방지
+  const { getActiveKanbanCardIds } = await import(
+    './queue-manager.js'
+  );
+
   try {
     const res = await fetch(`${BASE_URL}/boards/1`);
     if (!res.ok) {
-      console.warn('[kanban-sync] cleanupOrphanCards: 보드 조회 실패');
+      console.warn(
+        '[kanban-sync] cleanupOrphanCards: 보드 조회 실패',
+      );
       return 0;
     }
-    const board = await res.json() as {
-      columns: Array<{ id: number; cards: Array<{ id: number; title: string }> }>;
+    const board = (await res.json()) as {
+      columns: Array<{
+        id: number;
+        cards: Array<{ id: number; title: string }>;
+      }>;
     };
-    const inProgressCol = board.columns.find((c) => c.id === COLUMN.IN_PROGRESS);
-    if (!inProgressCol || inProgressCol.cards.length === 0) {
-      return 0;
+
+    // Step 1: In Progress 카드 → Blocked 이동
+    const inProgressCol = board.columns.find(
+      (c) => c.id === COLUMN.IN_PROGRESS,
+    );
+    let moved = 0;
+    if (inProgressCol) {
+      for (const card of inProgressCol.cards) {
+        await moveToBlocked(card.id);
+        moved++;
+      }
+    }
+    if (moved > 0) {
+      console.log(
+        `[kanban-sync] 고아 카드 ${moved}개 → Blocked 이동`,
+      );
     }
 
-    let moved = 0;
-    for (const card of inProgressCol.cards) {
-      await moveToBlocked(card.id);
-      moved++;
-    }
-    console.log(`[kanban-sync] 고아 카드 ${moved}개 → Blocked 이동 완료`);
-    return moved;
+    // Step 2: queue 활성 카드 ID 조회 (보호 대상)
+    const activeCardIds = getActiveKanbanCardIds();
+
+    // Step 3: Backlog/Review/Blocked bulk 삭제
+    const bulkRes = await fetch(`${BASE_URL}/cards/cleanup`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        columns: [
+          COLUMN.BACKLOG,
+          3, // Review
+          COLUMN.BLOCKED,
+        ],
+        exclude_card_ids:
+          activeCardIds.length > 0 ? activeCardIds : undefined,
+      }),
+    });
+    const bulkData = bulkRes.ok
+      ? ((await bulkRes.json()) as { deleted: number })
+      : { deleted: 0 };
+
+    // Step 4: Done 카드 TTL (3일)
+    const threeDaysAgo = new Date(
+      Date.now() - 3 * 24 * 60 * 60 * 1000,
+    )
+      .toISOString()
+      .replace('T', ' ')
+      .slice(0, 19);
+    const doneRes = await fetch(`${BASE_URL}/cards/cleanup`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        columns: [COLUMN.DONE],
+        before: threeDaysAgo,
+      }),
+    });
+    const doneData = doneRes.ok
+      ? ((await doneRes.json()) as { deleted: number })
+      : { deleted: 0 };
+
+    const total = moved + bulkData.deleted + doneData.deleted;
+    console.log(
+      `[kanban-sync] cleanup 완료: Blocked이동=${moved} stale삭제=${bulkData.deleted} Done만료=${doneData.deleted}`,
+    );
+    return total;
   } catch (err) {
     console.warn('[kanban-sync] cleanupOrphanCards 오류:', err);
     return 0;

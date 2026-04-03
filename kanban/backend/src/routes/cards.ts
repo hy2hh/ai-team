@@ -47,21 +47,26 @@ router.get('/', (req: Request, res: Response) => {
 // ── POST /cards ─────────────────────────────────────────────────────────────
 router.post('/', (req: Request, res: Response) => {
   const db = getDb();
-  const { column_id, title, description, priority = 'medium', assignee, progress = 0, due_date, tags } = req.body;
+  const { column_id, title, description, priority = 'medium', assignee, progress = 0, due_date, tags, session_id } = req.body;
   if (!column_id || !title) return res.status(400).json({ error: 'column_id and title required' });
 
   const progressVal = Math.max(0, Math.min(100, Number(progress) || 0));
   const dueDateVal = validateDueDate(due_date);
   const tagsVal = serializeTags(tags);
+  const sessionIdVal = typeof session_id === 'string' ? session_id : null;
 
-  const maxPos = (db.prepare('SELECT MAX(position) as maxp FROM cards WHERE column_id = ?').get(column_id) as { maxp: number | null }).maxp;
-  const position = (maxPos ?? -1) + 1;
+  const createCard = db.transaction(() => {
+    const maxPos = (db.prepare('SELECT MAX(position) as maxp FROM cards WHERE column_id = ?').get(column_id) as { maxp: number | null }).maxp;
+    const position = (maxPos ?? -1) + 1;
 
-  const result = db.prepare(
-    'INSERT INTO cards (column_id, title, description, priority, assignee, progress, position, due_date, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
-  ).run(column_id, title, description || null, priority, assignee || null, progressVal, position, dueDateVal, tagsVal);
+    const result = db.prepare(
+      'INSERT INTO cards (column_id, title, description, priority, assignee, progress, position, due_date, tags, session_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    ).run(column_id, title, description || null, priority, assignee || null, progressVal, position, dueDateVal, tagsVal, sessionIdVal);
 
-  const row = db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid) as CardRow;
+    return db.prepare('SELECT * FROM cards WHERE id = ?').get(result.lastInsertRowid) as CardRow;
+  });
+
+  const row = createCard();
   broadcast({ type: 'card:created', boardId: 1 });
   res.status(201).json(parseCardRow(row));
 });
@@ -87,9 +92,9 @@ router.patch('/:id', (req: Request, res: Response) => {
   fields.push("updated_at = datetime('now')");
   values.push(req.params.id);
 
-  db.prepare(`UPDATE cards SET ${fields.join(', ')} WHERE id = ?`).run(...values as Parameters<typeof db.prepare>);
-  const row = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as CardRow | undefined;
-  if (!row) return res.status(404).json({ error: 'Card not found' });
+  const updateResult = db.prepare(`UPDATE cards SET ${fields.join(', ')} WHERE id = ?`).run(...values as Parameters<typeof db.prepare>);
+  if (updateResult.changes === 0) return res.status(404).json({ error: 'Card not found' });
+  const row = db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as CardRow;
   broadcast({ type: 'card:updated', boardId: 1 });
   res.json(parseCardRow(row));
 });
@@ -120,17 +125,78 @@ router.patch('/:id/move', (req: Request, res: Response) => {
       newPosition = (maxPos ?? -1) + 1;
     }
 
-    db.prepare(
-      "UPDATE cards SET column_id = ?, position = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(column_id, newPosition, req.params.id);
-
-    return db.prepare('SELECT * FROM cards WHERE id = ?').get(req.params.id) as CardRow;
+    return db.prepare(
+      "UPDATE cards SET column_id = ?, position = ?, updated_at = datetime('now') WHERE id = ? RETURNING *"
+    ).get(column_id, newPosition, req.params.id) as CardRow;
   });
 
   const result = moveCard();
   if ('error' in result) return res.status(result.status).json({ error: result.error });
   broadcast({ type: 'card:moved', boardId: 1 });
   res.json(parseCardRow(result as CardRow));
+});
+
+// ── DELETE /cards/cleanup ────────────────────────────────────────────────────
+// Bulk 삭제: 조건에 맞는 카드를 일괄 삭제
+// Body: { columns?: number[], before?: string (ISO datetime, updated_at 기준), exclude_card_ids?: number[] }
+router.delete('/cleanup', (req: Request, res: Response) => {
+  const db = getDb();
+  const { columns, before, exclude_card_ids } = req.body ?? {};
+
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (Array.isArray(columns) && columns.length > 0) {
+    const placeholders = columns.map(() => '?').join(', ');
+    conditions.push(`column_id IN (${placeholders})`);
+    params.push(...columns);
+  }
+
+  if (typeof before === 'string' && before.length > 0) {
+    conditions.push('updated_at < ?');
+    params.push(before);
+  }
+
+  if (
+    Array.isArray(exclude_card_ids) &&
+    exclude_card_ids.length > 0
+  ) {
+    const placeholders = exclude_card_ids.map(() => '?').join(', ');
+    conditions.push(`id NOT IN (${placeholders})`);
+    params.push(...exclude_card_ids);
+  }
+
+  if (conditions.length === 0) {
+    return res
+      .status(400)
+      .json({ error: 'At least one filter required' });
+  }
+
+  const where = conditions.join(' AND ');
+  const deleteCleanup = db.transaction(() => {
+    const rows = db
+      .prepare(`SELECT id FROM cards WHERE ${where}`)
+      .all(...(params as [unknown])) as Array<{ id: number }>;
+    const ids = rows.map((r) => r.id);
+
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => '?').join(', ');
+      db.prepare(
+        `DELETE FROM cards WHERE id IN (${placeholders})`,
+      ).run(...(ids as [number]));
+    }
+
+    return ids;
+  });
+
+  const deleted = deleteCleanup();
+  if (deleted.length > 0) {
+    broadcast({ type: 'card:deleted', boardId: 1 });
+  }
+  console.log(
+    `[kanban-cleanup] Deleted ${deleted.length} cards: [${deleted.slice(0, 20).join(', ')}${deleted.length > 20 ? '...' : ''}]`,
+  );
+  res.json({ deleted: deleted.length, ids: deleted });
 });
 
 // ── DELETE /cards/:id ────────────────────────────────────────────────────────
