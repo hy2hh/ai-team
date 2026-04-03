@@ -21,6 +21,7 @@ import {
   runCrossVerification,
   snapshotChangedFiles,
   diffSnapshots,
+  getVerifyChecklist,
   type VerifyResult,
 } from './cross-verify.js';
 
@@ -98,6 +99,74 @@ export const getLoopState = (messageTs: string, agent: string): LoopState | null
     };
   } catch {
     return null;
+  }
+};
+
+/**
+ * Ralph Loop iteration 히스토리를 DB에 기록
+ *
+ * 매 FAIL 시 호출하여 실패 사유·검증자·시도한 접근을 축적한다.
+ * 다음 iteration의 requestRework()가 이 히스토리를 조회하여
+ * 새 세션에 주입함으로써 편향 없는 자가 개선을 가능하게 한다.
+ */
+const recordLoopHistory = (
+  messageTs: string,
+  agent: string,
+  iteration: number,
+  failReason: string,
+  verifier: string | null,
+  approach: string | null,
+): void => {
+  try {
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO ralph_loop_history
+        (message_ts, agent, iteration, fail_reason, verifier, approach, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      messageTs,
+      agent,
+      iteration,
+      failReason,
+      verifier,
+      approach,
+      Date.now(),
+    );
+  } catch (err) {
+    console.error('[qa-loop] 히스토리 기록 실패:', err);
+  }
+};
+
+/**
+ * Ralph Loop iteration 히스토리 조회
+ *
+ * 특정 메시지·에이전트 조합의 전체 iteration 기록을 반환한다.
+ * requestRework()에서 이전 시도를 메시지에 주입할 때 사용.
+ */
+const getLoopHistory = (
+  messageTs: string,
+  agent: string,
+): Array<{
+  iteration: number;
+  fail_reason: string;
+  verifier: string | null;
+  approach: string | null;
+}> => {
+  try {
+    const db = getDb();
+    return db.prepare(`
+      SELECT iteration, fail_reason, verifier, approach
+      FROM ralph_loop_history
+      WHERE message_ts = ? AND agent = ?
+      ORDER BY iteration ASC
+    `).all(messageTs, agent) as Array<{
+      iteration: number;
+      fail_reason: string;
+      verifier: string | null;
+      approach: string | null;
+    }>;
+  } catch {
+    return [];
   }
 };
 
@@ -252,6 +321,11 @@ export const runChalmersQA = async (
 
 /**
  * 에이전트에게 재작업 요청
+ *
+ * Ralph Loop 플러그인 패턴 적용:
+ * - threadTopic 설정으로 새 세션 강제 (이전 편향 추론 차단)
+ * - DB에서 이전 iteration 히스토리를 조회하여 메시지에 인라인 주입
+ * - VERIFY_MATRIX에서 검증 기준을 동적 추출하여 메시지에 포함
  */
 const requestRework = async (
   agent: string,
@@ -259,20 +333,57 @@ const requestRework = async (
   originalTask: string,
   event: SlackEvent,
   slackApp: App,
+  iteration: number,
+  maxIterations: number,
 ): Promise<{ text: string; changedFiles: string[] }> => {
+  // 1. DB에서 이전 히스토리 조회
+  const history = getLoopHistory(event.ts, agent);
+  const historySection = history.length > 0
+    ? history
+        .map((h) =>
+          [
+            `━━━ Iteration ${h.iteration} ━━━`,
+            `FAIL 사유: ${h.fail_reason}${h.verifier ? ` (검증자: ${h.verifier})` : ''}`,
+            h.approach ? `시도한 접근: ${h.approach}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        )
+        .join('\n')
+    : '(첫 번째 시도)';
+
+  // 2. 검증 기준 조회
+  const checklist = getVerifyChecklist(agent);
+
+  // 3. 새 세션 강제 + 강화된 메시지
   const reworkEvent: SlackEvent = {
     ...event,
     user: 'qa-loop',
+    threadTopic: `ralph-loop-iteration-${iteration}`,
     text: [
-      `[재작업 요청] 이전 작업이 검증에서 FAIL 판정을 받았습니다.`,
+      `[재작업 요청 — 반복 ${iteration}/${maxIterations}]`,
       '',
-      '*FAIL 사유:*',
+      `⚠️ 이전 시도가 실패했습니다. 같은 접근을 반복하지 마세요.`,
+      '',
+      '*이전 시도 히스토리:*',
+      historySection,
+      '',
+      ...(checklist
+        ? [
+            '*검증 기준 (재작업 후 이 항목으로 재검증됩니다):*',
+            checklist,
+            '',
+          ]
+        : []),
+      '*FAIL 사유 (최신):*',
       failureDetails,
       '',
       '*원래 작업:*',
       originalTask,
       '',
-      '위 이슈를 수정하고 완료 보고해주세요.',
+      '*지시사항:*',
+      '1. 위 이전 시도와 다른 접근으로 문제를 해결하세요',
+      '2. 수정 완료 후 자체 검증 결과를 포함해 보고하세요',
     ].join('\n'),
   };
 
@@ -396,13 +507,15 @@ export const runRalphLoop = async (
       `[qa-loop] Ralph Loop ${agent}: iteration ${state.iteration}/${MAX_RALPH_LOOP_ITERATIONS}`,
     );
 
-    // 1. 재작업 요청
+    // 1. 재작업 요청 (새 세션 + 히스토리 주입)
     const reworkResult = await requestRework(
       agent,
       failureDetails,
       originalTask,
       event,
       slackApp,
+      state.iteration,
+      MAX_RALPH_LOOP_ITERATIONS,
     );
 
     // 2. Cross-verify 재실행
@@ -443,11 +556,29 @@ export const runRalphLoop = async (
         };
       }
 
-      // QA FAIL — 다음 루프로
+      // QA FAIL — 히스토리 기록 후 다음 루프로
+      recordLoopHistory(
+        event.ts,
+        agent,
+        state.iteration,
+        qaResult.details,
+        'chalmers',
+        reworkResult.text.slice(0, 500),
+      );
       failureDetails = qaResult.details;
     } else {
-      // Cross-verify FAIL — 다음 루프로
-      const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
+      // Cross-verify FAIL — 히스토리 기록 후 다음 루프로
+      const failedVerifier = verifyResults.find(
+        (r) => r.result === 'FAIL',
+      );
+      recordLoopHistory(
+        event.ts,
+        agent,
+        state.iteration,
+        failedVerifier?.details ?? 'Cross-verify FAIL',
+        failedVerifier?.verifier ?? null,
+        reworkResult.text.slice(0, 500),
+      );
       failureDetails = failedVerifier?.details ?? 'Cross-verify FAIL';
     }
 
@@ -656,6 +787,16 @@ export const cleanupOldLoopStates = (): void => {
     `).run(cutoff);
     if (result.changes > 0) {
       console.log(`[qa-loop] ${result.changes}개 오래된 루프 상태 정리`);
+    }
+
+    // ralph_loop_history도 함께 정리
+    const historyResult = db.prepare(`
+      DELETE FROM ralph_loop_history WHERE created_at < ?
+    `).run(cutoff);
+    if (historyResult.changes > 0) {
+      console.log(
+        `[qa-loop] ${historyResult.changes}개 오래된 루프 히스토리 정리`,
+      );
     }
   } catch (err) {
     console.error('[qa-loop] 루프 상태 정리 실패:', err);

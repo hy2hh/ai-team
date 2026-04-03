@@ -155,6 +155,16 @@ const VERIFY_MATRIX: Record<
 };
 
 /**
+ * 에이전트의 검증 기준을 사람이 읽을 수 있는 문자열로 반환
+ * @param agent - 생산자 에이전트 이름
+ * @returns 검증 항목 bullet 문자열 (매트릭스에 없으면 빈 문자열)
+ */
+export const getVerifyChecklist = (agent: string): string =>
+  (VERIFY_MATRIX[agent] ?? [])
+    .map((v) => `• ${v.verifier}: ${v.checkItems}`)
+    .join('\n');
+
+/**
  * 에이전트가 검증이 필요한지 판단
  * @param producerAgent - 작업을 완료한 에이전트
  * @returns 검증 필요 여부

@@ -201,6 +201,25 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ON notifications(type);
     `,
   },
+  {
+    version: 6,
+    sql: `
+      -- Ralph Loop iteration 히스토리 (자가 개선 루프용)
+      CREATE TABLE IF NOT EXISTS ralph_loop_history (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        message_ts   TEXT    NOT NULL,
+        agent        TEXT    NOT NULL,
+        iteration    INTEGER NOT NULL,
+        fail_reason  TEXT    NOT NULL,
+        verifier     TEXT,
+        approach     TEXT,
+        created_at   INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_ralph_history_ts_agent
+        ON ralph_loop_history(message_ts, agent);
+    `,
+  },
 ];
 
 /**
