@@ -171,6 +171,36 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       ALTER TABLE task_queue ADD COLUMN kanban_card_id INTEGER;
     `,
   },
+  {
+    version: 5,
+    sql: `
+      -- 알림 저장 테이블
+      CREATE TABLE IF NOT EXISTS notifications (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        type        TEXT    NOT NULL,                    -- 알림 유형 (task_complete | qa_result | alert | info 등)
+        title       TEXT    NOT NULL,                    -- 알림 제목
+        message     TEXT,                               -- 알림 본문
+        agent       TEXT,                               -- 발생 주체 에이전트 (pm, backend, frontend 등)
+        channel     TEXT,                               -- 연관 Slack 채널
+        thread_ts   TEXT,                               -- 연관 Slack 스레드 ts
+        status      TEXT    NOT NULL DEFAULT 'unread',  -- unread | read | dismissed
+        created_at  INTEGER NOT NULL,
+        read_at     INTEGER
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_status
+        ON notifications(status);
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_agent
+        ON notifications(agent);
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_created_at
+        ON notifications(created_at);
+
+      CREATE INDEX IF NOT EXISTS idx_notifications_type
+        ON notifications(type);
+    `,
+  },
 ];
 
 /**
