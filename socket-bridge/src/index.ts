@@ -60,6 +60,8 @@ import {
   MAX_CONCURRENT_HANDLERS,
   AGENT_TIMEOUT_MS,
   MAX_DELEGATION_DEPTH,
+  CONTEXT_COMPRESSION_ENABLED,
+  CONTEXT_COMPRESSION_THRESHOLD_CHARS,
 } from './config.js';
 import {
   startQueueProcessor,
@@ -69,6 +71,14 @@ import {
 import { cancelQueueByThread } from './queue-manager.js';
 import { moveToDone, moveToBlocked, cleanupOrphanCards, updateCard } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
+import {
+  getRunContext,
+  deleteRunContext,
+  updateStatusMessage,
+  buildRerunModal,
+  findContextsByThread,
+} from './agent-control-buttons.js';
+import { buildMessageBlocks } from './slack-table.js';
 import {
   initQaLoopTable,
   cleanupOldLoopStates,
@@ -388,6 +398,83 @@ ${conversationHistory}`,
       err,
     );
     return '';
+  }
+};
+
+// ─── LLM 컨텍스트 압축 (Phase 2) ─────────────────────────
+
+/**
+ * 긴 스레드 히스토리를 Haiku로 압축 (Agent SDK 사용).
+ *
+ * 압축 전략:
+ *   - 주요 결정사항/답변 요약 보존
+ *   - 최근 3개 메시지 원문 유지 (연속성 보장)
+ *   - 압축 표시 헤더 추가 → 에이전트가 압축 여부 인지 가능
+ *
+ * @param conversationHistory - 압축할 스레드 히스토리 전문
+ * @returns 압축된 히스토리 (실패 시 원본 반환)
+ */
+const compressConversationHistory = async (
+  conversationHistory: string,
+): Promise<string> => {
+  try {
+    // 최근 3개 메시지는 원문 유지 (연속성 보장)
+    const lines = conversationHistory.split('\n').filter((l) => l.trim());
+    const recentLines = lines.slice(-6); // 대화 1턴 ≈ 2줄 (발화자: 내용)
+    const olderLines = lines.slice(0, -6);
+
+    if (olderLines.length === 0) {
+      // 압축할 구 히스토리가 없으면 그대로 반환
+      return conversationHistory;
+    }
+
+    const olderHistory = olderLines.join('\n');
+    let summaryText = '';
+
+    for await (const message of query({
+      prompt: `다음 Slack 스레드 이전 대화를 압축 요약하세요.
+
+규칙:
+- 주요 질문, 결정사항, 분석 결과를 bullet point로 요약
+- 에이전트 이름(발화자)은 유지
+- 반복되거나 부수적인 내용은 제거
+- 500자 이내로 압축
+- 요약문만 출력 (설명 없이)
+
+대화:
+${olderHistory}`,
+      options: {
+        model: 'claude-haiku-4-5-20251001',
+        maxTurns: 1,
+        permissionMode: 'bypassPermissions',
+        allowDangerouslySkipPermissions: true,
+      },
+    })) {
+      if (message.type === 'result') {
+        const result = message as SDKResultMessage;
+        if (result.subtype === 'success') {
+          summaryText = result.result.trim();
+        }
+      }
+    }
+
+    if (!summaryText) return conversationHistory;
+
+    const compressed = [
+      `[압축된 이전 대화 요약 — 원본 ${conversationHistory.length}자 → ${summaryText.length}자]`,
+      summaryText,
+      '',
+      '[최근 대화]',
+      recentLines.join('\n'),
+    ].join('\n');
+
+    console.log(
+      `[compress] 히스토리 압축: ${conversationHistory.length}자 → ${compressed.length}자`,
+    );
+    return compressed;
+  } catch (err) {
+    console.error('[compress] 히스토리 압축 실패, 원본 사용:', err);
+    return conversationHistory;
   }
 };
 
@@ -775,6 +862,9 @@ const executeSingle = async (
       `[hub] 순차 위임 시작: ${result.delegationSteps.length} steps`,
     );
     const pmApp = findAgentApp('pm', apps);
+    // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가
+    await safeAddReaction(app, event.channel, event.ts, 'hammer_and_pick');
+    console.log(`[reaction] ⚒️ 순차 위임 시작 → 사용자 메시지: ${event.ts}`);
     const seqResults: Array<{ agent: string; text: string; changedFiles: string[] }> = [];
 
     for (let si = 0; si < result.delegationSteps.length; si++) {
@@ -888,7 +978,7 @@ const executeSingle = async (
           await pmApp.client.chat.postMessage({
             channel: event.channel,
             thread_ts: event.thread_ts ?? event.ts,
-            text: `✅ *Step ${si + 1} 완료* — [${step.agents.join(', ')}]\n다음: Step ${si + 2} [${result.delegationSteps[si + 1].agents.join(', ')}]`,
+            text: `✅ *Step ${si + 1} 완료* — [${step.agents.join(', ')}]\n작업: ${step.task}\n다음: Step ${si + 2} [${result.delegationSteps[si + 1].agents.join(', ')}] — ${result.delegationSteps[si + 1].task}`,
           });
         } catch {
           // 포스팅 실패 무시
@@ -970,6 +1060,9 @@ const executeSingle = async (
       }, 'hub-review', pmApp, true, true, 'high');
     }
 
+    // ✅ 사용자 원본 메시지 완료 리액션 전환
+    await safeSwapReaction(app, event.channel, event.ts, 'hammer_and_pick', 'white_check_mark');
+    console.log(`[reaction] ✅ 순차 위임 완료 → 사용자 메시지: ${event.ts}`);
     return;
   }
 
@@ -986,6 +1079,9 @@ const executeSingle = async (
     changedFiles: string[];
   }> = [];
   let agentExecutionCount = 0;
+  // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가
+  await safeAddReaction(app, event.channel, event.ts, 'hammer_and_pick');
+  console.log(`[reaction] ⚒️ 허브 루프 시작 → 사용자 메시지: ${event.ts}`);
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
   let currentPmTs = result.postedTs;
   // 순환 핸드오프 감지: 전체 허브 루프에서 실행된 에이전트 추적
@@ -1219,10 +1315,12 @@ const executeSingle = async (
       // PM이 완료 판단 — 최종 요약을 Slack에 포스팅
       if (pmReview.text) {
         try {
+          const pmBlocks = buildMessageBlocks(pmReview.text);
           const postResult = await pmApp.client.chat.postMessage({
             channel: event.channel,
             text: pmReview.text,
             thread_ts: event.thread_ts ?? event.ts,
+            ...(pmBlocks ? { blocks: pmBlocks } : {}),
           });
           lastPmReview = { text: pmReview.text, postedTs: postResult.ts as string | undefined };
           console.log('[hub] PM 최종 요약 포스팅 완료');
@@ -1363,7 +1461,10 @@ const executeSingle = async (
     );
   }
 
-  // Hub 완료 — 개별 에이전트가 이미 ✅ 전환했으므로 추가 작업 없음
+  // ✅ 사용자 원본 메시지 완료 리액션 전환
+  await safeSwapReaction(app, event.channel, event.ts, 'hammer_and_pick', 'white_check_mark');
+  console.log(`[reaction] ✅ 허브 루프 완료 → 사용자 메시지: ${event.ts}`);
+  // Hub 완료
   console.log('[hub] Hub 완료 — 모든 에이전트 리액션 처리됨');
 };
 
@@ -1697,6 +1798,18 @@ const flushDebounceBuffer = async (
     }
   }
 
+  // LLM 컨텍스트 압축 (Phase 2): 임계값 초과 시 Haiku로 압축
+  if (
+    conversationHistory &&
+    CONTEXT_COMPRESSION_ENABLED &&
+    conversationHistory.length > CONTEXT_COMPRESSION_THRESHOLD_CHARS
+  ) {
+    console.log(
+      `[compress] 히스토리 ${conversationHistory.length}자 > 임계값 ${CONTEXT_COMPRESSION_THRESHOLD_CHARS}자, 압축 시작`,
+    );
+    conversationHistory = await compressConversationHistory(conversationHistory);
+  }
+
   // 스레드 주제 프리프로세싱 (스레드 + 히스토리 있을 때만)
   let threadTopic = '';
   if (threadTs && conversationHistory) {
@@ -1762,7 +1875,13 @@ const flushDebounceBuffer = async (
   const REJECTION_TEXT_PATTERN =
     /^[\s]*(거부|reject|취소|ㄴㄴ|노|no|반려|deny)[\s!.]*$/i;
   if (hasPendingApproval(slackEvent.channel)) {
-    if (APPROVAL_TEXT_PATTERN.test(newMessagesText)) {
+    // 보안: SID_USER_ID만 텍스트로 승인/거부 가능
+    const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+    if (slackEvent.user !== authorizedUserId) {
+      console.log(
+        `[auto-proceed] 텍스트 승인/거부 무시: 권한 없는 사용자 ${slackEvent.user} (승인 권한: ${authorizedUserId})`,
+      );
+    } else if (APPROVAL_TEXT_PATTERN.test(newMessagesText)) {
       const count = await manuallyApprove(
         slackEvent.channel,
         apps[0],
@@ -2087,6 +2206,237 @@ const main = async () => {
       },
     );
 
+    // ─── 에이전트 제어 버튼 핸들러 (취소/재실행) ────────────────
+    app.action(
+      'agent_cancel',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const clickerId =
+            (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId =
+            process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(
+              `[control] 미인가 사용자 취소 시도: ${clickerId}`,
+            );
+            return;
+          }
+          const controlId =
+            (action as { value?: string }).value ?? '';
+          const ctx = getRunContext(controlId);
+          if (!ctx) {
+            console.warn(
+              `[control] 컨텍스트 없음 (만료/완료): ${controlId}`,
+            );
+            return;
+          }
+          // 에이전트 중단
+          cancelAgent(ctx.eventTs);
+          cancelQueueByThread(ctx.eventTs);
+          // 상태 메시지 업데이트
+          await updateStatusMessage(
+            ctx.slackApp,
+            ctx.channel,
+            ctx.statusMessageTs,
+            'cancelled',
+            ctx.agentName,
+          );
+          deleteRunContext(controlId);
+          console.log(
+            `[control] 🛑 버튼 취소: ${ctx.agentName} (${ctx.eventTs})`,
+          );
+        } catch (err) {
+          console.error('[control] agent_cancel 핸들러 오류:', err);
+        }
+      },
+    );
+
+    app.action(
+      'agent_rerun',
+      async ({ ack, body }) => {
+        try {
+          await ack();
+          const clickerId =
+            (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId =
+            process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(
+              `[control] 미인가 사용자 재실행 시도: ${clickerId}`,
+            );
+            return;
+          }
+          const action = (
+            body as { actions?: Array<{ value?: string }> }
+          ).actions?.[0];
+          const controlId = action?.value ?? '';
+          const ctx = getRunContext(controlId);
+          if (!ctx) {
+            console.warn(
+              `[control] 컨텍스트 없음 (만료/완료): ${controlId}`,
+            );
+            return;
+          }
+          // Modal 열기
+          const triggerId = (body as { trigger_id?: string })
+            .trigger_id;
+          if (!triggerId) {
+            console.error('[control] trigger_id 없음');
+            return;
+          }
+          await app.client.views.open({
+            trigger_id: triggerId,
+            view: buildRerunModal(
+              controlId,
+              ctx.agentName,
+            ) as Parameters<
+              typeof app.client.views.open
+            >[0]['view'],
+          });
+        } catch (err) {
+          console.error('[control] agent_rerun 핸들러 오류:', err);
+        }
+      },
+    );
+
+    app.action(
+      'agent_cancel_all',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const clickerId =
+            (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId =
+            process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(
+              `[control] 미인가 사용자 전체 중단 시도: ${clickerId}`,
+            );
+            return;
+          }
+          const controlId =
+            (action as { value?: string }).value ?? '';
+          const ctx = getRunContext(controlId);
+          if (!ctx) {
+            console.warn(
+              `[control] 컨텍스트 없음 (만료/완료): ${controlId}`,
+            );
+            return;
+          }
+          // 같은 스레드의 모든 에이전트 중단
+          const threadContexts = findContextsByThread(
+            ctx.threadTs,
+          );
+          let cancelledCount = 0;
+          for (const tCtx of threadContexts) {
+            cancelAgent(tCtx.eventTs);
+            await updateStatusMessage(
+              tCtx.slackApp,
+              tCtx.channel,
+              tCtx.statusMessageTs,
+              'cancelled',
+              tCtx.agentName,
+            );
+            deleteRunContext(tCtx.controlId);
+            cancelledCount++;
+          }
+          // 큐 태스크도 전부 취소
+          const queueResult = cancelQueueByThread(ctx.threadTs);
+          cancelledCount += queueResult.count;
+          console.log(
+            `[control] ⏹️ 전체 중단: thread=${ctx.threadTs}, agents=${threadContexts.length}, queue=${queueResult.count}`,
+          );
+        } catch (err) {
+          console.error(
+            '[control] agent_cancel_all 핸들러 오류:',
+            err,
+          );
+        }
+      },
+    );
+
+    app.view(
+      'agent_rerun_modal',
+      async ({ ack, view }) => {
+        try {
+          await ack();
+          const controlId = view.private_metadata ?? '';
+          const ctx = getRunContext(controlId);
+          if (!ctx) {
+            console.warn(
+              `[control] 재실행 컨텍스트 없음: ${controlId}`,
+            );
+            return;
+          }
+          const additionalReqs =
+            view.state?.values?.rerun_input_block?.rerun_requirements
+              ?.value ?? '';
+
+          // 현재 에이전트 중단
+          cancelAgent(ctx.eventTs);
+          cancelQueueByThread(ctx.eventTs);
+
+          // 상태 메시지 → "재실행 중"
+          await updateStatusMessage(
+            ctx.slackApp,
+            ctx.channel,
+            ctx.statusMessageTs,
+            'rerunning',
+            ctx.agentName,
+          );
+          deleteRunContext(controlId);
+
+          // 새 요구사항을 붙여서 재실행
+          const newText = [
+            ctx.originalText,
+            '',
+            '[재실행 — 추가 요구사항]',
+            additionalReqs,
+          ].join('\n');
+
+          const rerunEvent: SlackEvent = {
+            type: 'message',
+            text: newText,
+            user: process.env.SID_USER_ID ?? 'U0AJ3T423RU',
+            channel: ctx.channel,
+            channel_name: '',
+            ts: `rerun_${Date.now()}`,
+            thread_ts: ctx.threadTs,
+            mentions: [],
+            raw: {},
+          };
+
+          const agentApp = findAgentApp(
+            ctx.agentName,
+            apps,
+          );
+          console.log(
+            `[control] 🔄 재실행: ${ctx.agentName} — "${additionalReqs.slice(0, 50)}..."`,
+          );
+
+          // 비동기 실행 (블로킹 방지)
+          executeSingle(
+            ctx.agentName,
+            rerunEvent,
+            'rerun',
+            agentApp,
+            apps,
+          ).catch((err) =>
+            console.error(
+              `[control] 재실행 오류: ${ctx.agentName}`,
+              err,
+            ),
+          );
+        } catch (err) {
+          console.error(
+            '[control] agent_rerun_modal 핸들러 오류:',
+            err,
+          );
+        }
+      },
+    );
+
     // 메시지 이벤트 핸들러 — 첫 번째 앱(PM)에서만 등록
     // 6개 앱이 모두 같은 메시지를 수신하므로 1개만 처리
     if (apps.length > 0) {
@@ -2139,7 +2489,9 @@ const main = async () => {
         }
 
         if (urlPrivate && mimetype.startsWith('image/')) {
-          const ext = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+          // 보안: path traversal 방지를 위한 ext sanitize
+          const rawExt = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+          const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '');
           const filename = `${ts}-${fileId}.${ext}`;
           const savedPath = await downloadSlackImage(urlPrivate, pmBotToken, filename);
           if (savedPath) {
@@ -2167,7 +2519,9 @@ const main = async () => {
           console.log(`[file] URL 텍스트 파싱: ${fileId} url=${urlPrivate ? '획득' : '없음'} mimetype=${mimetype}`);
 
           if (urlPrivate && mimetype.startsWith('image/')) {
-            const ext = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+            // 보안: path traversal 방지를 위한 ext sanitize
+            const rawExt = mimetype.split('/')[1]?.replace('jpeg', 'jpg') ?? 'png';
+            const ext = rawExt.replace(/[^a-zA-Z0-9]/g, '');
             const filename = `${ts}-${fileId}.${ext}`;
             const savedPath = await downloadSlackImage(urlPrivate, pmBotToken, filename);
             if (savedPath) {
@@ -2325,8 +2679,18 @@ const main = async () => {
           return;
         }
 
+        // 보안: SID_USER_ID만 리액션으로 제어 가능 (black_square_for_stop, white_check_mark)
+        const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+        const isAuthorized = userId === authorizedUserId;
+
         switch (re.reaction) {
           case 'black_square_for_stop': {
+            if (!isAuthorized) {
+              console.log(
+                `[control] ⛔ 에이전트 중단 무시: 권한 없는 사용자 ${userId} (승인 권한: ${authorizedUserId})`,
+              );
+              break;
+            }
             // 🧠 리액션 제거 (라우팅 중이었다면)
             try {
               await apps[0].client.reactions.remove({
@@ -2373,6 +2737,12 @@ const main = async () => {
             break;
           }
           case 'white_check_mark': {
+            if (!isAuthorized) {
+              console.log(
+                `[auto-proceed] ✅ 수동 승인 무시: 권한 없는 사용자 ${userId} (승인 권한: ${authorizedUserId})`,
+              );
+              break;
+            }
             // HIGH 리스크 수동 승인
             const count = await manuallyApprove(
               re.item.channel,

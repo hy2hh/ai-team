@@ -15,6 +15,7 @@ import { handleMessage } from './agent-runtime.js';
 import type { SlackEvent } from './types.js';
 import { rateLimited } from './rate-limiter.js';
 import { agentDisplayName } from './queue-processor.js';
+import { buildMessageBlocks } from './slack-table.js';
 
 /** 프로젝트 루트 (socket-bridge의 부모) */
 const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..');
@@ -358,11 +359,16 @@ export const runCrossVerification = async (
 
   try {
     await rateLimited(() =>
-      slackApp.client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: event.thread_ts ?? event.ts,
-        text: `${overallEmoji} *${agentDisplayName(producerAgent)} 작업 동료 검토 — ${overallStatus}*\n${summary}`,
-      }),
+      (() => {
+        const fullText = `${overallEmoji} *${agentDisplayName(producerAgent)} 작업 동료 검토 — ${overallStatus}*\n${summary}`;
+        const verifyBlocks = buildMessageBlocks(fullText);
+        return slackApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: fullText,
+          ...(verifyBlocks ? { blocks: verifyBlocks } : {}),
+        });
+      })(),
     );
   } catch {
     // 포스팅 실패 무시

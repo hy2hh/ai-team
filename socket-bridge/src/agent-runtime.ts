@@ -30,6 +30,14 @@ import { runMeeting, type MeetingType } from './meeting.js';
 import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
 import { buildMessageBlocks } from './slack-table.js';
+import {
+  generateControlId,
+  postRunningMessage,
+  updateStatusMessage,
+  storeRunContext,
+  findContextByEventTs,
+  deleteRunContext,
+} from './agent-control-buttons.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
   emitAgentStarted,
@@ -567,6 +575,18 @@ const buildContextRulesPrefix = (agentName: string): string => {
           '- 시장 → 기획: Researcher → PM (조사 결과로 PRD 작성)',
           '- 구현 → 보안: Frontend/Backend → SecOps (코드 완료 후 보안 리뷰)',
           '- 풀 사이클: PM → Designer → Frontend + Backend → SecOps',
+        ]
+      : []),
+    // Researcher 보고서 품질 강제 규칙
+    ...(agentName === 'researcher'
+      ? [
+          '',
+          '### 리서치 보고서 필수 규칙 (예외 없음)',
+          '모든 리서치 응답에 아래 3가지를 반드시 적용하라. 사용자가 명시하지 않아도 자동 적용.',
+          '',
+          '1. *검증 마커*: 모든 수치·통계 옆에 인라인으로 ✅ 직접 확인 / ⚠️ 간접 확인 / ❓ 미확인 표기. 하단 일괄 경고로 대체 금지.',
+          '2. *출처 구분*: WebFetch로 원문 접속한 수치는 ✅, WebSearch 스니펫만으로 확인한 수치는 ⚠️ 간접 확인 명시.',
+          '3. *면책 문구*: 보고서 상단과 하단 모두에 "이 보고서의 수치는 YYYY-MM-DD 기준입니다. 현재와 다를 수 있습니다." 포함.',
         ]
       : []),
     '',
@@ -1334,6 +1354,32 @@ export const handleMessage = async (
     }
   }
 
+  // 🎛️ 컨트롤 버튼 메시지 게시 (취소/재실행)
+  const controlId = generateControlId();
+  const threadTs = event.thread_ts ?? event.ts;
+  const statusMessageTs = await postRunningMessage(
+    slackApp,
+    event.channel,
+    threadTs,
+    agentName,
+    controlId,
+  );
+  if (statusMessageTs) {
+    storeRunContext({
+      controlId,
+      agentName,
+      originalText: event.text,
+      channel: event.channel,
+      threadTs,
+      statusMessageTs,
+      eventTs: event.ts,
+      slackApp,
+      routingMethod,
+      modelTier,
+      createdAt: Date.now(),
+    });
+  }
+
   try {
     // 에이전트별 Slack bot token 조회
     const botToken =
@@ -1344,6 +1390,7 @@ export const handleMessage = async (
     let resultText = '';
     let usedModel = '';
     let costUsd = 0;
+    let sdkFailed = false;
     const toolUses: Array<{ name: string }> = [];
 
     // 스레드 내 연속 대화 시 이전 세션 재사용 (히스토리 + 시스템 프롬프트 캐싱)
@@ -2017,6 +2064,12 @@ export const handleMessage = async (
           console.error(
             `[runtime] ${agentName} SDK 비성공 결과: subtype=${resultMsg.subtype} — ${errorText}`,
           );
+          // error_max_turns 등 비성공 결과 → Slack에 에러 메시지 전송
+          sdkFailed = true;
+          const isMaxTurns = resultMsg.subtype === 'error_max_turns';
+          resultText = isMaxTurns
+            ? `⚠️ 대화 한도를 초과하여 응답을 완료하지 못했습니다. 작업을 더 작은 단위로 나눠서 요청해주세요.`
+            : `⚠️ 처리 중 오류가 발생했습니다 (${resultMsg.subtype}). 잠시 후 다시 시도해주세요.`;
         }
       }
     }
@@ -2026,7 +2079,8 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // ⚒️ → ✅ 완료 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
+    // ⚒️ → ✅/❌ 완료 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
+    const doneReaction = sdkFailed ? 'x' : 'white_check_mark';
     if (canReact) {
       const timestamps = event.batchTs ?? [event.ts];
       for (const ts of timestamps) {
@@ -2039,11 +2093,11 @@ export const handleMessage = async (
           await slackApp.client.reactions.add({
             channel: event.channel,
             timestamp: ts,
-            name: 'white_check_mark',
+            name: doneReaction,
           });
         } catch (err) {
           console.error(
-            `[reaction] ✅ 완료 리액션 전환 실패:`,
+            `[reaction] ${sdkFailed ? '❌' : '✅'} 완료 리액션 전환 실패:`,
             err,
           );
         }
@@ -2175,7 +2229,24 @@ export const handleMessage = async (
       console.warn(
         `[runtime] ${agentName} 빈 결과 — Slack 포스팅 건너뜀`,
       );
-    } else {
+    }
+
+    // 상태 메시지 → "완료" (버튼 제거)
+    if (statusMessageTs) {
+      await updateStatusMessage(
+        slackApp,
+        event.channel,
+        statusMessageTs,
+        'completed',
+        agentName,
+      );
+      const ctx = findContextByEventTs(event.ts);
+      if (ctx) {
+        deleteRunContext(ctx.controlId);
+      }
+    }
+
+    if (skipPosting && resultText) {
       console.log(
         `[runtime] ${agentName} skipPosting=true — Slack 포스팅 억제`,
       );
@@ -2263,6 +2334,16 @@ export const handleMessage = async (
           console.error(`[reaction] ⛔ 중단 리액션 전환 실패:`, err);
         }
       }
+      // 상태 메시지 → "취소됨" (버튼 제거)
+      if (statusMessageTs) {
+        await updateStatusMessage(
+          slackApp,
+          event.channel,
+          statusMessageTs,
+          'cancelled',
+          agentName,
+        );
+      }
       return { text: '', delegationTargets: [], aborted: true };
     }
 
@@ -2309,6 +2390,17 @@ export const handleMessage = async (
           );
         }
       }
+    }
+
+    // 상태 메시지 → "오류" (버튼 제거)
+    if (statusMessageTs) {
+      await updateStatusMessage(
+        slackApp,
+        event.channel,
+        statusMessageTs,
+        'error',
+        agentName,
+      );
     }
 
     // 에러 시 Slack에 알림 (에러 분류 포함)
