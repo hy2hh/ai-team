@@ -1314,12 +1314,22 @@ export const handleMessage = async (
   skipPosting = false,
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
   existingKanbanCardId?: number | null,
+  stepInfo?: { current: number; total: number },
 ): Promise<HandleMessageResult> => {
   // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
   // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
   if (agentName === 'researcher' && isResearchRequest(event)) {
     const threadTs = event.thread_ts ?? event.ts;
     console.log(`[research-mode] 리서치 모드 선택 대기: ${threadTs}`);
+
+    // 버튼 클릭 핸들러 등록을 postMessage보다 먼저 수행
+    // (Slack이 HTTP 응답 전에 클라이언트에 버튼을 전달할 수 있으므로
+    //  postMessage await 이후에 등록하면 클릭 → resolve 미등록 → ⚠️ 경고 발생)
+    const selectedModePromise = new Promise<'academic' | 'practical'>(
+      (resolve) => {
+        pendingResearchMode.set(threadTs, resolve);
+      },
+    );
 
     // A/B 버튼 메시지 전송
     await rateLimited(() =>
@@ -1376,9 +1386,7 @@ export const handleMessage = async (
 
     // 사용자 선택 대기 (최대 5분 타임아웃)
     const selectedMode = await Promise.race([
-      new Promise<'academic' | 'practical'>((resolve) => {
-        pendingResearchMode.set(threadTs, resolve);
-      }),
+      selectedModePromise,
       new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 5 * 60 * 1000);
       }),
@@ -1486,6 +1494,7 @@ export const handleMessage = async (
     threadTs,
     agentName,
     controlId,
+    stepInfo,
   );
   if (statusMessageTs) {
     storeRunContext({

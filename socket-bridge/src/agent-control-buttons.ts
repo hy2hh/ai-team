@@ -80,8 +80,8 @@ export const findContextsByThread = (
   return results;
 };
 
-/** Block Kit actions 블록: [🛑 취소] [🔄 재실행] */
-export const buildControlActions = (controlId: string) => ({
+/** Block Kit actions 블록: [🛑 취소] [🔄 재실행] ([⏹️ 전체 중단] — 다중 스텝일 때만) */
+export const buildControlActions = (controlId: string, showCancelAll = true) => ({
   type: 'actions' as const,
   block_id: `agent_control_${controlId}`,
   elements: [
@@ -102,17 +102,21 @@ export const buildControlActions = (controlId: string) => ({
       action_id: 'agent_rerun',
       value: controlId,
     },
-    {
-      type: 'button' as const,
-      text: {
-        type: 'plain_text' as const,
-        text: '⏹️ 전체 중단',
-        emoji: true,
-      },
-      style: 'danger' as const,
-      action_id: 'agent_cancel_all',
-      value: controlId,
-    },
+    ...(showCancelAll
+      ? [
+          {
+            type: 'button' as const,
+            text: {
+              type: 'plain_text' as const,
+              text: '⏹️ 전체 중단',
+              emoji: true,
+            },
+            style: 'danger' as const,
+            action_id: 'agent_cancel_all',
+            value: controlId,
+          },
+        ]
+      : []),
   ],
 });
 
@@ -126,21 +130,25 @@ export const postRunningMessage = async (
   threadTs: string,
   agentName: string,
   controlId: string,
+  stepInfo?: { current: number; total: number },
 ): Promise<string | undefined> => {
+  const resolved = stepInfo ?? { current: 1, total: 1 };
+  const stepSuffix = ` (${resolved.current}/${resolved.total}단계)`;
+  const showCancelAll = resolved.total > 1;
   try {
     const result = await slackApp.client.chat.postMessage({
       channel,
       thread_ts: threadTs,
-      text: `🏃 ${agentName} 작업 중...`,
+      text: `🏃 ${agentName} 작업 중...${stepSuffix}`,
       blocks: [
         {
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `🏃 *${agentName}* 작업 중...`,
+            text: `🏃 *${agentName}* 작업 중...${stepSuffix}`,
           },
         },
-        buildControlActions(controlId),
+        buildControlActions(controlId, showCancelAll),
       ],
     });
     return (result as { ts?: string }).ts;

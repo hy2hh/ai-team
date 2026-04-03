@@ -906,6 +906,7 @@ const executeSingle = async (
             false,
             step.tier ?? 'standard',
             existingCardId,
+            { current: si + 1, total: result.delegationSteps!.length },
           );
         }),
       );
