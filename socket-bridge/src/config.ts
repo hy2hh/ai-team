@@ -84,3 +84,21 @@ export const CLEANUP_HANDOFF_EXPIRE_DAYS = envInt(
 /** 컨텍스트 정리 활성화 여부 */
 export const CONTEXT_CLEANUP_ENABLED =
   process.env.BRIDGE_CONTEXT_CLEANUP_ENABLED !== '0';
+
+// ─────────────────────────────────────────────
+// LLM 컨텍스트 압축 설정 (Phase 2)
+// ─────────────────────────────────────────────
+
+/** LLM 컨텍스트 압축 활성화 여부 */
+export const CONTEXT_COMPRESSION_ENABLED =
+  process.env.BRIDGE_CONTEXT_COMPRESSION_ENABLED !== '0';
+
+/**
+ * 스레드 히스토리 압축 임계값 (문자 수).
+ * 이 값을 초과하면 Haiku로 압축 후 에이전트에 전달.
+ * 기본 3000자 ≈ 약 750토큰. 긴 분석 응답 1개가 이 수준을 초과함.
+ */
+export const CONTEXT_COMPRESSION_THRESHOLD_CHARS = envInt(
+  'BRIDGE_CONTEXT_COMPRESSION_THRESHOLD_CHARS',
+  3000,
+);
