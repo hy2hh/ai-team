@@ -12,6 +12,7 @@
  */
 
 import type { App } from '@slack/bolt';
+import crypto from 'node:crypto';
 
 /** 대기 중인 권한 요청 */
 interface PendingPermission {
@@ -49,7 +50,7 @@ export const postPermissionRequest = async (
   reason: string,
   action: string,
 ): Promise<boolean> => {
-  const permissionId = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const permissionId = `perm_${crypto.randomUUID().replace(/-/g, '')}`;
 
   const postResult = await slackApp.client.chat.postMessage({
     channel,
