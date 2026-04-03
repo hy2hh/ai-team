@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { Button } from '@bifrost-platform/ui-kit-front';
 import { Card } from '@/lib/types';
+import { AGENTS, PRIORITY_CONFIG, getAgentColor, getProgressColor } from '@/lib/constants';
 
 // ─── 타입 ────────────────────────────────────────────────────────────────────
 
@@ -21,37 +23,7 @@ interface Props {
 
 // ─── 상수 ────────────────────────────────────────────────────────────────────
 
-const AGENTS = ['Homer', 'Bart', 'Marge', 'Lisa', 'Krusty', 'Sid', 'Chalmers', 'Wiggum'];
 const DUE_SOON_DAYS = 3;
-
-const AGENT_COLORS: Record<string, string> = {
-  homer:    '#4f7ef0',
-  bart:     '#22d3ee',
-  marge:    '#c084fc',
-  lisa:     '#4ade80',
-  krusty:   '#fb923c',
-  sid:      '#f472b6',
-  chalmers: '#f59e0b',
-  wiggum:   '#94a3b8',
-};
-
-const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  high:   { color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', label: '높음' },
-  medium: { color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.25)',  label: '보통' },
-  low:    { color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.25)',  label: '낮음' },
-};
-
-// ─── 헬퍼 ────────────────────────────────────────────────────────────────────
-
-function getAgentColor(name: string): string {
-  return AGENT_COLORS[name.toLowerCase()] ?? '#7a90b8';
-}
-
-function getProgressColor(progress: number): string {
-  if (progress >= 67) return '#4ade80';
-  if (progress >= 34) return '#fbbf24';
-  return '#f87171';
-}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -119,6 +91,14 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
   const [tagsVal, setTagsVal] = useState<string[]>(card.tags ?? []);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 언마운트 시 토스트 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); }
+    };
+  }, []);
 
   const progress = progressVal;
   const progressColor = getProgressColor(progress);
@@ -129,7 +109,8 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
   // 토스트 표시
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 2500);
+    if (toastTimerRef.current) { clearTimeout(toastTimerRef.current); }
+    toastTimerRef.current = setTimeout(() => setToast(null), 2500);
   };
 
   // 필드 저장 헬퍼
@@ -232,9 +213,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                 aria-label="카드 제목 편집"
                 style={{
                   fontSize: 17, fontWeight: 600, lineHeight: 1.4, color: 'var(--color-text-primary)',
-                  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-action-primary)',
+                  background: 'var(--color-bg-elevated)', border: '1px solid var(--color-point)',
                   borderRadius: 6, padding: '4px 8px', width: '100%', outline: 'none',
-                  boxShadow: '0 0 0 3px rgba(79,126,240,0.15)',
+                  boxShadow: '0 0 0 3px var(--color-point-subtle)',
                 }}
               />
             ) : (
@@ -272,14 +253,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
             ref={closeBtnRef}
             onClick={onClose}
             aria-label="모달 닫기"
-            style={{
-              width: 32, height: 32, borderRadius: 8, background: 'transparent', border: 'none',
-              cursor: 'pointer', color: 'var(--color-text-muted)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0,
-              transition: 'background 150ms, color 150ms',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-bg-card)'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-primary)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; (e.currentTarget as HTMLButtonElement).style.color = 'var(--color-text-muted)'; }}
+            className="modal-close-btn"
           >
             ×
           </button>
@@ -384,9 +358,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
               {dueDateVal && dueDateStatus && (
                 <span style={{
                   fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                  background: dueDateStatus === 'overdue' ? 'var(--color-due-overdue-bg)' : dueDateStatus === 'soon' ? 'var(--color-due-warning-bg)' : 'rgba(74,222,128,0.1)',
-                  color: dueDateStatus === 'overdue' ? 'var(--color-due-overdue)' : dueDateStatus === 'soon' ? 'var(--color-due-warning)' : '#4ade80',
-                  border: `1px solid ${dueDateStatus === 'overdue' ? 'rgba(248,113,113,0.3)' : dueDateStatus === 'soon' ? 'var(--color-due-warning-border)' : 'rgba(74,222,128,0.3)'}`,
+                  background: dueDateStatus === 'overdue' ? 'var(--color-due-overdue-bg)' : dueDateStatus === 'soon' ? 'var(--color-due-warning-bg)' : 'var(--color-due-normal-bg)',
+                  color: dueDateStatus === 'overdue' ? 'var(--color-due-overdue)' : dueDateStatus === 'soon' ? 'var(--color-due-warning)' : 'var(--color-due-normal)',
+                  border: `1px solid ${dueDateStatus === 'overdue' ? 'var(--color-due-overdue-border)' : dueDateStatus === 'soon' ? 'var(--color-due-warning-border)' : 'var(--color-due-normal-border)'}`,
                 }}>
                   {dueDateStatus === 'overdue' ? '⚠ 기한 초과' : dueDateStatus === 'soon' ? '🔔 임박' : '✓ 정상'}
                 </span>
@@ -402,18 +376,13 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                 <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>태그 없음</span>
               )}
               {tagsVal.map((tag) => (
-                <span key={tag} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, fontWeight: 500, padding: '3px 10px',
-                  borderRadius: 14, background: 'rgba(79,126,240,0.12)',
-                  color: '#4f7ef0', border: '1px solid rgba(79,126,240,0.25)',
-                }}>
+                <span key={tag} className="tag-pill">
                   {tag}
                   {onUpdate && (
                     <button
                       onClick={() => removeTag(tag)}
                       aria-label={`태그 ${tag} 삭제`}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4f7ef0', padding: 0, fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tag-text)', padding: 0, fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                     >
                       ×
                     </button>
@@ -436,19 +405,15 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                     borderRadius: 8, padding: '6px 10px', outline: 'none',
                   }}
                 />
-                <button
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="medium"
                   onClick={addTag}
                   disabled={!tagInput.trim()}
-                  aria-label="태그 추가"
-                  style={{
-                    padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-                    background: tagInput.trim() ? 'rgba(79,126,240,0.15)' : 'var(--color-bg-elevated)',
-                    color: tagInput.trim() ? '#4f7ef0' : 'var(--color-text-muted)',
-                    border: '1px solid var(--color-border)', cursor: tagInput.trim() ? 'pointer' : 'default',
-                  }}
                 >
                   추가
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -521,23 +486,27 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                   aria-label="카드 설명 편집"
                   style={{
                     fontSize: 14, lineHeight: 1.65, color: 'var(--color-text-secondary)',
-                    background: 'var(--color-bg-elevated)', border: '1px solid var(--color-action-primary)',
+                    background: 'var(--color-bg-elevated)', border: '1px solid var(--color-point)',
                     borderRadius: 10, padding: '12px 14px', resize: 'vertical', outline: 'none',
                   }}
                 />
                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                  <button
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="medium"
                     onClick={() => { setDescVal(card.description ?? ''); setEditDesc(false); }}
-                    style={{ padding: '5px 14px', borderRadius: 6, fontSize: 13, background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', cursor: 'pointer' }}
                   >
                     취소
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="medium"
                     onClick={() => { setEditDesc(false); void save({ description: descVal || null }); }}
-                    style={{ padding: '5px 14px', borderRadius: 6, fontSize: 13, background: 'rgba(79,126,240,0.15)', border: '1px solid rgba(79,126,240,0.3)', color: '#4f7ef0', cursor: 'pointer', fontWeight: 600 }}
                   >
                     저장
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
@@ -581,29 +550,24 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
         </div>
 
         {/* ── 푸터 ── */}
-        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--color-bg-elevated)' }}>
+        <div className="modal-footer modal-footer--split" style={{ background: 'var(--color-bg-elevated)' }}>
           {/* 저장 중 표시 */}
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', opacity: saving ? 1 : 0, transition: 'opacity 200ms' }}>저장 중…</span>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 20px', borderRadius: 8, background: 'var(--color-action-secondary)',
-              color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500,
-              border: '1px solid var(--color-border-strong)', cursor: 'pointer', transition: 'background 150ms',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary-hover)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--color-action-secondary)'; }}
-          >
+          <span style={{ fontSize: 'var(--text-caption)', color: 'var(--color-text-muted)', opacity: saving ? 1 : 0, transition: 'opacity 200ms' }}>저장 중…</span>
+          <Button variant="outline" size="medium" onClick={onClose}>
             닫기
-          </button>
+          </Button>
         </div>
 
         {/* 토스트 */}
         {toast && (
           <div style={{
             position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)',
-            background: '#1e293b', color: '#e2e8f0', fontSize: 13, fontWeight: 500,
-            padding: '8px 18px', borderRadius: 10, boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+            background: 'var(--color-bg-elevated)',
+            border: '1px solid var(--color-border)',
+            color: 'var(--color-text-primary)',
+            fontSize: 13, fontWeight: 500,
+            padding: '8px 18px', borderRadius: 10,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border)',
             pointerEvents: 'none', whiteSpace: 'nowrap',
             animation: 'toastIn 200ms cubic-bezier(0.16,1,0.3,1)',
           }}>

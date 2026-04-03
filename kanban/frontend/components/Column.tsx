@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { ColumnWithCards, Card as CardType } from '@/lib/types';
@@ -8,17 +8,6 @@ import Card from './Card';
 import AddCardModal from './AddCardModal';
 import CardDetailModal from './CardDetailModal';
 import { api } from '@/lib/api';
-
-// 컬럼 인덱스에 따른 accent 색상
-const COLUMN_ACCENTS = ['#4f7ef0', '#fbbf24', '#c084fc', '#4ade80', '#fb923c', '#f472b6'];
-const COLUMN_ACCENT_BG = [
-  'rgba(79,126,240,0.08)',
-  'rgba(251,191,36,0.08)',
-  'rgba(192,132,252,0.08)',
-  'rgba(74,222,128,0.08)',
-  'rgba(251,146,60,0.08)',
-  'rgba(244,114,182,0.08)',
-];
 
 interface Props {
   column: ColumnWithCards;
@@ -34,14 +23,18 @@ function isCardFiltered(card: CardType, filter: FilterState | null): boolean {
   return false;
 }
 
-export default function Column({ column, onRefresh, columnIndex, filter }: Props) {
+const Column = memo(function Column({ column, onRefresh, filter }: Props) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedCard, setSelectedCard] = useState<CardType | null>(null);
   const [colError, setColError] = useState<string | null>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { setNodeRef, isOver } = useDroppable({ id: `col-${column.id}` });
 
-  const accentColor = COLUMN_ACCENTS[columnIndex % COLUMN_ACCENTS.length];
-  const accentBg = COLUMN_ACCENT_BG[columnIndex % COLUMN_ACCENT_BG.length];
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) { clearTimeout(errorTimerRef.current); }
+    };
+  }, []);
 
   const isWipExceeded = column.wip_limit != null && column.cards.length >= column.wip_limit;
   const wipPercent = column.wip_limit ? Math.min((column.cards.length / column.wip_limit) * 100, 100) : 0;
@@ -52,10 +45,11 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
   );
   const allFiltered = filter && column.cards.length > 0 && visibleCount === 0;
 
-  const handleAdd = async (data: { title: string; description: string; priority: string; assignee: string; progress: number; due_date: string | null; tags: string[] }) => {
+  const handleAdd = useCallback(async (data: { title: string; description: string; priority: string; assignee: string; progress: number; due_date: string | null; tags: string[] }) => {
     if (isWipExceeded) {
       setColError(`WIP 한도(${column.wip_limit})에 도달했습니다.`);
-      setTimeout(() => setColError(null), 3000);
+      if (errorTimerRef.current) { clearTimeout(errorTimerRef.current); }
+      errorTimerRef.current = setTimeout(() => setColError(null), 3000);
       return;
     }
     try {
@@ -65,28 +59,30 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
     } catch (e) {
       console.error('Failed to create card', e);
       setColError('카드 생성에 실패했습니다. 다시 시도해주세요.');
-      setTimeout(() => setColError(null), 3000);
+      if (errorTimerRef.current) { clearTimeout(errorTimerRef.current); }
+      errorTimerRef.current = setTimeout(() => setColError(null), 3000);
     }
-  };
+  }, [column.id, column.wip_limit, isWipExceeded, onRefresh]);
 
-  const handleUpdate = async (
+  const handleUpdate = useCallback(async (
     id: number,
     data: Partial<Pick<CardType, 'title' | 'description' | 'priority' | 'assignee' | 'progress' | 'due_date' | 'tags'>>
   ) => {
     await api.updateCard(id, data as Parameters<typeof api.updateCard>[1]);
     onRefresh();
-  };
+  }, [onRefresh]);
 
-  const handleDelete = async (cardId: number) => {
+  const handleDelete = useCallback(async (cardId: number) => {
     try {
       await api.deleteCard(cardId);
       onRefresh();
     } catch (e) {
       console.error('Failed to delete card', e);
       setColError('카드 삭제에 실패했습니다. 다시 시도해주세요.');
-      setTimeout(() => setColError(null), 3000);
+      if (errorTimerRef.current) { clearTimeout(errorTimerRef.current); }
+      errorTimerRef.current = setTimeout(() => setColError(null), 3000);
     }
-  };
+  }, [onRefresh]);
 
   const cardIds = useMemo(
     () => column.cards.map((c: CardType) => `card-${c.id}`),
@@ -102,33 +98,28 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
         style={{
           display: 'flex',
           flexDirection: 'column',
-          borderRadius: 14,
-          background: isOver ? `${accentBg}` : 'var(--color-bg-elevated)',
-          border: `1px solid ${isOver ? accentColor : isWipExceeded ? 'rgba(248,113,113,0.45)' : 'var(--color-border)'}`,
+          borderRadius: 16,
+          background: isOver ? 'var(--color-point-subtle)' : 'var(--color-bg-elevated)',
+          border: `1px solid ${
+            isOver
+              ? 'var(--color-point-border)'
+              : isWipExceeded
+                ? 'var(--color-wip-exceeded-border)'
+                : 'var(--color-border)'
+          }`,
           boxShadow: isOver
-            ? `0 0 0 1px ${accentColor}40, 0 4px 24px rgba(0,0,0,0.2)`
+            ? '0 0 0 1px var(--color-point-border), 0 4px 24px rgba(0,0,0,0.2)'
             : isWipExceeded
-              ? '0 0 0 1px rgba(248,113,113,0.25), 0 2px 12px rgba(0,0,0,0.15)'
-              : '0 2px 12px rgba(0,0,0,0.15)',
+              ? '0 0 0 1px var(--color-wip-exceeded-shadow), 0 2px 12px rgba(0,0,0,0.15)'
+              : '0 2px 12px rgba(0,0,0,0.12)',
           transition: 'border-color var(--duration-fast), box-shadow var(--duration-fast), background var(--duration-fast)',
           overflow: 'hidden',
         }}
       >
-        {/* 상단 accent 바 */}
-        <div
-          aria-hidden="true"
-          style={{
-            height: 3,
-            background: `linear-gradient(90deg, ${accentColor} 0%, ${accentColor}60 100%)`,
-            borderRadius: '14px 14px 0 0',
-            flexShrink: 0,
-          }}
-        />
-
         {/* 컬럼 헤더 */}
         <div
           style={{
-            padding: '12px 16px 10px',
+            padding: '14px 16px 12px',
             borderBottom: '1px solid var(--color-border)',
             display: 'flex',
             alignItems: 'center',
@@ -137,15 +128,18 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+            {/* 중립 상태 점 — 브랜드 포인트 고정 (rainbow 제거) */}
             <span
               aria-hidden="true"
               style={{
-                width: 8,
-                height: 8,
+                width: 7,
+                height: 7,
                 borderRadius: '50%',
-                background: accentColor,
+                background: isOver
+                  ? 'var(--color-point)'
+                  : 'var(--color-border-strong)',
                 flexShrink: 0,
-                boxShadow: `0 0 6px ${accentColor}80`,
+                transition: 'background var(--duration-fast)',
               }}
             />
             <h3
@@ -163,12 +157,14 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
               {column.name}
             </h3>
           </div>
+
+          {/* 카드 수 / WIP 배지 */}
           <span
             aria-label={`카드 수 ${column.cards.length}${column.wip_limit ? ` / WIP 한도 ${column.wip_limit}` : ''}`}
             style={{
-              background: isWipExceeded ? 'rgba(248,113,113,0.12)' : 'var(--color-bg-card)',
-              color: isWipExceeded ? '#f87171' : 'var(--color-text-secondary)',
-              border: isWipExceeded ? '1px solid rgba(248,113,113,0.3)' : '1px solid var(--color-border)',
+              background: isWipExceeded ? 'var(--color-priority-high-bg)' : 'transparent',
+              color: isWipExceeded ? 'var(--color-priority-high)' : 'var(--color-text-muted)',
+              border: `1px solid ${isWipExceeded ? 'var(--color-priority-high-border)' : 'var(--color-border)'}`,
               fontSize: 11,
               fontWeight: 600,
               borderRadius: 20,
@@ -181,7 +177,7 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
           </span>
         </div>
 
-        {/* WIP 진행 바 */}
+        {/* WIP 진행 바 — brand-point 단일 색상 */}
         {column.wip_limit != null && (
           <div
             role="progressbar"
@@ -199,7 +195,7 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
               style={{
                 height: '100%',
                 width: `${wipPercent}%`,
-                background: isWipExceeded ? '#f87171' : accentColor,
+                background: isWipExceeded ? 'var(--color-priority-high)' : 'var(--color-point)',
                 transition: 'width 300ms ease-out, background 150ms',
               }}
             />
@@ -213,10 +209,10 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
             style={{
               margin: '8px 12px 0',
               fontSize: 12,
-              color: '#f87171',
-              background: 'rgba(248,113,113,0.08)',
-              border: '1px solid rgba(248,113,113,0.2)',
-              borderRadius: 6,
+              color: 'var(--color-priority-high)',
+              background: 'var(--color-priority-high-bg)',
+              border: '1px solid var(--color-priority-high-border)',
+              borderRadius: 8,
               padding: '6px 10px',
             }}
           >
@@ -243,7 +239,6 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
                 card={card}
                 onDelete={handleDelete}
                 onCardClick={setSelectedCard}
-                accentColor={accentColor}
                 isFiltered={isCardFiltered(card, filter)}
               />
             ))}
@@ -255,7 +250,6 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
             </div>
           )}
 
-          {/* 필터 후 빈 상태 */}
           {allFiltered && (
             <div
               role="status"
@@ -263,13 +257,12 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
               className="empty-state"
               style={{ marginTop: 8 }}
             >
-              <span aria-hidden="true">🔍</span>
               <span>필터 조건에 맞는 카드 없음</span>
             </div>
           )}
         </div>
 
-        {/* 카드 추가 버튼 — CSS custom property 기반 hover */}
+        {/* 카드 추가 버튼 — brand-point hover */}
         <div style={{ padding: '0 12px 12px' }}>
           <button
             onClick={() => setShowAddModal(true)}
@@ -290,9 +283,9 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
               transition: 'all var(--duration-fast)',
               opacity: isWipExceeded ? 0.4 : 1,
               minHeight: 44,
-              // CSS custom properties for hover (globals.css .add-card-btn:not(:disabled):hover)
-              '--col-accent': accentColor,
-              '--col-accent-bg': accentBg,
+              // brand-point hover (globals.css .add-card-btn:not(:disabled):hover)
+              '--col-accent': 'var(--color-point)',
+              '--col-accent-bg': 'var(--color-point-subtle)',
             } as React.CSSProperties}
           >
             + 카드 추가
@@ -313,4 +306,6 @@ export default function Column({ column, onRefresh, columnIndex, filter }: Props
       )}
     </>
   );
-}
+});
+
+export default Column;
