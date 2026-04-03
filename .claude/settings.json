@@ -4,11 +4,37 @@
       "Read(/Users/hangheejo/git/ai-team/**)",
       "Edit(/Users/hangheejo/git/ai-team/.claude/agents/**)",
       "Edit(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/settings.json)",
       "Edit(/Users/hangheejo/git/ai-team/.memory/**)",
       "Write(/Users/hangheejo/git/ai-team/.memory/**)",
       "Write(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
-      "Write(/Users/hangheejo/git/ai-team/.claude/agents/**)"
+      "Write(/Users/hangheejo/git/ai-team/.claude/agents/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/settings.json)"
     ]
   },
-  "hooks": {}
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"[QA Hook] 파일 수정 완료 — 작업 마무리 전 반드시 mcp__delegation__run_qa 도구로 Chalmers에게 QA 검증을 위임하세요.\"}}'",
+            "statusMessage": "QA 검증 알림 준비 중..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"systemMessage\":\"[Phase Check] 작업 완료 시 recommend_next_phase를 호출하여 다음 단계를 추천하세요. QA 검증이 필요한 파일 수정이 있었다면 mcp__delegation__run_qa도 실행하세요.\"}'",
+            "statusMessage": "다음 단계 확인 중..."
+          }
+        ]
+      }
+    ]
+  }
 }
