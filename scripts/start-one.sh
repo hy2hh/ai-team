@@ -78,8 +78,9 @@ fi
 ALLOWED_TOOLS="Read,Write,Edit,Glob,Grep,Bash(ls:*),Bash(cat:*),Bash(rm:*.json),Bash(find:*),Bash(mkdir:*),Bash(date:*),Bash(echo:*),Bash(sleep:*),Bash(wc:*),Bash(head:*),Bash(tail:*),mcp__slack__slack_post_message,mcp__slack__slack_reply_to_thread,mcp__slack__slack_get_channel_history,mcp__slack__slack_get_thread_replies,mcp__slack__slack_get_user_profile,mcp__slack__slack_get_users,mcp__slack__slack_list_channels,mcp__slack__slack_add_reaction,Agent,WebSearch,WebFetch"
 
 # 환경변수를 export 후 claude 실행 (MCP 서버가 프로세스 환경에서 ${VAR} 참조)
+# AGENT_ROLE: hook에서 에이전트 역할 식별에 사용 (designer 제외 등)
 tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_DIR" \
-  "export SLACK_BOT_TOKEN=\"$BOT_TOKEN\" SLACK_APP_TOKEN=\"$APP_TOKEN\" SLACK_TEAM_ID=\"$SLACK_TEAM_ID\" && claude --agent \"$PROJECT_DIR/$AGENT_FILE\" --allowedTools \"$ALLOWED_TOOLS\""
+  "export SLACK_BOT_TOKEN=\"$BOT_TOKEN\" SLACK_APP_TOKEN=\"$APP_TOKEN\" SLACK_TEAM_ID=\"$SLACK_TEAM_ID\" AGENT_ROLE=\"$AGENT_NAME\" && claude --agent \"$PROJECT_DIR/$AGENT_FILE\" --allowedTools \"$ALLOWED_TOOLS\""
 
 # claude --agent 초기화 대기 후 이벤트 감시 프롬프트 전송
 sleep 8
