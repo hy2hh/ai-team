@@ -131,7 +131,7 @@ QA_COMMAND_PATTERN = /(?:QA|qa)\s*(?:실행|검증|run)\s+(docs\/specs\/[^\s]+\.
 • `[x]` `index.ts` — QA 명령어 감지 시 `runDirectQA()` 분기 처리
 • `[x]` 파일 존재 검증 + 에러 처리
 
-*검증 기준 (DoD)*
+*검증 기준 (완료 조건)*
 
 • `QA 실행 docs/specs/xxx.md` → Chalmers QA 모드 직접 실행 (재작업 단계 없음)
 • Cross-verify FAIL → 기존 `runRalphLoop()` 동작 유지

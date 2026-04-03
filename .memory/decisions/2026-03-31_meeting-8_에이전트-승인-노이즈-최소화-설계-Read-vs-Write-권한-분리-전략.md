@@ -120,7 +120,7 @@ system-reminder에서 제공된 MCP 도구 목록을 확인했습니다. 이제 
 
 • `[ ]` `.claude/agents/shared/permissions-policy.md` 신규 생성 — Read/Write 분류 기준 + 도구 목록
 
-*검증 기준 (DoD)*
+*검증 기준 (완료 조건)*
 
 • Read 계열 도구 호출 시 승인 프롬프트 없이 자동 실행
 • Write 계열 도구는 기존대로 승인 요청 동작

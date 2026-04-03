@@ -128,7 +128,7 @@ QA_COMMAND_PATTERN = /(?:QA|qa)\s*(?:실행|검증|run)\s+(docs\/specs\/[^\s]+\.
 • `[ ]` `index.ts` — 라우팅 결과의 `specPath`를 `runRalphLoop()` 호출 시 전달
 • `[ ]` `qa-loop.ts` — `runChalmersQA()` 시작부에 파일 존재 검증 + 에러 처리
 
-*검증 기준 (DoD)*
+*검증 기준 (완료 조건)*
 
 • `QA 실행 docs/specs/2026-03-30_qa-agent.md` 입력 시 Chalmers가 QA 모드로 실행됨
 • 존재하지 않는 스펙 경로 입력 시 명확한 에러 메시지 반환

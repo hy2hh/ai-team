@@ -22,7 +22,7 @@
 ### 근거
 - 전원 합의: 3개 에이전트가 독립적으로 동일 결론 도달
 - 전환 비용 6-8주 예상 (MCP 재구현 + 프롬프트 재작성 + 라우팅 수정)
-- 품질 우선 철학 정합성: Claude "measure twice, cut once" ↔ 팀의 DoD, cross-verify, QA 루프
+- 품질 우선 철학 정합성: Claude "measure twice, cut once" ↔ 팀의 완료 조건, cross-verify, QA 루프
 - SWE-bench 성능: Claude 80.8% vs Codex 64.7% (복잡한 멀티파일 작업)
 
 ### Codex 재검토 트리거 조건
