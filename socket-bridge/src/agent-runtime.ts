@@ -1303,6 +1303,10 @@ export interface HandleMessageResult {
   kanbanCardId?: number;
   /** 사용자 ⛔ 리액션 또는 stale 타임아웃으로 중단된 경우 true */
   aborted?: boolean;
+  /** error_max_turns 발생 시 덮어쓰기 전 마지막 assistant 텍스트 */
+  partialResult?: string;
+  /** error_max_turns로 종료된 경우 true */
+  isMaxTurns?: boolean;
 }
 
 export const handleMessage = async (
@@ -1520,6 +1524,9 @@ export const handleMessage = async (
       ] ?? '';
 
     let resultText = '';
+    let lastMeaningfulText = '';
+    let partialResultText = '';
+    let hitMaxTurns = false;
     let usedModel = '';
     let costUsd = 0;
     let sdkFailed = false;
@@ -2147,10 +2154,13 @@ export const handleMessage = async (
     for await (const message of query({ prompt, options: queryOptions })) {
       // 도구 사용 기록 수집 (사실 주장 감사에 활용)
       if (message.type === 'assistant') {
-        const assistantMsg = message as { type: 'assistant'; message: { content: Array<{ type: string; name?: string }> } };
+        const assistantMsg = message as { type: 'assistant'; message: { content: Array<{ type: string; name?: string; text?: string }> } };
         for (const block of assistantMsg.message.content) {
           if (block.type === 'tool_use' && block.name) {
             toolUses.push({ name: block.name });
+          }
+          if (block.type === 'text' && block.text) {
+            lastMeaningfulText = block.text;
           }
         }
       }
@@ -2199,9 +2209,18 @@ export const handleMessage = async (
           // error_max_turns 등 비성공 결과 → Slack에 에러 메시지 전송
           sdkFailed = true;
           const isMaxTurns = resultMsg.subtype === 'error_max_turns';
+          // 체크포인트: error_max_turns 시 partial result 보존
+          if (isMaxTurns) {
+            // SDK result에 부분 결과가 있으면 사용, 없으면 기존 resultText 사용
+            partialResultText =
+              ('result' in resultMsg && resultMsg.result)
+                ? String(resultMsg.result)
+                : resultText || lastMeaningfulText;
+          }
           resultText = isMaxTurns
             ? `⚠️ 대화 한도를 초과하여 응답을 완료하지 못했습니다. 작업을 더 작은 단위로 나눠서 요청해주세요.`
             : `⚠️ 처리 중 오류가 발생했습니다 (${resultMsg.subtype}). 잠시 후 다시 시도해주세요.`;
+          hitMaxTurns = isMaxTurns;
         }
       }
     }
@@ -2339,6 +2358,14 @@ export const handleMessage = async (
         const fullText = resultText + metaFooter;
         const messageBlocks = buildMessageBlocks(fullText);
 
+        // 디버그: 테이블 블록 여부 로깅
+        const hasTableBlock = messageBlocks?.some((b) => b.type === 'table');
+        if (hasTableBlock) {
+          console.log(
+            `[runtime] ${agentName} 테이블 블록 포함 — blocks 전달`,
+          );
+        }
+
         const postResult =
           await rateLimited(() =>
             slackApp.client.chat.postMessage({
@@ -2349,6 +2376,15 @@ export const handleMessage = async (
             }),
           );
         postedTs = postResult.ts;
+
+        // 디버그: Slack API 응답에서 warning 확인
+        if ((postResult as { warning?: string }).warning) {
+          console.warn(
+            `[runtime] ${agentName} Slack API warning:`,
+            (postResult as { warning?: string }).warning,
+          );
+        }
+
         console.log(
           `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
         );
@@ -2422,6 +2458,10 @@ export const handleMessage = async (
       delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,
       escalationReason,
       kanbanCardId,
+      ...(hitMaxTurns ? {
+        partialResult: partialResultText || undefined,
+        isMaxTurns: true,
+      } : {}),
     };
   } catch (err) {
     // AbortError: 이모지로 의도적 중단

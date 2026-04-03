@@ -41,6 +41,7 @@ export interface TaskQueueRow {
   retry_count: number;
   max_retries: number;
   kanban_card_id: number | null;
+  checkpoint: string | null;
 }
 
 export interface QueueStatusSummary {
@@ -243,14 +244,20 @@ export const markFailed = (id: string, error: string): void => {
  * error_max_turns 발생 시 재시도를 위해 queued 상태로 복원
  * retry_count < max_retries 조건을 확인해야 함 (호출 전 체크)
  */
-export const requeueForRetry = (id: string): void => {
+export const requeueForRetry = (
+  id: string,
+  checkpoint?: string,
+): void => {
   const db = getDb();
   db.prepare(`
     UPDATE task_queue
-    SET status = 'queued', retry_count = retry_count + 1, started_at = NULL, error = NULL
+    SET status = 'queued', retry_count = retry_count + 1,
+        started_at = NULL, error = NULL, checkpoint = ?
     WHERE id = ?
-  `).run(id);
-  console.log(`[queue] requeued for retry: ${id}`);
+  `).run(checkpoint ?? null, id);
+  console.log(
+    `[queue] requeued for retry: ${id}${checkpoint ? ' (with checkpoint)' : ''}`,
+  );
 };
 
 export const markSkipped = (id: string, reason: string): void => {

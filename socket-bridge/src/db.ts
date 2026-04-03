@@ -220,6 +220,13 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ON ralph_loop_history(message_ts, agent);
     `,
   },
+  {
+    version: 7,
+    sql: `
+      -- Task Queue 체크포인트 (max_turns 재시도 시 중간 진행 상태 보존)
+      ALTER TABLE task_queue ADD COLUMN checkpoint TEXT;
+    `,
+  },
 ];
 
 /**

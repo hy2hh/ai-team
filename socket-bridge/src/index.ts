@@ -726,15 +726,69 @@ const executeSingle = async (
   app: App,
   apps?: App[],
 ): Promise<void> => {
-  const result = await handleMessage(
+  let result = await handleMessage(
     agentName,
     event,
     method,
     app,
   );
 
-  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
-  if (result.kanbanCardId) {
+  // max_turns 도달 시 → 체크포인트 기반 자동 재시도 (최대 3회)
+  const MAX_MENTION_RETRIES = 3;
+  let retryCount = 0;
+  while (result.isMaxTurns && retryCount < MAX_MENTION_RETRIES) {
+    retryCount++;
+    console.log(
+      `[mention-retry] ${agentName} max_turns 도달 — 체크포인트 재시도 ${retryCount}/${MAX_MENTION_RETRIES}`,
+    );
+    const checkpoint = result.partialResult?.slice(0, 3000);
+    const retryParts = [
+      `[이어서 작업 — 대화 한도 초과로 자동 재시도 ${retryCount}/${MAX_MENTION_RETRIES}]`,
+      '',
+    ];
+    if (checkpoint) {
+      retryParts.push(
+        '*이전 진행 상태:*',
+        checkpoint,
+        '',
+      );
+    }
+    retryParts.push(
+      '*원래 작업:*',
+      event.text,
+      '',
+      '*지시사항:*',
+      '1. 이전에 수정한 파일들을 확인하고 남은 작업을 이어서 완료하세요',
+      '2. 이미 완료된 작업을 반복하지 마세요',
+      '3. 결과를 간결하게 보고하세요',
+    );
+    const retryEvent: SlackEvent = {
+      ...event,
+      user: 'mention-retry',
+      threadTopic: `mention-retry-${retryCount}:${event.ts}`,
+      text: retryParts.join('\n'),
+    };
+    try {
+      await rateLimited(() =>
+        app.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `🔄 *${agentName} 작업 재시도 중 [${retryCount}/${MAX_MENTION_RETRIES}]* — 대화 한도 초과, 체크포인트에서 이어서 계속합니다`,
+        }),
+      );
+    } catch {
+      // 알림 실패 무시
+    }
+    result = await handleMessage(
+      agentName,
+      retryEvent,
+      'mention-retry',
+      app,
+    );
+  }
+
+  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동 (max_turns 실패 시 Done 이동 방지)
+  if (result.kanbanCardId && !result.isMaxTurns) {
     moveToDone(result.kanbanCardId).catch((err) =>
       console.warn('[kanban-sync] executeSingle moveToDone 실패:', err),
     );

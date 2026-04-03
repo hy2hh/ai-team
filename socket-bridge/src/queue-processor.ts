@@ -186,8 +186,9 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
       channel_name: 'queue',
       user: 'queue-processor',
       text: taskPrompt,
-      ts: task.id, // 태스크 ID를 메시지 ts로 사용
+      ts: task.id,
       thread_ts: task.thread_ts,
+      threadTopic: `queue-task:${task.id}`, // 태스크별 독립 세션 강제
       mentions: [],
       raw: {},
     };
@@ -209,6 +210,30 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
 
     if (result === 'TIMEOUT') {
       throw new Error(`태스크 타임아웃 (${TASK_TIMEOUT_MS / 1000}초)`);
+    }
+
+    // error_max_turns 감지 → 체크포인트 저장 후 재시도
+    if (result.isMaxTurns && task.retry_count < task.max_retries) {
+      const checkpoint = result.partialResult
+        ? truncate(result.partialResult, 3000)
+        : undefined;
+      console.log(
+        `[queue-processor] max_turns 도달, 체크포인트 저장 후 재시도: ${task.id}`,
+      );
+      setTimeout(() => {
+        requeueForRetry(task.id, checkpoint);
+        console.log(`[queue-processor] 체크포인트 재큐잉 완료: ${task.id}`);
+      }, RETRY_BACKOFF_MS);
+      try {
+        await slackApp.client.chat.postMessage({
+          channel: task.channel,
+          thread_ts: task.thread_ts,
+          text: `🔄 *${agentDisplayName(task.agent)} 작업 재시도 대기 중 [${task.retry_count + 1}/${task.max_retries}]* — 대화 한도 초과, 체크포인트에서 이어서 계속합니다`,
+        });
+      } catch {
+        // 알림 실패 무시
+      }
+      return;
     }
 
     // 완료 처리
@@ -358,6 +383,30 @@ export const stopQueueProcessor = (): void => {
  * 태스크 프롬프트 구성
  */
 const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null): string => {
+  // 재시도 + checkpoint 존재 → "이어서 작업" 패턴
+  if (task.retry_count > 0 && task.checkpoint) {
+    const parts = [
+      `[큐 태스크 이어서 실행 — 재시도 #${task.retry_count}]`,
+      '',
+      `*원래 작업:* ${task.task}`,
+      '',
+      '*이전 진행 상태 (대화 한도 도달로 중단됨):*',
+      truncate(task.checkpoint, 3000),
+    ];
+    if (task.context) {
+      parts.push('', `*추가 컨텍스트:*\n${task.context}`);
+    }
+    parts.push(
+      '',
+      '*지시사항:*',
+      '1. 위 이전 진행 상태를 기반으로 남은 작업을 이어서 완료하세요',
+      '2. 이미 완료된 작업을 반복하지 마세요',
+      '3. 결과를 간결하게 보고하세요',
+    );
+    return parts.join('\n');
+  }
+
+  // 기존 로직 (첫 실행 또는 checkpoint 없는 재시도)
   let prompt = `[큐 태스크 실행]\n\n*작업:* ${task.task}`;
 
   if (prevResult) {
