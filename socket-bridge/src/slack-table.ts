@@ -26,7 +26,20 @@ interface SlackSectionBlock {
   text: { type: 'mrkdwn'; text: string };
 }
 
-type SlackBlock = SlackTableBlock | SlackSectionBlock;
+/** Block Kit actions block (버튼 등 인터랙티브 요소) */
+export interface SlackActionsBlock {
+  type: 'actions';
+  block_id: string;
+  elements: Array<{
+    type: string;
+    text: { type: string; text: string; emoji?: boolean };
+    style?: string;
+    action_id: string;
+    value: string;
+  }>;
+}
+
+type SlackBlock = SlackTableBlock | SlackSectionBlock | SlackActionsBlock;
 
 const SLACK_SECTION_MAX = 3000;
 

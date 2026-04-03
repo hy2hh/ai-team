@@ -410,6 +410,39 @@ const activeAgents = new Map<string, ActiveAgentEntry>();
  */
 const pendingCancellations = new Set<string>();
 
+// ─── Lisa 리서치 모드 선택 대기 ────────────────────────────
+// key: threadTs, value: resolve 함수 (선택된 모드를 전달)
+const pendingResearchMode = new Map<
+  string,
+  (mode: 'academic' | 'practical') => void
+>();
+
+/** 버튼 클릭 시 호출 — 대기 중인 Promise를 resolve */
+export const resolveResearchMode = (
+  threadTs: string,
+  mode: 'academic' | 'practical',
+): boolean => {
+  const resolve = pendingResearchMode.get(threadTs);
+  if (resolve) {
+    resolve(mode);
+    pendingResearchMode.delete(threadTs);
+    return true;
+  }
+  return false;
+};
+
+/** 리서치 요청인지 판별 (depth 미지정 시 모드 선택 필요) */
+const isResearchRequest = (event: SlackEvent): boolean => {
+  const text = event.text.toLowerCase();
+  // depth가 이미 명시된 경우 건너뜀
+  if (text.includes('depth=academic') || text.includes('depth=practical')) {
+    return false;
+  }
+  // 리서치 관련 키워드 포함 여부
+  const researchKeywords = ['리서치', '조사', '분석', '시장', '트렌드', 'research', 'analyze', 'survey'];
+  return researchKeywords.some((kw) => text.includes(kw));
+};
+
 /**
  * 에이전트 즉시 중단 (black_square_for_stop 리액션)
  * 실행 중이면 즉시 중단, 아직 실행 전(🔍 단계)이면 대기열에 등록
@@ -584,8 +617,8 @@ const buildContextRulesPrefix = (agentName: string): string => {
           '### 리서치 보고서 필수 규칙 (예외 없음)',
           '모든 리서치 응답에 아래 3가지를 반드시 적용하라. 사용자가 명시하지 않아도 자동 적용.',
           '',
-          '1. *검증 마커*: 모든 수치·통계 옆에 인라인으로 ✅ 직접 확인 / ⚠️ 간접 확인 / ❓ 미확인 표기. 하단 일괄 경고로 대체 금지.',
-          '2. *출처 구분*: WebFetch로 원문 접속한 수치는 ✅, WebSearch 스니펫만으로 확인한 수치는 ⚠️ 간접 확인 명시.',
+          '1. *검증 마커*: 모든 수치·통계 옆에 인라인으로 ✅ / ⚠️ (사유) / ❓ (사유) 표기. ⚠️·❓에는 반드시 괄호 안에 구체적 사유를 명시. 예: ⚠️ (WebSearch 기반, 원문 미접속), ❓ (공개 데이터 없음). 하단 일괄 경고로 대체 금지.',
+          '2. *출처 구분*: WebFetch로 원문 접속한 수치는 ✅, WebSearch 스니펫만으로 확인한 수치는 ⚠️ (WebSearch 기반, 원문 미접속) 명시.',
           '3. *면책 문구*: 보고서 상단과 하단 모두에 "이 보고서의 수치는 YYYY-MM-DD 기준입니다. 현재와 다를 수 있습니다." 포함.',
         ]
       : []),
@@ -1282,6 +1315,96 @@ export const handleMessage = async (
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
   existingKanbanCardId?: number | null,
 ): Promise<HandleMessageResult> => {
+  // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
+  // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
+  if (agentName === 'researcher' && isResearchRequest(event)) {
+    const threadTs = event.thread_ts ?? event.ts;
+    console.log(`[research-mode] 리서치 모드 선택 대기: ${threadTs}`);
+
+    // A/B 버튼 메시지 전송
+    await rateLimited(() =>
+      slackApp.client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: threadTs,
+        text: '리서치 모드를 선택해주세요: (A) 리서치 보고서 / (B) 실행 플레이북',
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: [
+                '*📊 리서치 결과를 어떤 용도로 쓰실 예정인가요?*',
+                '',
+                '*`(A)` 리서치 보고서* — 발표, 의사결정, 투자자 자료 등 수치 신뢰도가 중요한 경우',
+                '→ 모든 수치를 원문 출처로 직접 확인합니다. 시간이 더 걸릴 수 있어요.',
+                '',
+                '*`(B)` 실행 플레이북* — 기획 아이디에이션, 트렌드 파악, 내부 참고용 등',
+                '→ ROI 사례·업계 추정치도 포함해서 폭넓게 조사합니다. 미검증 수치는 별도 표기해요.',
+              ].join('\n'),
+            },
+          },
+          {
+            type: 'actions',
+            block_id: `research_mode_${threadTs}`,
+            elements: [
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: '📄 (A) 리서치 보고서',
+                  emoji: true,
+                },
+                style: 'primary',
+                action_id: 'research_mode_academic',
+                value: threadTs,
+              },
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: '📋 (B) 실행 플레이북',
+                  emoji: true,
+                },
+                action_id: 'research_mode_practical',
+                value: threadTs,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    // 사용자 선택 대기 (최대 5분 타임아웃)
+    const selectedMode = await Promise.race([
+      new Promise<'academic' | 'practical'>((resolve) => {
+        pendingResearchMode.set(threadTs, resolve);
+      }),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 5 * 60 * 1000);
+      }),
+    ]);
+
+    // 타임아웃 시 정리
+    pendingResearchMode.delete(threadTs);
+
+    if (!selectedMode) {
+      console.log(`[research-mode] 타임아웃: ${threadTs}`);
+      await rateLimited(() =>
+        slackApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: threadTs,
+          text: '⏰ 리서치 모드 선택 시간이 초과되었습니다. 다시 요청해주세요.',
+        }),
+      );
+      return { text: '', delegationTargets: [] };
+    }
+
+    // 선택된 모드를 원래 메시지에 주입
+    console.log(`[research-mode] ${selectedMode} 선택됨: ${threadTs}`);
+    event.text = `${event.text}\n\ndepth=${selectedMode}`;
+  }
+  // ─── 가로채기 끝 ────────────────────────────────────────
+
   const session = getOrCreateSession(agentName);
   const prompt = formatSlackEventAsPrompt(event, routingMethod);
 
@@ -2206,6 +2329,7 @@ export const handleMessage = async (
       try {
         const fullText = resultText + metaFooter;
         const messageBlocks = buildMessageBlocks(fullText);
+
         const postResult =
           await rateLimited(() =>
             slackApp.client.chat.postMessage({

@@ -23,6 +23,7 @@ import {
   cancelAllAgents,
   cleanupStaleAgents,
   cleanupExpiredSessions,
+  resolveResearchMode,
 } from './agent-runtime.js';
 import {
   tryClaim,
@@ -2205,6 +2206,83 @@ const main = async () => {
         }
       },
     );
+
+    // ─── Lisa 리서치 모드 선택 버튼 핸들러 ────────────────────
+    for (const mode of ['academic', 'practical'] as const) {
+      app.action(
+        `research_mode_${mode}`,
+        async ({ ack, body, action }) => {
+          try {
+            await ack();
+
+            // 버튼 value에서 threadTs 직접 추출 (가장 신뢰도 높음)
+            const threadTs =
+              (action as { value?: string }).value ?? '';
+            const b = body as {
+              channel?: { id?: string };
+              message?: { ts?: string };
+              container?: {
+                message_ts?: string;
+                channel_id?: string;
+              };
+            };
+            const channel =
+              b.channel?.id ?? b.container?.channel_id ?? '';
+            const messageTs =
+              b.message?.ts ?? b.container?.message_ts ?? '';
+            const label =
+              mode === 'academic'
+                ? '📄 (A) 리서치 보고서'
+                : '📋 (B) 실행 플레이북';
+
+            console.log(
+              `[research-mode] 버튼 클릭: ${mode}, threadTs=${threadTs}`,
+            );
+
+            // resolve를 먼저 실행 (에이전트 즉시 재개)
+            const resolved = resolveResearchMode(
+              threadTs,
+              mode,
+            );
+            if (!resolved) {
+              console.warn(
+                `[research-mode] 대기 중인 요청 없음: ${threadTs}`,
+              );
+            }
+
+            // 버튼 메시지를 선택 결과로 업데이트 (비동기, 실패해도 무방)
+            if (channel && messageTs) {
+              app.client.chat
+                .update({
+                  channel,
+                  ts: messageTs,
+                  text: `${label} 선택됨`,
+                  blocks: [
+                    {
+                      type: 'section',
+                      text: {
+                        type: 'mrkdwn',
+                        text: `✅ *${label}* 모드가 선택되었습니다.`,
+                      },
+                    },
+                  ],
+                })
+                .catch((err: unknown) => {
+                  console.error(
+                    `[research-mode] 메시지 업데이트 실패:`,
+                    err,
+                  );
+                });
+            }
+          } catch (err) {
+            console.error(
+              `[research-mode] ${mode} 핸들러 오류:`,
+              err,
+            );
+          }
+        },
+      );
+    }
 
     // ─── 에이전트 제어 버튼 핸들러 (취소/재실행) ────────────────
     app.action(
