@@ -1538,7 +1538,7 @@ const executeSingle = async (
  * @param apps - 전체 Slack App 목록
  */
 /** 병렬 동시성 제한 — MCP 서버 과다 spawn 방지 (에이전트당 3개 MCP) */
-const MAX_PARALLEL_AGENTS = 3;
+const MAX_PARALLEL_AGENTS = 5;
 
 const executeParallel = async (
   agentNames: string[],

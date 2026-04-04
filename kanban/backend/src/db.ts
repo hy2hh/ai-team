@@ -101,8 +101,8 @@ function seedData(): void {
   const insertColumn = database.prepare('INSERT INTO columns (board_id, name, position, wip_limit) VALUES (?, ?, ?, ?)');
   const cols = [
     ['Backlog', 0, null],
-    ['In Progress', 1, 3],
-    ['Review', 2, 2],
+    ['In Progress', 1, 5],
+    ['Review', 2, 3],
     ['Done', 3, null],
     ['Blocked', 4, null],
   ];

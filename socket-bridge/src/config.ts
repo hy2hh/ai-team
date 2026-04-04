@@ -25,7 +25,7 @@ export const SESSION_TTL_MS = envInt('BRIDGE_SESSION_TTL_MS', 30 * 24 * 60 * 60 
 export const MAX_DELEGATION_DEPTH = envInt('BRIDGE_MAX_DELEGATION_DEPTH', 3);
 
 /** 동시 메시지 처리 수 */
-export const MAX_CONCURRENT_HANDLERS = envInt('BRIDGE_MAX_CONCURRENT_HANDLERS', 3);
+export const MAX_CONCURRENT_HANDLERS = envInt('BRIDGE_MAX_CONCURRENT_HANDLERS', 5);
 
 /** Slack API 레이트 리밋 (req/min) */
 export const SLACK_RATE_LIMIT = envInt('BRIDGE_SLACK_RATE_LIMIT', 50);
