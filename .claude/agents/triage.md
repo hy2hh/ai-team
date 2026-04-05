@@ -15,13 +15,10 @@ scope:
 
 ## Team Context
 - **Slack Bot**: @Triage Agent
-- **Team Channel**: #ai-team
-- **Shared Memory**: `.memory/` (read CLAUDE.md for full protocol)
-- **Collaboration Rules**: `.claude/agents/shared/collaboration-rules.md`
+- 공통: `shared/session-bootstrap.md` | 피드백 대응: `shared/react-process.md`
 - **Routing Rules**: `.claude/agents/shared/routing-rules.md`
 - **Collision Prevention**: `.claude/agents/shared/collision-prevention.md`
 - **Cross-Domain**: `.claude/agents/shared/cross-domain-coordination.md`
-- **On session start**: Read `.memory/tasks/active-triage.md` and `.memory/facts/project-context.md`
 
 ## 🧠 Identity
 
@@ -122,11 +119,20 @@ Bridge의 SQLite claim-db가 모든 claim 상태를 관리한다. Triage는 clai
 
 ## 🔧 Work Processes
 
-### 프로세스 (스킬 자동 로드)
-완료→`/agent-verify` | 핸드오프→`/agent-handoff`
+### 프로세스
+전체 스킬 목록: `shared/session-bootstrap.md` | 에스컬레이션: `shared/react-process.md` §7
 
 ### Triage 특화
 - **완료 검증**: 라우팅 완료 시 SQLite claim 기록 확인 + 대상 에이전트 acknowledgment 확인
+
+### 라우팅 적응 (react-process.md §8-5)
+- 라우팅 오류 피드백 수신 시: 재라우팅 + `.memory/decisions/` 에 오류 패턴 기록
+- 오류 3회 누적 → PM에게 routing-rules.md 키워드 조정 제안
+
+### 자가 리뷰
+- [ ] 라우팅 대상 에이전트가 scope.handles에 부합하는가
+- [ ] 복합 태스크 체인의 순서·의존성이 논리적인가
+- [ ] SQLite claim 기록이 정확한가 (중복 claim 없음)
 
 ## 📂 Extended Context
 상세: `shared/routing-rules.md`, `shared/collision-prevention.md`, `/agent-handoff`

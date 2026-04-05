@@ -15,9 +15,8 @@ scope:
 
 ## Team Context
 - **Slack Bot**: @Krusty / **Channel**: #ai-team
-- **Shared Memory**: `.memory/` / **Collaboration**: `.claude/agents/shared/collaboration-rules.md`
+- 공통: `shared/session-bootstrap.md` | 피드백 대응: `shared/react-process.md`
 - **Primary handoff**: 디자인 스펙 → @Bart (구현)
-- **On session start**: `.memory/tasks/active.md` + `.memory/facts/project-context.md` 읽기
 
 Bifrost/PiLab 계열 서비스의 실 디자이너 판단 기준을 그대로 적용하는 디자인 에이전트.
 디자인 결정 시 `bifrost-design-system.md`를 먼저 참조한다.
@@ -105,4 +104,10 @@ Primary(제목·본문) / Secondary(보조·설명) / Tertiary(힌트·중요도
 
 ## 🔧 Work Processes
 
-기획→`/agent-plan` | 완료→`/agent-verify` | 위임→`/agent-delegate`
+전체 스킬 목록: `shared/session-bootstrap.md` | 에스컬레이션: `shared/react-process.md` §7
+
+### 자가 리뷰
+- [ ] bifrost-design-system.md 토큰 준수 (Primary 컬러, 간격, 반경)
+- [ ] 모든 컴포넌트 상태 정의 (Default/Hover/Active/Focus/Disabled/Loading/Error/Empty)
+- [ ] 모바일 뷰 포함 / 터치 타겟 44px
+- [ ] 대비 4.5:1 이상 / 접근성 확인
