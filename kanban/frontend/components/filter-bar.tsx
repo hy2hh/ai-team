@@ -1,23 +1,6 @@
 'use client';
 
-const AGENTS = ['Homer', 'Bart', 'Marge', 'Lisa', 'Krusty', 'Sid', 'Chalmers', 'Wiggum'];
-
-const AGENT_COLORS: Record<string, string> = {
-  homer:    '#4f7ef0',
-  bart:     '#22d3ee',
-  marge:    '#c084fc',
-  lisa:     '#4ade80',
-  krusty:   '#fb923c',
-  sid:      '#f472b6',
-  chalmers: '#f59e0b',
-  wiggum:   '#94a3b8',
-};
-
-const PRIORITY_OPTIONS = [
-  { value: 'high',   label: '높음', color: '#f87171', bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.3)' },
-  { value: 'medium', label: '보통', color: '#fbbf24', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.3)'  },
-  { value: 'low',    label: '낮음', color: '#4ade80', bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.3)'  },
-];
+import { AGENTS, AGENT_COLORS, PRIORITY_OPTIONS } from '@/lib/constants';
 
 export interface FilterState {
   assignees: Set<string>;
@@ -75,6 +58,7 @@ export default function FilterBar({
             onClick={() => onToggleAssignee(agent)}
             aria-pressed={active}
             aria-label={`${agent} 담당자 필터 ${active ? '해제' : '적용'}`}
+            className="filter-pill-btn focus-ring"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -144,6 +128,7 @@ export default function FilterBar({
             onClick={() => onTogglePriority(opt.value)}
             aria-pressed={active}
             aria-label={`${opt.label} 우선순위 필터 ${active ? '해제' : '적용'}`}
+            className="filter-pill-btn focus-ring"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -181,6 +166,7 @@ export default function FilterBar({
         onClick={isFiltering ? onReset : undefined}
         disabled={!isFiltering}
         aria-label={isFiltering ? '필터 초기화' : '적용된 필터 없음'}
+        className="filter-pill-btn focus-ring"
         style={{
           marginLeft: 4,
           padding: '5px 12px',
@@ -188,9 +174,9 @@ export default function FilterBar({
           fontSize: 12,
           fontWeight: 500,
           cursor: isFiltering ? 'pointer' : 'default',
-          background: isFiltering ? 'rgba(248,113,113,0.1)' : 'transparent',
-          color: isFiltering ? '#f87171' : 'var(--color-text-muted)',
-          border: `1px solid ${isFiltering ? 'rgba(248,113,113,0.25)' : 'var(--color-border)'}`,
+          background: isFiltering ? 'var(--color-due-overdue-bg)' : 'transparent',
+          color: isFiltering ? 'var(--color-due-overdue)' : 'var(--color-text-muted)',
+          border: `1px solid ${isFiltering ? 'var(--color-due-overdue-border)' : 'var(--color-border)'}`,
           transition: 'all var(--duration-fast)',
           minHeight: 32,
           opacity: isFiltering ? 1 : 0.5,

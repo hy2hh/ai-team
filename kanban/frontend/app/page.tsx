@@ -1,4 +1,6 @@
 'use client';
+import { useMemo } from 'react';
+import Link from 'next/link';
 import Board from '@/components/Board';
 import { useTheme } from '@/lib/theme';
 
@@ -15,12 +17,16 @@ const AGENTS = [
 
 export default function Home() {
   const { theme, toggleTheme } = useTheme();
-  const today = new Date().toLocaleDateString('ko-KR', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    weekday: 'short',
-  });
+  // P3: useMemo — 렌더마다 Date 재계산 방지
+  const today = useMemo(
+    () => new Date().toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'short',
+    }),
+    []
+  );
 
   return (
     <main className="min-h-screen bg-[var(--color-bg-base)]">
@@ -41,19 +47,19 @@ export default function Home() {
           WebkitBackdropFilter: 'blur(12px)',
         }}
       >
-        {/* 왼쪽: 로고 + 제목 */}
+        {/* 왼쪽: 로고 + 탭 네비게이션 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
             style={{
               width: 36,
               height: 36,
               borderRadius: 10,
-              background: 'linear-gradient(135deg, #4f7ef0 0%, #c084fc 100%)',
+              background: 'linear-gradient(135deg, var(--color-point) 0%, #c084fc 100%)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 18,
-              boxShadow: '0 0 16px rgba(79,126,240,0.4)',
+              boxShadow: '0 0 16px var(--color-point-glow)',
               flexShrink: 0,
             }}
           >
@@ -72,6 +78,7 @@ export default function Home() {
               Team Kanban
             </h1>
             <p
+              className="header-date"
               style={{
                 fontSize: 12,
                 color: 'var(--color-text-muted)',
@@ -83,10 +90,27 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 탭 네비게이션 */}
+        <nav aria-label="페이지 네비게이션" style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+          <Link
+            href="/"
+            className="nav-tab-link nav-tab-link--active"
+            aria-current="page"
+          >
+            Board
+          </Link>
+          <Link
+            href="/dashboard"
+            className="nav-tab-link"
+          >
+            Dashboard
+          </Link>
+        </nav>
+
         {/* 오른쪽: 에이전트 아바타 목록 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>팀원</span>
-          <div style={{ display: 'flex', alignItems: 'center' }}>
+          <span className="header-avatars" style={{ fontSize: 12, color: 'var(--color-text-muted)', marginRight: 4 }}>팀원</span>
+          <div className="header-avatars" style={{ display: 'flex', alignItems: 'center' }}>
             {AGENTS.map((agent, i) => (
               <span
                 key={agent.name}
@@ -115,6 +139,7 @@ export default function Home() {
             ))}
           </div>
           <span
+            className="header-avatars"
             style={{
               fontSize: 12,
               color: 'var(--color-text-muted)',
@@ -132,22 +157,9 @@ export default function Home() {
           <button
             onClick={toggleTheme}
             title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
-            style={{
-              marginLeft: 12,
-              width: 36,
-              height: 36,
-              borderRadius: 8,
-              border: '1px solid var(--color-border)',
-              background: 'var(--color-bg-elevated)',
-              color: 'var(--color-text-secondary)',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 16,
-              transition: 'background 150ms, border-color 150ms',
-              flexShrink: 0,
-            }}
+            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
+            className="theme-toggle-btn focus-ring"
+            style={{ marginLeft: 12 }}
           >
             {theme === 'dark' ? '☀️' : '🌙'}
           </button>

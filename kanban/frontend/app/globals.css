@@ -48,32 +48,38 @@
   --color-text-muted:     #3d506e;
   --color-text-inverse:   #ffffff;
 
-  /* 액션 — 브라이트 인디고/블루 계열 */
-  --color-action-primary:         #4f7ef0;
-  --color-action-primary-hover:   #6b95f5;
+  /* 액션 — Bifrost brand-point 계열 */
+  --color-action-primary:         #7C7AE8;
+  --color-action-primary-hover:   #9B99EF;
   --color-action-secondary:       #172039;
   --color-action-secondary-hover: #1e2d47;
 
-  /* 포인트컬러 토큰 */
-  --color-point:        #818cf8;
-  --color-point-hover:  #a5b4fc;
-  --color-point-subtle: rgba(129, 140, 248, 0.12);
-  --color-point-border: rgba(129, 140, 248, 0.30);
-  --color-point-glow:   rgba(129, 140, 248, 0.20);
+  /* 포인트컬러 토큰 — Bifrost brand-point #5F5BE2 (다크 모드 밝기 조정) */
+  --color-point:        #7C7AE8;
+  --color-point-hover:  #9B99EF;
+  --color-point-subtle: rgba(95, 91, 226, 0.12);
+  --color-point-border: rgba(95, 91, 226, 0.30);
+  --color-point-glow:   rgba(95, 91, 226, 0.20);
 
   /* 포커스 */
-  --color-focus-ring: #818cf8;
+  --color-focus-ring: #7C7AE8;
 
   /* 드래그/드롭 */
-  --color-drag-over: #818cf8;
+  --color-drag-over: #7C7AE8;
 
   /* 상태 색상 */
-  --color-priority-high:    #f87171;
-  --color-priority-medium:  #fbbf24;
-  --color-priority-low:     #4ade80;
-  --color-progress-high:    #4ade80;
-  --color-progress-medium:  #fbbf24;
-  --color-progress-low:     #f87171;
+  --color-priority-high:          #f87171;
+  --color-priority-medium:        #fbbf24;
+  --color-priority-low:           #4ade80;
+  --color-priority-high-bg:       rgba(248, 113, 113, 0.12);
+  --color-priority-high-border:   rgba(248, 113, 113, 0.25);
+  --color-priority-medium-bg:     rgba(251, 191, 36, 0.12);
+  --color-priority-medium-border: rgba(251, 191, 36, 0.25);
+  --color-priority-low-bg:        rgba(74, 222, 128, 0.12);
+  --color-priority-low-border:    rgba(74, 222, 128, 0.25);
+  --color-progress-high:          #4ade80;
+  --color-progress-medium:        #fbbf24;
+  --color-progress-low:           #f87171;
 
   /* 에이전트 아바타 */
   --color-agent-homer:    #4f7ef0;
@@ -85,20 +91,39 @@
   --color-agent-chalmers: #f59e0b;
   --color-agent-wiggum:   #94a3b8;
 
-  /* 컬럼 accent */
-  --color-col-todo:       #4f7ef0;
-  --color-col-inprogress: #fbbf24;
-  --color-col-review:     #c084fc;
-  --color-col-done:       #4ade80;
+  /* 컬럼 accent — 6개 컬럼 순환용 (Column.tsx COLUMN_ACCENTS와 동기화) */
+  --color-col-1:          var(--color-point);       /* Todo: brand-point */
+  --color-col-2:          #fbbf24;                  /* In Progress: amber */
+  --color-col-3:          #c084fc;                  /* Review: purple */
+  --color-col-4:          #4ade80;                  /* Done: green */
+  --color-col-5:          #fb923c;                  /* 추가 컬럼: orange */
+  --color-col-6:          #f472b6;                  /* 추가 컬럼: pink */
   --color-col-default:    #7a90b8;
 
+  /* 컬럼 accent 배경 (8% 투명도) */
+  --color-col-1-bg:       rgba(95, 91, 226, 0.08);
+  --color-col-2-bg:       rgba(251, 191, 36, 0.08);
+  --color-col-3-bg:       rgba(192, 132, 252, 0.08);
+  --color-col-4-bg:       rgba(74, 222, 128, 0.08);
+  --color-col-5-bg:       rgba(251, 146, 60, 0.08);
+  --color-col-6-bg:       rgba(244, 114, 182, 0.08);
+
+  /* 레거시 alias — 기존 코드 호환 */
+  --color-col-todo:       var(--color-col-1);
+  --color-col-inprogress: var(--color-col-2);
+  --color-col-review:     var(--color-col-3);
+  --color-col-done:       var(--color-col-4);
+
   /* 마감일 상태 */
-  --color-due-warning:        #fb923c;
+  --color-due-warning:         #fb923c;
   --color-due-warning-bg:     rgba(251, 146, 60, 0.12);
-  --color-due-warning-border: rgba(251, 146, 60, 0.3);
+  --color-due-warning-border: rgba(251, 146, 60, 0.30);
   --color-due-overdue:        #f87171;
   --color-due-overdue-bg:     rgba(248, 113, 113, 0.12);
+  --color-due-overdue-border: rgba(248, 113, 113, 0.30);
   --color-due-normal:         #4ade80;
+  --color-due-normal-bg:      rgba(74, 222, 128, 0.10);
+  --color-due-normal-border:  rgba(74, 222, 128, 0.25);
 
   /* 태그 */
   --color-tag-bg:     var(--color-point-subtle);
@@ -149,32 +174,38 @@
   --color-text-muted:     #94a3b8;
   --color-text-inverse:   #0f172a;
 
-  /* 액션 — 진한 인디고/블루 (라이트 배경 대비 확보) */
-  --color-action-primary:         #3b6fd4;
-  --color-action-primary-hover:   #2d5bbf;
+  /* 액션 — Bifrost brand-point #5F5BE2 */
+  --color-action-primary:         #5F5BE2;
+  --color-action-primary-hover:   #4D49C5;
   --color-action-secondary:       #f1f5f9;
   --color-action-secondary-hover: #e2e8f0;
 
-  /* 포인트컬러 토큰 */
-  --color-point:        #4f46e5;
-  --color-point-hover:  #3730a3;
-  --color-point-subtle: rgba(79, 70, 229, 0.10);
-  --color-point-border: rgba(79, 70, 229, 0.25);
-  --color-point-glow:   rgba(79, 70, 229, 0.15);
+  /* 포인트컬러 토큰 — Bifrost brand-point #5F5BE2 */
+  --color-point:        #5F5BE2;
+  --color-point-hover:  #4D49C5;
+  --color-point-subtle: rgba(95, 91, 226, 0.10);
+  --color-point-border: rgba(95, 91, 226, 0.25);
+  --color-point-glow:   rgba(95, 91, 226, 0.15);
 
   /* 포커스 */
-  --color-focus-ring: #4f46e5;
+  --color-focus-ring: #5F5BE2;
 
   /* 드래그/드롭 */
-  --color-drag-over: #4f46e5;
+  --color-drag-over: #5F5BE2;
 
   /* 상태 색상 — 라이트 배경에 맞게 진하게 조정 */
-  --color-priority-high:    #dc2626;
-  --color-priority-medium:  #d97706;
-  --color-priority-low:     #16a34a;
-  --color-progress-high:    #16a34a;
-  --color-progress-medium:  #d97706;
-  --color-progress-low:     #dc2626;
+  --color-priority-high:          #dc2626;
+  --color-priority-medium:        #d97706;
+  --color-priority-low:           #16a34a;
+  --color-priority-high-bg:       rgba(220, 38, 38, 0.10);
+  --color-priority-high-border:   rgba(220, 38, 38, 0.25);
+  --color-priority-medium-bg:     rgba(217, 119, 6, 0.10);
+  --color-priority-medium-border: rgba(217, 119, 6, 0.25);
+  --color-priority-low-bg:        rgba(22, 163, 74, 0.10);
+  --color-priority-low-border:    rgba(22, 163, 74, 0.25);
+  --color-progress-high:          #16a34a;
+  --color-progress-medium:        #d97706;
+  --color-progress-low:           #dc2626;
 
   /* 에이전트 아바타 — 다크과 동일 (충분한 채도) */
   --color-agent-homer:    #4f7ef0;
@@ -186,25 +217,44 @@
   --color-agent-chalmers: #f59e0b;
   --color-agent-wiggum:   #94a3b8;
 
-  /* 컬럼 accent — 라이트 배경용 진한 버전 */
-  --color-col-todo:       #3b6fd4;
-  --color-col-inprogress: #d97706;
-  --color-col-review:     #9333ea;
-  --color-col-done:       #16a34a;
+  /* 컬럼 accent — 라이트 배경용 (채도 높은 버전) */
+  --color-col-1:          var(--color-point);       /* Todo: brand-point */
+  --color-col-2:          #d97706;                  /* In Progress: amber-600 */
+  --color-col-3:          #9333ea;                  /* Review: purple-600 */
+  --color-col-4:          #16a34a;                  /* Done: green-600 */
+  --color-col-5:          #ea580c;                  /* 추가 컬럼: orange-600 */
+  --color-col-6:          #db2777;                  /* 추가 컬럼: pink-600 */
   --color-col-default:    #64748b;
 
+  /* 컬럼 accent 배경 (6% 투명도 — 라이트 배경 대비) */
+  --color-col-1-bg:       rgba(95, 91, 226, 0.06);
+  --color-col-2-bg:       rgba(217, 119, 6, 0.06);
+  --color-col-3-bg:       rgba(147, 51, 234, 0.06);
+  --color-col-4-bg:       rgba(22, 163, 74, 0.06);
+  --color-col-5-bg:       rgba(234, 88, 12, 0.06);
+  --color-col-6-bg:       rgba(219, 39, 119, 0.06);
+
+  /* 레거시 alias */
+  --color-col-todo:       var(--color-col-1);
+  --color-col-inprogress: var(--color-col-2);
+  --color-col-review:     var(--color-col-3);
+  --color-col-done:       var(--color-col-4);
+
   /* 마감일 상태 */
-  --color-due-warning:        #d97706;
-  --color-due-warning-bg:     rgba(217, 119, 6, 0.1);
+  --color-due-warning:         #d97706;
+  --color-due-warning-bg:     rgba(217, 119, 6, 0.10);
   --color-due-warning-border: rgba(217, 119, 6, 0.25);
   --color-due-overdue:        #dc2626;
-  --color-due-overdue-bg:     rgba(220, 38, 38, 0.1);
+  --color-due-overdue-bg:     rgba(220, 38, 38, 0.10);
+  --color-due-overdue-border: rgba(220, 38, 38, 0.30);
   --color-due-normal:         #16a34a;
+  --color-due-normal-bg:      rgba(22, 163, 74, 0.10);
+  --color-due-normal-border:  rgba(22, 163, 74, 0.25);
 
   /* 태그 */
-  --color-tag-bg:     rgba(59, 111, 212, 0.1);
-  --color-tag-border: rgba(59, 111, 212, 0.25);
-  --color-tag-text:   #2d5bbf;
+  --color-tag-bg:     var(--color-point-subtle);
+  --color-tag-border: var(--color-point-border);
+  --color-tag-text:   var(--color-point);
 
   /* accent alias */
   --color-accent: var(--color-action-primary);
@@ -248,12 +298,18 @@
   --color-point-glow:           var(--color-point-glow);
 
   /* 우선순위 / 진행률 */
-  --color-priority-high:        var(--color-priority-high);
-  --color-priority-medium:      var(--color-priority-medium);
-  --color-priority-low:         var(--color-priority-low);
-  --color-progress-high:        var(--color-progress-high);
-  --color-progress-medium:      var(--color-progress-medium);
-  --color-progress-low:         var(--color-progress-low);
+  --color-priority-high:          var(--color-priority-high);
+  --color-priority-medium:        var(--color-priority-medium);
+  --color-priority-low:           var(--color-priority-low);
+  --color-priority-high-bg:       var(--color-priority-high-bg);
+  --color-priority-high-border:   var(--color-priority-high-border);
+  --color-priority-medium-bg:     var(--color-priority-medium-bg);
+  --color-priority-medium-border: var(--color-priority-medium-border);
+  --color-priority-low-bg:        var(--color-priority-low-bg);
+  --color-priority-low-border:    var(--color-priority-low-border);
+  --color-progress-high:          var(--color-progress-high);
+  --color-progress-medium:        var(--color-progress-medium);
+  --color-progress-low:           var(--color-progress-low);
 
   /* 에이전트 아바타 */
   --color-agent-homer:          var(--color-agent-homer);
@@ -265,12 +321,25 @@
   --color-agent-chalmers:       var(--color-agent-chalmers);
   --color-agent-wiggum:         var(--color-agent-wiggum);
 
-  /* 컬럼 accent */
+  /* 컬럼 accent (6개 순환 + 배경) */
+  --color-col-1:                var(--color-col-1);
+  --color-col-2:                var(--color-col-2);
+  --color-col-3:                var(--color-col-3);
+  --color-col-4:                var(--color-col-4);
+  --color-col-5:                var(--color-col-5);
+  --color-col-6:                var(--color-col-6);
+  --color-col-default:          var(--color-col-default);
+  --color-col-1-bg:             var(--color-col-1-bg);
+  --color-col-2-bg:             var(--color-col-2-bg);
+  --color-col-3-bg:             var(--color-col-3-bg);
+  --color-col-4-bg:             var(--color-col-4-bg);
+  --color-col-5-bg:             var(--color-col-5-bg);
+  --color-col-6-bg:             var(--color-col-6-bg);
+  /* 레거시 alias */
   --color-col-todo:             var(--color-col-todo);
   --color-col-inprogress:       var(--color-col-inprogress);
   --color-col-review:           var(--color-col-review);
   --color-col-done:             var(--color-col-done);
-  --color-col-default:          var(--color-col-default);
 
   /* 마감일 */
   --color-due-warning:          var(--color-due-warning);
@@ -278,7 +347,10 @@
   --color-due-warning-border:   var(--color-due-warning-border);
   --color-due-overdue:          var(--color-due-overdue);
   --color-due-overdue-bg:       var(--color-due-overdue-bg);
+  --color-due-overdue-border:   var(--color-due-overdue-border);
   --color-due-normal:           var(--color-due-normal);
+  --color-due-normal-bg:        var(--color-due-normal-bg);
+  --color-due-normal-border:    var(--color-due-normal-border);
 
   /* 태그 */
   --color-tag-bg:               var(--color-tag-bg);
@@ -350,7 +422,7 @@ select option {
 
 /* 컬럼 컨테이너 */
 .column-container {
-  width: 288px;
+  width: 280px;
   flex-shrink: 0;
 }
 
@@ -382,8 +454,8 @@ select option {
 .card-base {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 12px;
+  padding: 14px 16px;
   position: relative;
   overflow: hidden;
   transition: transform 150ms, box-shadow 150ms, border-color 150ms;
@@ -435,7 +507,7 @@ select option {
 
 /* 프로그레스 바 트랙 */
 .progress-bar-track {
-  height: 3px;
+  height: 4px;
   background: var(--color-border-strong);
   border-radius: 2px;
   overflow: hidden;
@@ -504,7 +576,7 @@ select option {
 }
 
 /* =============================================
-   카드 hover — CSS custom property 기반
+   카드 hover/active — CSS custom property 기반
    --card-accent-shadow, --card-accent-border 는 Card.tsx에서 인라인 주입
    ============================================= */
 .card-item {
@@ -515,8 +587,13 @@ select option {
 }
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.3), 0 0 0 1px var(--card-accent-shadow, var(--color-border-strong)), 0 0 8px var(--color-point-glow);
-  border-color: var(--card-accent-border, var(--color-border-strong)) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  border-color: var(--color-border-strong) !important;
+}
+/* 카드 클릭(active) 피드백 */
+.card-item:not(.card-base--filtered-out):not(.card-item--dragging):active {
+  transform: scale(0.98);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.25);
 }
 /* 카드 삭제 버튼 — hover 시 표시 */
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover .delete-btn {
@@ -525,6 +602,9 @@ select option {
 .delete-btn:hover {
   color: var(--color-priority-high) !important;
   background: var(--color-due-overdue-bg) !important;
+}
+.delete-btn:active {
+  transform: scale(0.9);
 }
 
 /* =============================================
@@ -603,7 +683,7 @@ select option {
 /* 태블릿: 480–767px */
 @media (min-width: 480px) and (max-width: 767px) {
   .column-container {
-    width: 240px !important;
+    width: 236px !important;
   }
   .modal-box {
     width: calc(100vw - 40px) !important;
@@ -729,11 +809,21 @@ select option {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: background var(--duration-fast), color var(--duration-fast);
+  transition: background var(--duration-fast), color var(--duration-fast), transform var(--duration-fast);
 }
 .modal-close-btn:hover {
   background: var(--color-bg-card);
   color: var(--color-text-primary);
+}
+.modal-close-btn:active {
+  transform: scale(0.9);
+}
+
+/* select — 다크/라이트 테마 포커스 링 */
+select:focus-visible {
+  outline: none;
+  border-color: var(--color-point) !important;
+  box-shadow: 0 0 0 3px var(--color-point-subtle) !important;
 }
 
 /* =============================================
@@ -838,4 +928,173 @@ select option {
 .focus-ring:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+/* 전역 포커스 링 — 모든 인터랙티브 요소 */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* =============================================
+   UI Kit 오버라이드 — brand-point → var(--color-point)
+   @bifrost-platform/ui-kit-front index.css의 brand-point는 #5F5BE2 하드코딩.
+   다크 테마에서 --color-point(#7C7AE8)와 불일치하므로 CSS 변수로 오버라이드.
+   ============================================= */
+.bg-brand-point {
+  background-color: var(--color-point) !important;
+}
+.border-brand-point {
+  border-color: var(--color-point) !important;
+}
+.text-brand-point {
+  color: var(--color-point) !important;
+}
+.hover\:bg-brand-300:hover {
+  background-color: var(--color-point-hover) !important;
+}
+.hover\:border-brand-300:hover {
+  border-color: var(--color-point-hover) !important;
+}
+.hover\:text-brand-300:hover {
+  color: var(--color-point-hover) !important;
+}
+.active\:bg-brand-500:active {
+  background-color: color-mix(in srgb, var(--color-point) 80%, #000 20%) !important;
+}
+.active\:border-brand-500:active {
+  border-color: color-mix(in srgb, var(--color-point) 80%, #000 20%) !important;
+}
+.active\:text-brand-500:active {
+  color: color-mix(in srgb, var(--color-point) 80%, #000 20%) !important;
+}
+
+/* =============================================
+   버튼 Active 상태 (눌렸을 때 피드백)
+   ============================================= */
+.btn-primary:active:not(:disabled) {
+  background: color-mix(in srgb, var(--color-point) 80%, #000 20%);
+  box-shadow: 0 0 6px var(--color-point-glow);
+  transform: scale(0.98);
+}
+.btn-secondary:active:not(:disabled) {
+  background: var(--color-action-secondary-hover);
+  transform: scale(0.98);
+}
+
+/* =============================================
+   헤더 네비게이션 탭 링크
+   ============================================= */
+.nav-tab-link {
+  display: inline-flex;
+  align-items: center;
+  height: 60px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  color: var(--color-text-secondary);
+  transition: color var(--duration-fast), border-color var(--duration-fast);
+}
+.nav-tab-link:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-border-strong);
+}
+.nav-tab-link--active {
+  color: var(--color-point);
+  border-bottom-color: var(--color-point);
+}
+.nav-tab-link--active:hover {
+  color: var(--color-point-hover);
+  border-color: var(--color-point-hover);
+}
+
+/* =============================================
+   테마 토글 버튼
+   ============================================= */
+.theme-toggle-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background var(--duration-fast), border-color var(--duration-fast), transform var(--duration-fast);
+  flex-shrink: 0;
+}
+.theme-toggle-btn:hover {
+  background: var(--color-bg-card);
+  border-color: var(--color-border-strong);
+}
+.theme-toggle-btn:active {
+  transform: scale(0.92) rotate(15deg);
+}
+
+/* =============================================
+   필터 바 — 담당자/우선순위 버튼 hover
+   (동적 색상은 인라인 스타일 유지, hover 피드백만 CSS)
+   ============================================= */
+.filter-pill-btn {
+  transition: all var(--duration-fast);
+}
+.filter-pill-btn:not([aria-pressed="true"]):hover {
+  background: var(--color-bg-card) !important;
+  border-color: var(--color-border-strong) !important;
+}
+.filter-pill-btn:active {
+  transform: scale(0.96);
+}
+
+/* =============================================
+   반응형 보완 — 데스크탑(1440px+) 헤더 에이전트 아바타 숨김
+   ============================================= */
+@media (max-width: 639px) {
+  .header-avatars {
+    display: none;
+  }
+  .header-date {
+    display: none;
+  }
+}
+
+/* =============================================
+   시스템 다크/라이트 모드 폴백
+   (JavaScript 비활성 or 초기 렌더 전 flicker 방지용)
+   ============================================= */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-theme="light"]) {
+    /* 배경 레이어 — 라이트 팔레트 */
+    --color-bg-base:        #f0f4f8;
+    --color-bg-surface:     #ffffff;
+    --color-bg-elevated:    #f8fafc;
+    --color-bg-card:        #ffffff;
+    --color-bg-input:       #f1f5f9;
+    --color-bg-overlay:     rgba(15, 23, 42, 0.5);
+    --color-border:         #e2e8f0;
+    --color-border-strong:  #cbd5e1;
+    --color-text-primary:   #1e293b;
+    --color-text-secondary: #475569;
+    --color-text-muted:     #94a3b8;
+    --color-text-inverse:   #0f172a;
+    --color-action-primary:         #5F5BE2;
+    --color-action-primary-hover:   #4D49C5;
+    --color-action-secondary:       #f1f5f9;
+    --color-action-secondary-hover: #e2e8f0;
+    --color-point:        #5F5BE2;
+    --color-point-hover:  #4D49C5;
+    --color-point-subtle: rgba(95, 91, 226, 0.10);
+    --color-point-border: rgba(95, 91, 226, 0.25);
+    --color-point-glow:   rgba(95, 91, 226, 0.15);
+    --color-focus-ring: #5F5BE2;
+  }
 }

@@ -1,24 +1,9 @@
 'use client';
+import { memo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card as CardType } from '@/lib/types';
-
-const PRIORITY_CONFIG: Record<string, { color: string; bg: string; border: string; label: string }> = {
-  high:   { color: 'var(--color-priority-high)',   bg: 'rgba(248,113,113,0.12)', border: 'rgba(248,113,113,0.25)', label: '높음' },
-  medium: { color: 'var(--color-priority-medium)', bg: 'rgba(251,191,36,0.12)',  border: 'rgba(251,191,36,0.25)',  label: '보통' },
-  low:    { color: 'var(--color-priority-low)',    bg: 'rgba(74,222,128,0.12)',  border: 'rgba(74,222,128,0.25)',  label: '낮음' },
-};
-
-const AGENT_COLORS: Record<string, string> = {
-  homer:    'var(--color-agent-homer)',
-  bart:     'var(--color-agent-bart)',
-  marge:    'var(--color-agent-marge)',
-  lisa:     'var(--color-agent-lisa)',
-  krusty:   'var(--color-agent-krusty)',
-  sid:      'var(--color-agent-sid)',
-  chalmers: 'var(--color-agent-chalmers)',
-  wiggum:   'var(--color-agent-wiggum)',
-};
+import { PRIORITY_CONFIG, AGENT_COLORS } from '@/lib/constants';
 
 function getProgressColor(progress: number): string {
   if (progress >= 67) return 'var(--color-progress-high)';
@@ -54,19 +39,18 @@ function AgentAvatar({ name }: { name: string }) {
       aria-hidden="true"
       title={name}
       style={{
-        width: 22,
-        height: 22,
+        width: 20,
+        height: 20,
         borderRadius: '50%',
         background: color,
         border: '1.5px solid var(--color-bg-card)',
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 700,
         color: '#ffffff',
         flexShrink: 0,
-        boxShadow: `0 0 6px ${color}50`,
       }}
     >
       {name.charAt(0).toUpperCase()}
@@ -78,11 +62,10 @@ interface Props {
   card: CardType;
   onDelete: (id: number) => void;
   onCardClick: (card: CardType) => void;
-  accentColor?: string;
   isFiltered?: boolean;
 }
 
-export default function Card({ card, onDelete, onCardClick, accentColor, isFiltered = false }: Props) {
+const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = false }: Props) {
   const {
     attributes,
     listeners,
@@ -106,14 +89,9 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
   const dueDateStatus = getDueDateStatus(card.due_date ?? null);
   const tags = card.tags ?? [];
 
-  // 마감일 aria-label
   const dueDateAriaLabel = card.due_date
     ? `마감일 ${card.due_date}${dueDateStatus === 'overdue' ? ' — 기한 초과' : dueDateStatus === 'soon' ? ' — 임박' : ''}`
     : '';
-
-  // CSS custom property 기반 hover (JS onMouseEnter/Leave 제거)
-  const cardAccentShadow = accentColor ? `${accentColor}40` : 'var(--color-border-strong)';
-  const cardAccentBorder = accentColor ? `${accentColor}50` : 'var(--color-border-strong)';
 
   return (
     <div
@@ -127,7 +105,6 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
           e.preventDefault();
           onCardClick(card);
         }
-        // Space 및 방향키는 dnd-kit이 처리
       }}
     >
       <div
@@ -136,37 +113,32 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
         style={{
           background: 'var(--color-bg-card)',
           border: '1px solid var(--color-border)',
-          borderRadius: 10,
-          padding: '10px 12px',
+          borderRadius: 12,
+          padding: '14px 16px',
           cursor: isDragging ? 'grabbing' : 'grab',
           opacity: isDragging ? 0.6 : 1,
           position: 'relative',
           overflow: 'hidden',
           boxShadow: isDragging
             ? '0 8px 32px rgba(0,0,0,0.4)'
-            : '0 1px 4px rgba(0,0,0,0.2)',
-          // CSS custom properties for hover effects (globals.css에서 사용)
-          '--card-accent-shadow': cardAccentShadow,
-          '--card-accent-border': cardAccentBorder,
-        } as React.CSSProperties}
+            : '0 1px 3px rgba(0,0,0,0.15)',
+        }}
       >
-        {/* 우선순위 왼쪽 바 */}
-        <div
-          aria-hidden="true"
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 8,
-            bottom: 8,
-            width: 3,
-            background: priorityCfg.color,
-            borderRadius: '0 3px 3px 0',
-            opacity: 0.8,
-          }}
-        />
-
-        {/* 제목 행 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, paddingLeft: 8 }}>
+        {/* 제목 행 — 우선순위 점 인라인 */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          {/* 우선순위 점 (좌측 바 → 인라인 점으로 교체) */}
+          <span
+            aria-hidden="true"
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              background: priorityCfg.color,
+              display: 'inline-block',
+              flexShrink: 0,
+              marginTop: 5,
+            }}
+          />
           <p
             style={{
               color: 'var(--color-text-primary)',
@@ -194,7 +166,7 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 12,
+              fontSize: 11,
               opacity: 0,
               transition: 'opacity var(--duration-fast), color var(--duration-fast), background var(--duration-fast)',
               flexShrink: 0,
@@ -204,14 +176,14 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
           </button>
         </div>
 
-        {/* 설명 */}
+        {/* 설명 — 점 너비(7px) + 간격(8px) = 15px 들여쓰기로 제목 텍스트와 정렬 */}
         {card.description && (
           <p
             style={{
               color: 'var(--color-text-secondary)',
               fontSize: 12,
               lineHeight: 1.5,
-              margin: '5px 0 0 20px',
+              margin: '6px 0 0 15px',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
@@ -222,9 +194,9 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
           </p>
         )}
 
-        {/* 진행률 바 — 0%도 트랙 표시 */}
-        <div style={{ marginTop: 8, paddingLeft: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+        {/* 진행률 바 */}
+        <div style={{ marginTop: 10, paddingLeft: 15 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
             <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>진행률</span>
             <span style={{ fontSize: 11, fontWeight: 600, color: progress === 0 ? 'var(--color-text-muted)' : progressColor }}>
               {progress === 0 ? '시작 전' : `${progress}%`}
@@ -236,7 +208,7 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
                 style={{
                   height: '100%',
                   width: `${progress}%`,
-                  background: `linear-gradient(90deg, ${progressColor}90 0%, ${progressColor} 100%)`,
+                  background: `linear-gradient(90deg, ${progressColor}80 0%, ${progressColor} 100%)`,
                   borderRadius: 2,
                   transition: `width var(--duration-slow) ease-out`,
                 }}
@@ -245,9 +217,9 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
           </div>
         </div>
 
-        {/* 태그 pills — tooltip으로 전체 내용 확인 가능 */}
+        {/* 태그 pills */}
         {tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6, paddingLeft: 8 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8, paddingLeft: 15 }}>
             {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
@@ -275,11 +247,12 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            marginTop: 8,
-            paddingLeft: 8,
+            marginTop: 10,
+            paddingLeft: 15,
             flexWrap: 'wrap',
           }}
         >
+          {/* 우선순위 배지 */}
           <span
             className="badge"
             style={{
@@ -303,7 +276,7 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
             {priorityCfg.label}
           </span>
 
-          {/* 마감일 뱃지 */}
+          {/* 마감일 뱃지 — 이모지 없이 텍스트만 */}
           {card.due_date && dueDateStatus && (
             <span
               aria-label={dueDateAriaLabel}
@@ -311,39 +284,49 @@ export default function Card({ card, onDelete, onCardClick, accentColor, isFilte
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 3,
-                fontSize: 10,
-                fontWeight: 600,
-                padding: '1px 6px',
+                fontSize: 11,
+                fontWeight: 500,
+                padding: '1px 7px',
                 borderRadius: 10,
                 background: dueDateStatus === 'overdue'
                   ? 'var(--color-due-overdue-bg)'
                   : dueDateStatus === 'soon'
                     ? 'var(--color-due-warning-bg)'
-                    : 'rgba(148,163,184,0.1)',
+                    : 'transparent',
                 color: dueDateStatus === 'overdue'
                   ? 'var(--color-due-overdue)'
                   : dueDateStatus === 'soon'
                     ? 'var(--color-due-warning)'
                     : 'var(--color-text-muted)',
-                border: `1px solid ${dueDateStatus === 'overdue' ? 'rgba(248,113,113,0.3)' : dueDateStatus === 'soon' ? 'var(--color-due-warning-border)' : 'var(--color-border)'}`,
+                border: `1px solid ${
+                  dueDateStatus === 'overdue'
+                    ? 'var(--color-due-overdue-border)'
+                    : dueDateStatus === 'soon'
+                      ? 'var(--color-due-warning-border)'
+                      : 'var(--color-border)'
+                }`,
               }}
             >
-              <span aria-hidden="true">
-                {dueDateStatus === 'overdue' ? '⚠' : dueDateStatus === 'soon' ? '🔔' : '📅'}
-              </span>
               {formatDueDate(card.due_date)}
             </span>
           )}
 
+          {/* 담당자 */}
           {card.assignee && (
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
               <AgentAvatar name={card.assignee} />
-              <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }} aria-label={`담당자: ${card.assignee}`}>{card.assignee}</span>
+              <span
+                style={{ fontSize: 11, color: 'var(--color-text-muted)' }}
+                aria-label={`담당자: ${card.assignee}`}
+              >
+                {card.assignee}
+              </span>
             </div>
           )}
         </div>
       </div>
-
     </div>
   );
-}
+});
+
+export default Card;
