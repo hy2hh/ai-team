@@ -1567,23 +1567,11 @@ export const handleMessage = async (
               agents: z.array(z.string()),
               reason: z.string(),
               tier: z.enum(['high', 'standard', 'fast']).optional().describe('모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
-              no_ui_changes: z.boolean().optional().describe('true로 명시하면 UI/UX 변경 없는 순수 로직 작업임을 선언 — Frontend 단독 위임 허용. 미선언 시 Designer 선행 필수.'),
             },
-            async ({ agents, reason, tier, no_ui_changes }) => {
+            async ({ agents, reason, tier }) => {
               const valid = agents.filter((a: string) =>
                 ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
               );
-
-              // Frontend 단독 위임 시 Designer 선행 또는 no_ui_changes 명시 필수
-              if (valid.includes('frontend') && !valid.includes('designer') && !no_ui_changes) {
-                console.warn(`[enforcement] delegate 차단: Frontend 단독 위임에 Designer 누락 (no_ui_changes 미선언)`);
-                return {
-                  content: [{
-                    type: 'text' as const,
-                    text: `⛔ 위임 차단: Frontend(Bart) 단독 위임 시 반드시 Designer(Krusty)를 함께 포함하거나, 순수 로직 작업임을 \`no_ui_changes: true\`로 명시해야 합니다.\n\n• UI/UX 변경 포함 → agents에 "designer" 추가 (Designer → Frontend 순서)\n• 순수 로직/버그픽스 → \`no_ui_changes: true\` 파라미터 추가`,
-                  }],
-                };
-              }
 
               // 2+ 구현 에이전트 위임 시 스펙 파일 + 에러 케이스 AC 검증
               const implAgents = valid.filter((a) =>
@@ -1650,9 +1638,8 @@ export const handleMessage = async (
                 tier: z.enum(['high', 'standard', 'fast']).optional().describe('이 step에서 사용할 모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
               })).describe('순차 실행할 step 배열 (앞에서부터 순서대로 실행)'),
               reason: z.string().describe('순차 실행이 필요한 이유'),
-              no_ui_changes: z.boolean().optional().describe('true로 명시하면 UI/UX 변경 없는 순수 로직 작업임을 선언 — Frontend 단독 위임 허용. 미선언 시 전체 step에 Designer 포함 필수.'),
             },
-            async ({ steps, reason: _reason, no_ui_changes }) => {
+            async ({ steps, reason: _reason }) => {
               const validSteps: DelegationStep[] = steps.map((step: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }) => ({
                 agents: step.agents.filter((a: string) =>
                   ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
@@ -1660,19 +1647,6 @@ export const handleMessage = async (
                 task: step.task,
                 tier: step.tier,
               })).filter((step) => step.agents.length > 0);
-
-              // 전체 step 중 frontend가 있고 designer가 한 번도 없으면 차단 (no_ui_changes 예외)
-              const hasFrontend = validSteps.some((s: { agents: string[] }) => s.agents.includes('frontend'));
-              const hasDesigner = validSteps.some((s: { agents: string[] }) => s.agents.includes('designer'));
-              if (hasFrontend && !hasDesigner && !no_ui_changes) {
-                console.warn(`[enforcement] delegate_sequential 차단: Frontend 포함 step에 Designer 누락 (no_ui_changes 미선언)`);
-                return {
-                  content: [{
-                    type: 'text' as const,
-                    text: `⛔ 순차 위임 차단: Frontend(Bart)가 포함된 step이 있으나 전체 step에 Designer(Krusty)가 없습니다.\n\n• UI/UX 변경 포함 → steps에 Designer step 추가 (Designer → Frontend 순서 유지)\n• 순수 로직/버그픽스 → \`no_ui_changes: true\` 파라미터 추가`,
-                  }],
-                };
-              }
 
               // 전체 step에서 구현 에이전트 2+ 참여 시 스펙 파일 검증
               const allImplAgents = new Set(

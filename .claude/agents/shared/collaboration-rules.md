@@ -32,6 +32,7 @@
 - **금지**: 선언만 하고 실행 안 하는 패턴. 훅 우회 (python3 등)도 보안 위반
 
 ## Escalation Rules
+- **피드백 대응**: `shared/react-process.md` 절차 준수. 이의 제기/재작업/재검증 프로토콜 포함
 - **모호한 작업**: sid에게 확인
 - **에이전트 차단**: @mention + 명확한 요청 + 데드라인
 - **요구사항 충돌**: Marge에게 우선순위 조정
@@ -60,6 +61,7 @@
 2. 새 지식 → `facts/` 업데이트
 3. 결정 → `decisions/YYYY-MM-DD_{topic}.md`
 4. 핸드오프 → `handoff/{from}-to-{to}_{topic}.md`
+5. 반복 이슈 학습 → `decisions/YYYY-MM-DD_lesson-{topic}.md` (react-process.md §8)
 
 ### File Ownership
 - `facts/`: Marge 소유 (다른 에이전트는 제안만)
@@ -103,10 +105,12 @@
 - 리스크: LOW=자동 진행 / MEDIUM=알림+자동 / HIGH=sid 승인 필수
 - Ralph Loop: 검증 통과 후에만 커밋 + 추천. 3회 실패 → sid 에스컬레이션
 
-## 체인 위임 규칙 (PM 전용)
+## 체인 위임 규칙 (PM 전용) {#chain-delegation-rules}
 - **A→B 순서가 있는 모든 작업은 `delegate_sequential`로만 등록** — 개별 `delegate` 후 수동 핸드오프 의존 금지
-- **UI/UX 체인 표준**: Designer(`delegate_sequential` step 1) → Frontend(`delegate_sequential` step 2)
+- **UI/UX 체인 권장**: UI/UX 변경이 포함된 작업은 Designer(`delegate_sequential` step 1) → Frontend(`delegate_sequential` step 2) 순서가 원칙
 - 이유: PM 컨텍스트 단절 시 수동 핸드오프 체인이 영구 중단됨. bridge 자동 체인이 유일한 신뢰할 수 있는 보장 메커니즘
+- **Designer 스펙 이미 확보된 경우**: 현재 스레드에서 Designer가 이미 구체적 수정 스펙(컴포넌트·CSS 변수·적용 방식)을 제공했으면, Frontend에 직접 `delegate` 가능. 위임 메시지에 스펙 출처 명시 필수.
+- **Frontend 단독 작업인 경우**: 코드 수정, ARIA 추가, API 연동, 버그픽스 등 UI 설계가 필요 없는 작업은 Designer 선행 없이 Frontend에 직접 `delegate` 가능.
 
 ## Auto-Commit Rule (코드 수정 에이전트)
 - 코드/설정 수정 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)
@@ -120,6 +124,12 @@
 - 보고 없는 완료 = 완료가 아니다. 완료 내용 + 수정 파일 + 커밋 hash + 체크리스트
 - 위임/완료보고/Cross-Verification 상세 → `/agent-delegate` 스킬 참조
 
+## UI 작업 시각 검증 의무 (CSS/스타일 수정 전용)
+- **CSS 파일 수정 완료 ≠ UI 작업 완료.** 반드시 브라우저 렌더링/스크린샷으로 실제 적용 확인 후 완료 선언.
+- Designer(Krusty): 구현 완료 보고 수신 시 스크린샷 시각 검증 → "준수/위반" 항목 명시 의무. 미확인 PASS 선언 금지.
+- PM(Marge): Chalmers QA 위임 시 "스크린샷 기반 시각 검증 포함" 명시 필수. 정적 코드 분석만으로는 UI 완료 조건 불충족.
+- Chalmers: UI 변경 QA 시 실제 렌더링 확인 포함. CSS 변수 선언만 확인하고 적용 여부를 미검증하면 QA 미통과.
+
 ## Measurement Reporting
 측정/분석 보고 시 평가 기준 출처 필수. 출처 없는 점수 게시 금지.
 ```
@@ -131,4 +141,4 @@
 상세 자료: `.claude/context/{role}/` (tools.md, conventions.md, examples/, templates/)
 
 ## 프로세스 (스킬로 이전)
-위임→`/agent-delegate` | 핸드오프→`/agent-handoff` | 디버깅→`/agent-debug` | 리뷰→`/agent-review` | 기획→`/agent-plan` | 구현→`/agent-implement` | 완료→`/agent-verify` | API→`/agent-api-contract`
+위임→`/agent-delegate` | 핸드오프→`/agent-handoff` | 디버깅→`/agent-debug` | 리뷰→`/agent-review` | 기획→`/agent-plan` | 구현→`/agent-implement` | 완료→`/agent-verify` | API→`/agent-api-contract` | TDD→`/agent-tdd`
