@@ -98,6 +98,13 @@ import {
   type AgentEvent,
   type CircuitEvent,
 } from './hook-events.js';
+import {
+  detectModelSelectRequest,
+  extractModelTierFromText,
+  postModelSelectMessage,
+  resolveModelSelect,
+  type ModelTier,
+} from './model-select.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
@@ -725,12 +732,16 @@ const executeSingle = async (
   method: string,
   app: App,
   apps?: App[],
+  modelTier: 'high' | 'standard' | 'fast' = 'standard',
 ): Promise<void> => {
   let result = await handleMessage(
     agentName,
     event,
     method,
     app,
+    false,
+    false,
+    modelTier,
   );
 
   // max_turns 도달 시 → 체크포인트 기반 자동 재시도 (최대 3회)
@@ -784,6 +795,9 @@ const executeSingle = async (
       retryEvent,
       'mention-retry',
       app,
+      false,
+      false,
+      modelTier,
     );
   }
 
@@ -842,73 +856,6 @@ const executeSingle = async (
   let targets = result.delegationTargets.filter(
     (t) => t.agent !== 'pm' && isValidAgent(t.agent),
   );
-
-  // ─── UI/UX 체인 검증 (Designer → Frontend 순서 강제) ──────────────
-  // UI/UX 작업을 Designer 없이 Frontend에 직접 위임하면 경고 + 차단
-  const UI_UX_KEYWORDS = /UI|UX|화면|레이아웃|컴포넌트|디자인|CSS|스타일|칸반|보드|카드|배너|모달|폼|페이지/i;
-  const taskText = event.text ?? '';
-
-  const checkUiUxChain = (
-    targetAgents: string[],
-    designerIncluded: boolean,
-  ): boolean => {
-    const hasFrontend = targetAgents.includes('frontend');
-    const hasDesigner = designerIncluded || targetAgents.includes('designer');
-    return hasFrontend && !hasDesigner && UI_UX_KEYWORDS.test(taskText);
-  };
-
-  // 병렬 위임 체인 검증
-  const parallelViolation = checkUiUxChain(
-    targets.map((t) => t.agent),
-    false,
-  );
-
-  // 순차 위임 체인 검증: Designer가 선행 step에 없는데 Frontend가 등장하면 위반
-  let sequentialViolation = false;
-  if (result.delegationSteps && result.delegationSteps.length > 0 && UI_UX_KEYWORDS.test(taskText)) {
-    let designerSeenSoFar = false;
-    for (const step of result.delegationSteps) {
-      if (step.agents.includes('designer')) {
-        designerSeenSoFar = true;
-      }
-      if (step.agents.includes('frontend') && !designerSeenSoFar) {
-        sequentialViolation = true;
-        break;
-      }
-    }
-  }
-
-  if (parallelViolation || sequentialViolation) {
-    const pmApp = findAgentApp('pm', apps);
-    console.warn('[chain-guard] UI/UX 체인 위반 감지 — Designer 없이 Frontend 직접 위임 차단');
-    try {
-      await pmApp.client.chat.postMessage({
-        channel: event.channel,
-        thread_ts: event.thread_ts ?? event.ts,
-        text: [
-          ':no_entry: *[체인 가드] UI/UX 위임 순서 위반 — 자동 차단*',
-          '',
-          '위임 규칙: *Designer → Frontend* 순서가 필수입니다.',
-          '현재 위임에 *Designer 없이 Frontend*가 포함되어 있고, UI/UX 관련 작업으로 감지되었습니다.',
-          '',
-          '*차단된 이유:*',
-          '• UI/UX 키워드 감지: `' + (taskText.match(UI_UX_KEYWORDS)?.[0] ?? '') + '`',
-          '• Designer 선행 없이 Frontend 직접 위임',
-          '',
-          '*올바른 순서:*',
-          '1. Designer에게 먼저 UX 스펙/디자인 위임',
-          '2. Designer 완료 후 Frontend에게 구현 위임',
-          '',
-          'Marge(PM): Designer를 먼저 위임하도록 수정 후 재시도하세요.',
-        ].join('\n'),
-      });
-    } catch (e) {
-      console.error('[chain-guard] 경고 메시지 전송 실패:', e);
-    }
-    // 위반 시 위임 차단 — 진행하지 않음
-    return;
-  }
-  // ─── UI/UX 체인 검증 끝 ───────────────────────────────────────────
 
   // 순차 위임 또는 병렬 위임이 없으면 종료
   const hasSequential = result.delegationSteps && result.delegationSteps.length > 0;
@@ -2037,6 +1984,44 @@ const flushDebounceBuffer = async (
     }
   }
 
+  // 모델 선택 감지 — 실행 전 사용자가 모델 변경 의도를 표현한 경우 처리
+  // 1) 모델이 메시지에 명시된 경우 → 직접 사용 (Block Kit UI 생략)
+  // 2) 모델이 명시되지 않은 경우(e.g. "모델 바꿔줘") → Block Kit UI 표시
+  let selectedModelTier: ModelTier = 'standard';
+  if (
+    routing.execution === 'single' &&
+    !routing.isQACommand &&
+    detectModelSelectRequest(rawTextsForRouting)
+  ) {
+    const threadTs = slackEvent.thread_ts ?? slackEvent.ts;
+    const explicitTier = extractModelTierFromText(rawTextsForRouting);
+    if (explicitTier !== null) {
+      // 모델이 명시됨 → 바로 적용
+      selectedModelTier = explicitTier;
+      const tierLabel =
+        explicitTier === 'high' ? 'Opus' : explicitTier === 'fast' ? 'Haiku' : 'Sonnet';
+      console.log(`[model-select] 명시된 모델 자동 적용: ${tierLabel} (tier=${explicitTier})`);
+    } else {
+      // 모델 미명시 → Block Kit UI 표시
+      console.log(
+        `[model-select] 모델 미명시 — Block Kit 전송: channel=${channel} thread=${threadTs}`,
+      );
+      const chosen = await postModelSelectMessage(
+        apps[0],
+        channel,
+        threadTs,
+      );
+      if (chosen === null) {
+        console.log(`[model-select] 취소 또는 타임아웃 — 기본 Sonnet 사용`);
+      } else {
+        selectedModelTier = chosen;
+        const tierLabel =
+          chosen === 'high' ? 'Opus' : chosen === 'fast' ? 'Haiku' : 'Sonnet';
+        console.log(`[model-select] ${tierLabel} 선택됨`);
+      }
+    }
+  }
+
   // 실행
   const executeTask = async () => {
     // QA 명령어 — specPath 없으면 사용법 안내
@@ -2095,6 +2080,7 @@ const flushDebounceBuffer = async (
           routing.method,
           agentApp,
           apps,
+          selectedModelTier,
         );
         break;
       }
@@ -2267,6 +2253,85 @@ const main = async () => {
         }
       },
     );
+
+    // ─── 모델 선택 버튼 핸들러 ─────────────────────────────────
+    const MODEL_SELECT_ACTIONS: Array<{
+      actionId: string;
+      tier: ModelTier | null;
+      label: string;
+    }> = [
+      { actionId: 'model_select_opus', tier: 'high', label: '🧠 Opus' },
+      { actionId: 'model_select_sonnet', tier: 'standard', label: '⚡ Sonnet' },
+      { actionId: 'model_select_haiku', tier: 'fast', label: '🚀 Haiku' },
+      { actionId: 'model_select_cancel', tier: null, label: '취소' },
+    ];
+
+    for (const { actionId, tier, label } of MODEL_SELECT_ACTIONS) {
+      app.action(
+        actionId,
+        async ({ ack, body, action }) => {
+          try {
+            await ack();
+
+            // value = `${channel}:${threadTs}`
+            const key = (action as { value?: string }).value ?? '';
+            const b = body as {
+              channel?: { id?: string };
+              message?: { ts?: string };
+              container?: {
+                message_ts?: string;
+                channel_id?: string;
+              };
+            };
+            const msgChannel =
+              b.channel?.id ?? b.container?.channel_id ?? '';
+            const messageTs =
+              b.message?.ts ?? b.container?.message_ts ?? '';
+
+            const resolved = resolveModelSelect(key, tier);
+            if (!resolved) {
+              console.warn(
+                `[model-select] 대기 중인 요청 없음: ${key}`,
+              );
+            }
+
+            // 버튼 메시지를 선택 결과로 업데이트
+            if (msgChannel && messageTs) {
+              const resultText =
+                tier === null
+                  ? '✖ 취소됨 — 기본 Sonnet으로 실행합니다.'
+                  : `✅ *${label}* 모델이 선택되었습니다.`;
+              app.client.chat
+                .update({
+                  channel: msgChannel,
+                  ts: messageTs,
+                  text: resultText,
+                  blocks: [
+                    {
+                      type: 'section',
+                      text: {
+                        type: 'mrkdwn',
+                        text: resultText,
+                      },
+                    },
+                  ],
+                })
+                .catch((err: unknown) => {
+                  console.error(
+                    `[model-select] 메시지 업데이트 실패:`,
+                    err,
+                  );
+                });
+            }
+          } catch (err) {
+            console.error(
+              `[model-select] ${actionId} 핸들러 오류:`,
+              err,
+            );
+          }
+        },
+      );
+    }
 
     // ─── Lisa 리서치 모드 선택 버튼 핸들러 ────────────────────
     for (const mode of ['academic', 'practical'] as const) {
