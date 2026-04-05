@@ -41,13 +41,13 @@ const envStr = (key: string, fallback: string): string =>
   process.env[key] ?? fallback;
 
 /** HIGH tier: 회의, 계획, 복잡한 추론 (Opus) */
-export const MODEL_HIGH = envStr('BRIDGE_MODEL_HIGH', 'claude-opus-4-5');
+export const MODEL_HIGH = envStr('BRIDGE_MODEL_HIGH', 'claude-opus-4-6');
 
 /** STANDARD tier: 일반 에이전트 실행 (Sonnet, 기본값) */
 export const MODEL_STANDARD = envStr('BRIDGE_MODEL_STANDARD', 'claude-sonnet-4-6');
 
 /** FAST tier: 분류, 요약, 경량 작업 (Haiku) */
-export const MODEL_FAST = envStr('BRIDGE_MODEL_FAST', 'claude-haiku-4-5-20251001');
+export const MODEL_FAST = envStr('BRIDGE_MODEL_FAST', 'claude-haiku-4-5');
 
 // ─────────────────────────────────────────────
 // 팀 Ralph Loop 설정
