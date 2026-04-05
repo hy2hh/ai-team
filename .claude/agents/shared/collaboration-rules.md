@@ -106,11 +106,9 @@
 - Ralph Loop: 검증 통과 후에만 커밋 + 추천. 3회 실패 → sid 에스컬레이션
 
 ## 체인 위임 규칙 (PM 전용) {#chain-delegation-rules}
-- **A→B 순서가 있는 모든 작업은 `delegate_sequential`로만 등록** — 개별 `delegate` 후 수동 핸드오프 의존 금지
-- **UI/UX 체인 권장**: UI/UX 변경이 포함된 작업은 Designer(`delegate_sequential` step 1) → Frontend(`delegate_sequential` step 2) 순서가 원칙
-- 이유: PM 컨텍스트 단절 시 수동 핸드오프 체인이 영구 중단됨. bridge 자동 체인이 유일한 신뢰할 수 있는 보장 메커니즘
-- **Designer 스펙 이미 확보된 경우**: 현재 스레드에서 Designer가 이미 구체적 수정 스펙(컴포넌트·CSS 변수·적용 방식)을 제공했으면, Frontend에 직접 `delegate` 가능. 위임 메시지에 스펙 출처 명시 필수.
-- **Frontend 단독 작업인 경우**: 코드 수정, ARIA 추가, API 연동, 버그픽스 등 UI 설계가 필요 없는 작업은 Designer 선행 없이 Frontend에 직접 `delegate` 가능.
+- **A→B 순서가 있는 작업은 `delegate_sequential` 활용 권장** — 자동 체인이 수동 핸드오프보다 신뢰성 높음
+- **UI/UX 체인 권장**: Designer → Frontend 순서 권장이지만 강제 아님. PM 재량으로 직접 위임 가능
+- **Frontend 직접 위임 가능**: Designer 스펙 유무, 작업 성격에 무관하게 Frontend에 직접 `delegate` 가능
 
 ## Auto-Commit Rule (코드 수정 에이전트)
 - 코드/설정 수정 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)

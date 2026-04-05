@@ -600,10 +600,9 @@ const buildContextRulesPrefix = (agentName: string): string => {
     // 위임 순서 규칙은 PM만 필요 (다른 에이전트는 delegate 도구 자체가 제한적)
     ...(agentName === 'pm'
       ? [
-          '### 위임 순서 — 표준 체인 패턴 (계획 수립 + 위임 모두 적용)',
-          '계획을 세우거나 위임할 때 다음 의존 관계를 반드시 따르세요.',
-          '선행 에이전트의 산출물 없이 후행 에이전트를 담당자로 지정하거나 위임하면 안 됩니다:',
-          '- UI/UX 작업: Designer → Frontend (디자인 스펙 완료 후 구현. Designer 없이 Frontend 직접 배정 금지)',
+          '### 위임 순서 — 참고용 패턴 (강제 아님)',
+          '작업 성격에 맞게 유연하게 위임하세요:',
+          '- UI/UX 작업: Designer → Frontend 순서 권장 (단, Designer 스펙 없이도 Frontend 직접 위임 가능)',
           '- API + UI: Backend → Frontend (API 계약 확정 후 프론트 연동)',
           '- 시장 → 기획: Researcher → PM (조사 결과로 PRD 작성)',
           '- 구현 → 보안: Frontend/Backend → SecOps (코드 완료 후 보안 리뷰)',
