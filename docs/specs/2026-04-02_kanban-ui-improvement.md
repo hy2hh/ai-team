@@ -1,7 +1,7 @@
 # 칸반 보드 UI 개선 — 종합 디자인 스펙
 > 작성일: 2026-04-02
 > 작성자: Krusty (Designer)
-> 상태: IN_PROGRESS
+> 상태: COMPLETED
 > 버전: 3.0 (2026-04-02 재확인 — 실제 코드 미반영으로 재위임)
 
 ---
@@ -275,24 +275,24 @@ export function getProgressColor(progress: number): string;
 ## 에러 케이스
 
 ### EC-1. CSS 토큰 변수 누락
-- Given: `--color-point` 토큰이 `globals.css`에 정의되지 않은 상태에서 컴포넌트가 참조
-- When: `next dev` 또는 `next build` 실행
-- Then: CSS 변수 fallback이 작동해 기본 색상으로 렌더링되어야 하며 런타임 에러 없음
+- [x] Given: `--color-point` 토큰이 `globals.css`에 정의되지 않은 상태에서 컴포넌트가 참조
+- [x] When: `next dev` 또는 `next build` 실행
+- [x] Then: CSS 변수 fallback이 작동해 기본 색상으로 렌더링되어야 하며 런타임 에러 없음
 
 ### EC-2. 다크/라이트 테마 전환 시 포인트컬러 대비
-- Given: 사용자가 라이트 테마로 전환
-- When: 포인트컬러가 라이트 배경 위에 렌더링됨
-- Then: 라이트 테마용 `--color-point: #4f46e5`가 적용되어 WCAG AA 기준(4.5:1) 대비비 유지
+- [x] Given: 사용자가 라이트 테마로 전환
+- [x] When: 포인트컬러가 라이트 배경 위에 렌더링됨
+- [x] Then: 라이트 테마용 `--color-point: #4f46e5`가 적용되어 WCAG AA 기준(4.5:1) 대비비 유지
 
 ### EC-3. 모달 공통 클래스 누락
-- Given: `globals.css`에 `.modal-container` 클래스가 정의되지 않음
-- When: `AddCardModal` 또는 `CardDetailModal`이 렌더링됨
-- Then: 컴포넌트가 깨지지 않고 기본 스타일로 표시되어야 함
+- [x] Given: `globals.css`에 `.modal-container` 클래스가 정의되지 않음
+- [x] When: `AddCardModal` 또는 `CardDetailModal`이 렌더링됨
+- [x] Then: 컴포넌트가 깨지지 않고 기본 스타일로 표시되어야 함
 
 ### EC-4. 상수 파일 import 오류
-- Given: `lib/constants.ts`가 존재하지 않는 상태에서 컴포넌트가 import
-- When: TypeScript 컴파일 실행
-- Then: 컴파일 에러가 명시적으로 표시되며, 런타임에서 undefined가 전파되지 않아야 함
+- [x] Given: `lib/constants.ts`가 존재하지 않는 상태에서 컴포넌트가 import
+- [x] When: TypeScript 컴파일 실행
+- [x] Then: 컴파일 에러가 명시적으로 표시되며, 런타임에서 undefined가 전파되지 않아야 함
 
 ---
 

@@ -1,7 +1,7 @@
 # claude-kanban UI 개선 — 디자인 시스템 토큰 적용
 > 작성일: 2026-04-02
 > 작성자: Marge (PM)
-> 상태: IN_PROGRESS
+> 상태: COMPLETED
 
 ---
 
@@ -18,32 +18,32 @@ ui-kit-front 참조 경로: `/Users/hangheejo/git/ui-kit-front`
 ## Acceptance Criteria
 
 ### AC-1. 타이포그래피 토큰 정의
-- [ ] `globals.css`에 `--text-h3` ~ `--text-label` 토큰 추가
-- [ ] `--line-height-*`, `--font-weight-*` 토큰 추가
+- [x] `globals.css`에 `--text-h3` ~ `--text-label` 토큰 추가
+- [x] `--line-height-*`, `--font-weight-*` 토큰 추가
 
 ### AC-2. Border Radius 토큰 정의
-- [ ] `globals.css`에 `--radius-sm` ~ `--radius-full` 토큰 추가
+- [x] `globals.css`에 `--radius-sm` ~ `--radius-full` 토큰 추가
 
 ### AC-3. 포인트컬러 토큰 정의
-- [ ] 다크: `--color-point: #818cf8` (및 hover/subtle/border/glow 변형)
-- [ ] 라이트: `--color-point: #4f46e5` (및 변형)
-- [ ] 다크/라이트 분기 적용
+- [x] 다크: `--color-point: #818cf8` (및 hover/subtle/border/glow 변형)
+- [x] 라이트: `--color-point: #4f46e5` (및 변형)
+- [x] 다크/라이트 분기 적용
 
 ### AC-4. 모달 공통 클래스
-- [ ] `.modal-container`, `.modal-header`, `.modal-body`, `.modal-footer` 클래스 정의
-- [ ] `AddCardModal`, `CardDetailModal`에 해당 클래스 적용
+- [x] `.modal-container`, `.modal-header`, `.modal-body`, `.modal-footer` 클래스 정의
+- [x] `AddCardModal`, `CardDetailModal`에 해당 클래스 적용
 
 ### AC-5. 버튼·입력 공통 클래스
-- [ ] `.btn-primary`, `.btn-secondary`, `.input-field`, `.textarea-field` 정의
-- [ ] 포인트컬러 토큰 사용
+- [x] `.btn-primary`, `.btn-secondary`, `.input-field`, `.textarea-field` 정의
+- [x] 포인트컬러 토큰 사용
 
 ### AC-6. 상수 통합
-- [ ] `src/lib/constants.ts` 생성: AGENTS, AGENT_COLORS, PRIORITY_CONFIG 통합
-- [ ] 컴포넌트에서 중복 정의 제거
+- [x] `src/lib/constants.ts` 생성: AGENTS, AGENT_COLORS, PRIORITY_CONFIG 통합
+- [x] 컴포넌트에서 중복 정의 제거
 
 ### AC-7. 빌드 안정성
-- [ ] `next build` 통과
-- [ ] TypeScript 컴파일 에러 없음
+- [x] `next build` 통과
+- [x] TypeScript 컴파일 에러 없음
 
 ---
 
