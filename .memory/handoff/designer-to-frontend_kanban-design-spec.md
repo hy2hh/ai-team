@@ -357,4 +357,53 @@
 
 ---
 
-**Krusty (Designer)** | 2026-03-27
+---
+
+## 6. 포인트컬러 개편 (2026-04-03 업데이트)
+
+### 6.1 선택된 포인트컬러
+
+| 테마 | 값 | CSS 변수 |
+|------|-----|----------|
+| 다크 | `#7C7AE8` (Bifrost brand-point + 밝기 +15%) | `--color-point` |
+| 라이트 | `#5F5BE2` (Bifrost brand-point 원색) | `--color-point` |
+
+파생 토큰:
+- `--color-point-hover`: 다크 `#9B99EF` / 라이트 `#4D49C5`
+- `--color-point-subtle`: `rgba(95, 91, 226, 0.12)` / `0.10`
+- `--color-point-border`: `rgba(95, 91, 226, 0.30)` / `0.25`
+- `--color-point-glow`: `rgba(95, 91, 226, 0.20)` / `0.15`
+
+### 6.2 적용 범위
+
+| 컴포넌트 | 적용 위치 | 방법 |
+|----------|-----------|------|
+| `.btn-primary` | 배경색, hover | `var(--color-point)` |
+| `.input-field:focus` | border + glow | `var(--color-point)`, `var(--color-point-subtle)` |
+| `.textarea-field:focus` | border + glow | `var(--color-point)`, `var(--color-point-subtle)` |
+| UI kit `<Button variant="primary">` | `.bg-brand-point` 오버라이드 | globals.css에서 `!important` 오버라이드 |
+| 로딩 스피너 | `border-top-color` | `var(--color-point)` |
+| 태그 pill | 배경/border/텍스트 | `--color-tag-{bg,border,text}` (point 기반) |
+| 카드 hover | glow ring | `var(--color-point-glow)` |
+| CardDetailModal 편집 input | focus border | `var(--color-point)` |
+| 포커스 링 (전역) | `button/a:focus-visible` | `var(--color-focus-ring)` |
+| 헤더 로고 | gradient | `var(--color-point)` |
+| Nav 탭 active | color + border-bottom | `var(--color-point)` |
+
+### 6.3 컬럼 accent — 변경 없음
+
+`COLUMN_ACCENTS = ['#7C7AE8', '#fbbf24', '#c084fc', '#4ade80', '#fb923c', '#f472b6']`
+
+• col-1(1번 컬럼): brand-point — point color와 일치 ✅
+• col-2~6: 컬럼 시맨틱 색상 유지 (amber/purple/green/orange/pink)
+
+### 6.4 Bart(Frontend) 후속 작업
+
+- [ ] `COLUMN_ACCENTS[0]`를 다크/라이트 테마에 따라 동적으로 읽도록 변경 (현재 다크 `#7C7AE8` 하드코딩, 라이트 `#5F5BE2` 불일치)
+  - 제안: `useTheme()`로 theme 값 읽고 `theme === 'dark' ? '#7C7AE8' : '#5F5BE2'`로 처리
+  - 또는 CSS custom property를 JS에서 읽는 유틸 함수 사용
+- [ ] `next build` + `next dev` 런타임 에러 없음 검증
+
+---
+
+**Krusty (Designer)** | 2026-03-27 (업데이트: 2026-04-03)
