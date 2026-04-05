@@ -1,0 +1,41 @@
+{
+  "name": "legal-rag",
+  "version": "0.1.0",
+  "description": "Legal RAG Pipeline - AI Hub, lbox-open, 법망 API 통합",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "server": "tsx src/server.ts",
+    "server:dev": "tsx watch src/server.ts",
+    "ingest": "tsx src/pipeline/ingest.ts",
+    "ingest:aihub": "tsx src/pipeline/ingest.ts --source=aihub",
+    "ingest:lbox": "tsx src/pipeline/ingest.ts --source=lbox-open",
+    "ingest:lawnet": "tsx src/pipeline/ingest.ts --source=lawnet",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@xenova/transformers": "^2.17.0",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "glob": "^10.3.10",
+    "p-limit": "^5.0.0",
+    "pdfkit": "^0.18.0",
+    "uuid": "^13.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
+    "@types/node": "^20.12.0",
+    "@types/pdfkit": "^0.17.5",
+    "@types/uuid": "^10.0.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
