@@ -80,6 +80,8 @@ export interface AgentSession {
   agentName: string;
   /** 시스템 프롬프트 (persona 파일 내용) */
   systemPrompt: string;
+  /** persona 파일 로드 시각 (ms) — 파일 변경 감지용 */
+  personaLoadedAt: number;
   /** 스레드별 SDK 세션 ID (thread_ts → sessionId) */
   threadSessions: Map<string, string>;
 }

@@ -2,13 +2,14 @@
  * Markdown → Slack Block Kit 변환 유틸리티
  *
  * 처리 대상:
- * - 마크다운 테이블 → Slack Table Block (복수 테이블 지원)
+ * - 마크다운 테이블 → Slack Table Block (메시지당 1개만 - Slack API 제한)
  * - ## / ### 헤딩 → *bold* 텍스트
  * - - [ ] / - [x] 체크박스 → ☐ / ☑ 이모지
  * - Slack mrkdwn 미지원 문법 정리
  *
  * 제약사항 (Slack API):
  * - 메시지당 최대 50 블록
+ * - 메시지당 테이블 1개만 허용 (초과 시 invalid_attachments 에러)
  * - section 블록 텍스트 최대 3000자
  * - table 블록 최대 100행 × 20열
  */
@@ -164,7 +165,8 @@ export function extractTableBlock(text: string): SlackTableBlock | null {
 /**
  * 전체 메시지 텍스트를 Slack Block Kit 배열로 변환.
  *
- * 복수 마크다운 테이블을 모두 Table Block으로 변환하고,
+ * 마크다운 테이블 중 첫 번째만 Table Block으로 변환 (Slack API 제한: 메시지당 1개).
+ * 두 번째 이상 테이블은 mrkdwn 텍스트로 처리.
  * 테이블 사이/앞/뒤 텍스트는 mrkdwn 변환 후 section 블록으로 처리.
  * 테이블이 없으면 마크다운→mrkdwn 변환만 수행한 section 블록을 반환.
  */
@@ -194,12 +196,13 @@ export function buildMessageBlocks(text: string): SlackBlock[] | null {
       }
 
       const tableBlock = parseTableLines(tableLines);
-      if (tableBlock) {
+      if (tableBlock && !hasTable) {
+        // Slack API 제한: 메시지당 테이블 1개만 허용
         flushTextBuffer();
         blocks.push(tableBlock);
         hasTable = true;
       } else {
-        // 유효한 테이블이 아니면 텍스트로 처리
+        // 유효한 테이블이 아니거나 두 번째 이상 테이블이면 텍스트로 처리
         textBuffer.push(...tableLines);
       }
     } else {

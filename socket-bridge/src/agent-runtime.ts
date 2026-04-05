@@ -597,18 +597,6 @@ const buildContextRulesPrefix = (agentName: string): string => {
     agentIdList,
     '- 자신이 직접 처리할 수 있는 작업은 위임하지 마세요.',
     '',
-    // 위임 순서 규칙은 PM만 필요 (다른 에이전트는 delegate 도구 자체가 제한적)
-    ...(agentName === 'pm'
-      ? [
-          '### 위임 순서 — 참고용 패턴 (강제 아님)',
-          '작업 성격에 맞게 유연하게 위임하세요:',
-          '- UI/UX 작업: Designer → Frontend 순서 권장 (단, Designer 스펙 없이도 Frontend 직접 위임 가능)',
-          '- API + UI: Backend → Frontend (API 계약 확정 후 프론트 연동)',
-          '- 시장 → 기획: Researcher → PM (조사 결과로 PRD 작성)',
-          '- 구현 → 보안: Frontend/Backend → SecOps (코드 완료 후 보안 리뷰)',
-          '- 풀 사이클: PM → Designer → Frontend + Backend → SecOps',
-        ]
-      : []),
     // Researcher 보고서 품질 강제 규칙
     ...(agentName === 'researcher'
       ? [
@@ -1241,18 +1229,41 @@ const getMcpServersForAgent = (
 const sessions = new Map<string, AgentSession>();
 
 /**
- * 에이전트 세션을 가져오거나 새로 생성
+ * 에이전트 세션을 가져오거나 새로 생성.
+ * persona 파일이 변경된 경우 시스템 프롬프트를 재로드한다.
  * @param agentName - 에이전트 이름
  * @returns 에이전트 세션
  */
 const getOrCreateSession = (agentName: string): AgentSession => {
   const existing = sessions.get(agentName);
+
+  // persona 파일 수정 시각 확인
+  const relativePath = AGENT_PERSONA_FILES[agentName];
+  let personaFileMtimeMs = 0;
+  if (relativePath) {
+    try {
+      personaFileMtimeMs = statSync(join(PROJECT_DIR, relativePath)).mtimeMs;
+    } catch {
+      // 파일 없으면 무시
+    }
+  }
+
   if (existing) {
+    // 파일이 세션 생성 이후 수정된 경우 시스템 프롬프트 재로드
+    if (personaFileMtimeMs > existing.personaLoadedAt) {
+      console.log(
+        `[runtime] persona 파일 변경 감지 — 시스템 프롬프트 재로드: ${agentName}`,
+      );
+      existing.systemPrompt = loadPersona(agentName);
+      existing.personaLoadedAt = Date.now();
+    }
     return existing;
   }
+
   const session: AgentSession = {
     agentName,
     systemPrompt: loadPersona(agentName),
+    personaLoadedAt: Date.now(),
     threadSessions: new Map(),
   };
   sessions.set(agentName, session);
@@ -1561,7 +1572,7 @@ export const handleMessage = async (
         tools: [
           tool(
             'delegate',
-            '다른 에이전트에게 작업을 즉시 위임합니다. 의존성이 있는 작업은 먼저 실행할 에이전트만 지정하세요. 예: 디자이너 → 프론트엔드 순서가 필요하면 디자이너만 먼저 delegate하고, 리뷰 후 프론트엔드를 delegate하세요. 독립적인 작업만 한 번에 여러 에이전트를 지정하세요.',
+            '다른 에이전트에게 작업을 즉시 위임합니다. 독립적인 작업은 한 번에 여러 에이전트를 지정하세요. 순서가 반드시 필요한 경우만 delegate_sequential을 사용하세요.',
             {
               agents: z.array(z.string()),
               reason: z.string(),
