@@ -2344,41 +2344,20 @@ const main = async () => {
               `[research-mode] 버튼 클릭: ${mode}, threadTs=${threadTs}`,
             );
 
-            // resolve를 먼저 실행 (에이전트 즉시 재개)
+            // resolve 실행 — messageTs/channel 포함하여 agent-runtime이 인플레이스 업데이트
             const resolved = resolveResearchMode(
               threadTs,
               mode,
+              messageTs,
+              channel,
             );
             if (!resolved) {
               console.warn(
                 `[research-mode] 대기 중인 요청 없음: ${threadTs}`,
               );
             }
-
-            // 버튼 메시지를 선택 결과로 업데이트 (비동기, 실패해도 무방)
-            if (channel && messageTs) {
-              app.client.chat
-                .update({
-                  channel,
-                  ts: messageTs,
-                  text: `${label} 선택됨`,
-                  blocks: [
-                    {
-                      type: 'section',
-                      text: {
-                        type: 'mrkdwn',
-                        text: `✅ *${label}* 모드가 선택되었습니다.`,
-                      },
-                    },
-                  ],
-                })
-                .catch((err: unknown) => {
-                  console.error(
-                    `[research-mode] 메시지 업데이트 실패:`,
-                    err,
-                  );
-                });
-            }
+            // 버튼 메시지 업데이트는 agent-runtime의 updateToRunningMessage가 담당
+            // (별도 chat.update 불필요 — 단일 메시지에서 작업 중 → 완료까지 처리)
           } catch (err) {
             console.error(
               `[research-mode] ${mode} 핸들러 오류:`,
