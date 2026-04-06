@@ -36,6 +36,7 @@ import {
   updateToRunningMessage,
   updateStatusMessage,
   storeRunContext,
+  deleteRunContext,
   findContextByEventTs,
 } from './agent-control-buttons.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
@@ -1558,36 +1559,38 @@ export const handleMessage = async (
     }
   }
 
-  // 🎛️ 컨트롤 버튼 메시지 게시 (취소/재실행)
+  // 🎛️ 컨트롤 버튼 메시지 게시 (취소/재실행) — 비활성화: 이모지 리액션 방식으로 대체
   // Lisa 리서치 모드: 선택 버튼 메시지를 새 메시지 없이 인플레이스 업데이트
+  // skipPosting=true (cross-verify 등 내부 실행): 텍스트 상태 메시지 생략 — 이모지 리액션으로만 완료 표시
   const controlId = generateControlId();
   const threadTs = event.thread_ts ?? event.ts;
   let statusMessageTs: string | undefined;
-  if (researchModeContext) {
-    const modeLabel =
-      researchModeContext.mode === 'academic'
-        ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
-        : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
-    await updateToRunningMessage(
-      slackApp,
-      researchModeContext.channel,
-      researchModeContext.messageTs,
-      agentName,
-      controlId,
-      modeLabel,
-      stepInfo,
-    );
-    statusMessageTs = researchModeContext.messageTs;
-  } else {
-    statusMessageTs = await postRunningMessage(
-      slackApp,
-      event.channel,
-      threadTs,
-      agentName,
-      controlId,
-      stepInfo,
-    );
-  }
+  // if (researchModeContext) {
+  //   const modeLabel =
+  //     researchModeContext.mode === 'academic'
+  //       ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
+  //       : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
+  //   await updateToRunningMessage(
+  //     slackApp,
+  //     researchModeContext.channel,
+  //     researchModeContext.messageTs,
+  //     agentName,
+  //     controlId,
+  //     modeLabel,
+  //     stepInfo,
+  //   );
+  //   statusMessageTs = researchModeContext.messageTs;
+  // } else if (!skipPosting) {
+  //   // skipPosting=true(cross-verify 등)는 텍스트 상태 메시지 불필요 — 이모지 리액션으로만 처리
+  //   statusMessageTs = await postRunningMessage(
+  //     slackApp,
+  //     event.channel,
+  //     threadTs,
+  //     agentName,
+  //     controlId,
+  //     stepInfo,
+  //   );
+  // }
   if (statusMessageTs) {
     storeRunContext({
       controlId,
@@ -1895,6 +1898,16 @@ export const handleMessage = async (
               reason: z.string().optional().describe('실행 이유 (선택)'),
             },
             async ({ specPath, reason }: { specPath: string; reason?: string }) => {
+              // hub-review 모드에서는 QA 트리거 차단 — 에이전트 작업이 완전히 완료된 후에만 허용
+              if (routingMethod === 'hub-review') {
+                console.warn('[run_qa] hub-review 모드에서 호출 차단 — 에이전트 작업 완료 후 호출하세요');
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: '⛔ hub-review 중에는 run_qa를 호출할 수 없습니다. 모든 에이전트 작업이 완료된 후 재호출하세요.',
+                  }],
+                };
+              }
               console.log(`[run_qa] QA 실행 요청: specPath=${specPath}${reason ? `, reason=${reason}` : ''}`);
               try {
                 // dynamic import로 circular dependency 방지 (qa-loop → agent-runtime 순환 참조)
@@ -1932,6 +1945,16 @@ export const handleMessage = async (
               hasCodeChanges: z.boolean().optional().describe('코드/설정 파일 변경 여부. true이면 QA(Chalmers)가 다음 단계 첫 번째로 자동 삽입됩니다.'),
             },
             async ({ agents, reason, actionSummary, riskLevel, dodPendingItems, hasCodeChanges }) => {
+              // hub-review 모드에서는 recommend_next_phase 차단 — 에이전트가 아직 작업 중일 수 있음
+              if (routingMethod === 'hub-review') {
+                console.warn('[delegation] recommend_next_phase hub-review 모드 차단 — 허브 루프 완료 후에만 호출 가능');
+                return {
+                  content: [{
+                    type: 'text' as const,
+                    text: '⛔ hub-review 중에는 recommend_next_phase를 호출할 수 없습니다. 모든 에이전트 작업이 완료되어 허브 루프가 종료된 후 재호출하세요.',
+                  }],
+                };
+              }
               // 방안 A: 완료 조건 게이트 — 미충족 항목이 있으면 자동 진행 차단
               if (dodPendingItems && dodPendingItems.length > 0) {
                 const itemList = dodPendingItems.map((i) => `• ${i}`).join('\n');
@@ -2425,8 +2448,10 @@ export const handleMessage = async (
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     // statusMessageTs가 있으면 "작업중" 메시지를 결과로 업데이트, 없으면 새 메시지 포스팅
+    // PM이 delegation을 포함한 경우: 상태 메시지를 "완료"로 바꾸지 않고 "작업중" 유지 (hub 루프가 최종 업데이트)
+    const hasDelegation = delegationQueue.length > 0 || sequentialSteps.length > 0;
     let postedTs: string | undefined;
-    if (resultText && !skipPosting) {
+    if (resultText && !skipPosting && !hasDelegation) {
       const fullText = resultText + metaFooter;
       const messageBlocks = buildMessageBlocks(fullText);
 
@@ -2496,8 +2521,9 @@ export const handleMessage = async (
       );
     }
 
-    // statusMessageTs 없는 경우에만 별도 상태 업데이트 (결과 있으면 위에서 이미 처리)
-    if (statusMessageTs && (!resultText || skipPosting)) {
+    // resultText가 없으면 bare "완료" 메시지는 노이즈 → 상태 메시지 삭제
+    // skipPosting + resultText: 상태 메시지를 "완료"로 업데이트 (결과는 Slack에 노출 안 함)
+    if (statusMessageTs && skipPosting && resultText) {
       await updateStatusMessage(
         slackApp,
         event.channel,
@@ -2506,6 +2532,30 @@ export const handleMessage = async (
         agentName,
       );
       // 완료 시 runContext 유지 — 30분 TTL 내 이모지(🔄)로 재실행 가능
+    } else if (statusMessageTs && !resultText) {
+      // 빈 결과: bare "✅ 완료" 메시지는 노이즈 — 삭제
+      try {
+        await slackApp.client.chat.delete({
+          channel: event.channel,
+          ts: statusMessageTs,
+        });
+        console.log(
+          `[runtime] ${agentName} 빈 결과 — 상태 메시지 삭제 (노이즈 방지)`,
+        );
+      } catch (delErr) {
+        // 삭제 실패 시 fallback: "완료"로 업데이트
+        console.warn(
+          `[runtime] ${agentName} 상태 메시지 삭제 실패 — fallback 업데이트:`,
+          delErr,
+        );
+        await updateStatusMessage(
+          slackApp,
+          event.channel,
+          statusMessageTs,
+          'completed',
+          agentName,
+        );
+      }
     }
 
     if (skipPosting && resultText) {
@@ -2526,6 +2576,8 @@ export const handleMessage = async (
       escalationReason,
     });
     recordAgentStat(agentName, true);
+    // 완료된 컨텍스트는 즉시 DB에서 삭제 — bridge 재시작 시 "중단됨"으로 잘못 표시되는 것을 방지
+    deleteRunContext(controlId);
     emitAgentCompleted(
       agentName,
       event.channel,
