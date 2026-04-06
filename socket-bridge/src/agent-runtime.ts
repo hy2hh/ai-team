@@ -198,7 +198,7 @@ const SESSION_STORE_PATH = join(
 );
 
 // SESSION_TTL_MS: config.ts에서 import (환경변수 BRIDGE_SESSION_TTL_MS로 조정 가능)
-import { SESSION_TTL_MS, MODEL_HIGH, MODEL_STANDARD, MODEL_FAST } from './config.js';
+import { SESSION_TTL_MS, MODEL_HIGH, MODEL_STANDARD, MODEL_FAST, MAX_TURNS } from './config.js';
 
 /** 영구화 저장소 타입 */
 interface SessionStore {
@@ -2122,7 +2122,7 @@ export const handleMessage = async (
       allowedTools: baseTools,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
-      maxTurns: 100,
+      maxTurns: MAX_TURNS,
       persistSession: true,
       mcpServers: baseMcpServers,
       abortController,

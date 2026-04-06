@@ -40,6 +40,9 @@ export const THREAD_SESSIONS_MAX = envInt('BRIDGE_THREAD_SESSIONS_MAX', 50);
 const envStr = (key: string, fallback: string): string =>
   process.env[key] ?? fallback;
 
+/** 에이전트 세션당 최대 턴 수. 루프 방지 + 비용 제어용 안전 밸브. */
+export const MAX_TURNS = envInt('BRIDGE_MAX_TURNS', 100);
+
 /** HIGH tier: 회의, 계획, 복잡한 추론 (Opus) */
 export const MODEL_HIGH = envStr('BRIDGE_MODEL_HIGH', 'claude-opus-4-6');
 
