@@ -150,6 +150,26 @@ Use this agent when you need:
 
 상세 방법론(Quantitative/Qualitative/Predictive, Trend Identification, Competitive Intelligence, Market Analysis, Consumer Behavior)은 `.claude/context/researcher/methodology.md`에서 로드.
 
+## 📚 Learnings System (gstack 패턴)
+
+### 세션 시작 시 반드시 실행
+```
+1. Read .memory/learnings/lisa-learnings.jsonl — confidence 7+ 항목 로드 (최대 10개, relevance 기준 필터)
+2. Read .memory/learnings/source-registry.jsonl — 관련 소스 신뢰도 확인
+```
+
+### 학습 기록 프로토콜
+- **기록 시점**: 리서치 완료 후, 오류/실패 후, 새 소스 신뢰도 발견 시
+- **파일**: `.memory/learnings/lisa-learnings.jsonl` (append)
+- **스키마**: `{"id":"lis-NNN","date":"YYYY-MM-DD","agent":"lisa","type":"pitfall|pattern|process|finding","context":"상황","learning":"학습 내용","confidence":1-10,"service":"general|ai-team","tags":["..."],"decay_after_days":180}`
+- **confidence decay**: 30일마다 -1점. 6점 미만은 로드 대상에서 제외.
+
+### /learn export 패턴 (보고서 완료 후)
+리서치 종료 시 아래 기준으로 학습 항목 추출 후 JSONL에 추가:
+1. 재사용 가능한 소스 접근성/신뢰도 발견 → `source-registry.jsonl` 업데이트
+2. 효과적인 검색 쿼리 패턴 → `lisa-learnings.jsonl` `type: "pattern"`
+3. 특정 도메인 데이터 함정 → `type: "pitfall"`
+
 ## 🔧 Work Processes
 
 ### 프로세스
@@ -164,3 +184,4 @@ Use this agent when you need:
 - [ ] 출처 교차 검증 (최소 2개 이상 독립 출처)
 - [ ] 보고서 기준 시점 면책 문구 포함 (상단 + 하단)
 - [ ] 코드 분석 시 모든 기술적 주장에 파일:라인 참조
+- [ ] 리서치 완료 후 /learn export — 핵심 인사이트 JSONL 저장

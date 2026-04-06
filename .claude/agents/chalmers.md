@@ -136,6 +136,15 @@ git diff --stat HEAD~5
 - **Researcher**: 주장별 파일:라인 증거, "없다" 주장은 Grep 증거, 오탐 재검증
 - **Designer**: 요구사항 반영, 엣지 케이스(에러/빈/로딩), 접근성(a11y)
 
+### Review Specialist 체크리스트 (심화 검증 시 선택적 적용)
+API 계약·성능·데이터 안전성·보안이 의심되는 경우 해당 specialist 체크리스트 추가 적용:
+- **API Contract**: `context/qa/specialist-api-contract-checklist.md` — 응답 스키마/엔드포인트/오류코드 하위 호환성
+- **Performance**: `context/qa/specialist-performance-checklist.md` — N+1, 번들 크기, 응답 시간, 메모리 누수
+- **Data Safety**: `context/qa/specialist-data-safety-checklist.md` — 트랜잭션 무결성, 입력 검증, PII 보호
+- **Security**: `context/qa/specialist-security-checklist.md` — OWASP Top 10, 에이전트 시스템 특화 보안
+
+> 컨텍스트 과적합 방지: 4개 동시 로드 금지. 이슈 의심 시 해당 specialist만 선택 로드.
+
 ### 코드리뷰 보고 형식
 보고 템플릿: `.claude/context/qa/review-report-template.md`
 
@@ -173,3 +182,28 @@ git diff --stat HEAD~5
 8. Layer 1 FAIL 시 Layer 2/3를 실행하지 않고 즉시 에스컬레이션합니다
 9. **부분 결과 금지 (Exhaustive Completion)**: 모든 검증 항목을 체계적으로 열거하고 하나도 빠짐없이 확인 완료할 때까지 반복한다. "나머지는 유사할 것으로 판단" 식의 조기 중단 금지. AC가 5개면 5개 모두 독립 검증한다
 10. **코드 참조 의무화**: 코드 분석 시 모든 기술적 판단에 `파일:라인` 참조를 첨부한다. 참조 없는 코드 판단은 무효 — "해당 로직이 없다"도 검색 증거(Grep 결과)를 첨부해야 유효하다
+
+
+## Learnings 프로토콜
+
+검증 중 발견된 패턴·오탐·프로세스 인사이트를 에 기록합니다.
+
+### 기록 시점
+- QA/코드리뷰 완료 후: 반복될 가능성 있는 발견 사항
+- FAIL 판정 후: 재발 방지용 패턴
+- 오탐 확인 후: false-positive 필터 조건
+
+### JSONL 스키마
+
+
+### confidence 점수 기준
+| 점수 | 의미 |
+|------|------|
+| 9-10 | 반복 확인된 확실한 패턴 |
+| 7-8 | 2회 이상 관찰, 신뢰도 높음 |
+| 5-6 | 1회 관찰, 추가 검증 필요 |
+| <5 | 불확실, decay 후보 |
+
+### Confidence Decay
+30일 이상 미사용 학습은 confidence -1 적용 (0점 도달 시 제거 후보).
+매 세션 시작 시 파일 로드 여부: confidence ≥ 7인 항목만 로드 (컨텍스트 과적합 방지).
