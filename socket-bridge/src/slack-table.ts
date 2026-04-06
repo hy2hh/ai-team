@@ -110,6 +110,11 @@ function parseTableLines(tableLines: string[]): SlackTableBlock | null {
     return cells.map((cell) => {
       const sanitized = cell
         .trim()
+        // raw_text는 plain text 전용 — mrkdwn 인라인 포맷 제거 (invalid_blocks 방지)
+        // NOTE: _italic_ / ~strike~ 는 Slack 이모지 코드(:white_check_mark: 등) 오탐 위험으로 스킵
+        .replace(/`([^`\n]+)`/g, '$1')        // `code` → code (backtick span)
+        .replace(/\*\*([^*\n]+)\*\*/g, '$1')  // **bold** → bold
+        .replace(/\*([^*\n]+)\*/g, '$1')      // *bold* → bold
         .replace(/[\x00-\x1F\x7F]/g, '')
         .slice(0, 500);
       return { type: 'raw_text' as const, text: sanitized };
