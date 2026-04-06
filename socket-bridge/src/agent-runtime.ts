@@ -44,6 +44,7 @@ import {
   emitAgentCompleted,
   emitAgentFailed,
 } from './hook-events.js';
+import { getClaudeSdkQueryAuthOptions } from './anthropic-auth.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
@@ -907,6 +908,45 @@ const filterToolsByRouting = (
 };
 
 /**
+ * 읽기 전용 요청 감지
+ * "검토만 하세요", "확인만 해주세요", "수정 작업은 진행하지 말고" 등의 패턴을 감지
+ */
+const isReadonlyRequest = (text: string): boolean => {
+  return /검토만\s*(해주세요|하세요|진행해?주세요?|부탁)|확인만\s*(해주세요|하세요)|읽기만\s*(해주세요|하세요)|분석만\s*(해주세요|하세요)|수정\s*(작업은|은)\s*(하지\s*말고|진행하지\s*말고|제외)|수정\s*(없이|하지\s*말고|금지)/.test(
+    text,
+  );
+};
+
+/** readonly 모드에서 제거할 쓰기 도구 목록 */
+const WRITE_ONLY_TOOL_PATTERNS = new Set([
+  'Write',
+  'Edit',
+  'NotebookEdit',
+  'Bash(git:*)',
+  'Bash(npm:*)',
+  'Bash(pnpm:*)',
+  'Bash(npx:*)',
+  'Bash(node:*)',
+  'Bash(rm:*.json)',
+  'Bash(mkdir:*)',
+]);
+
+/**
+ * readonly 모드용 도구 필터링 — 쓰기 도구 제거
+ * Write, Edit, 쓰기 Bash 명령, Atlassian 쓰기 도구를 모두 제거
+ */
+const filterReadonlyTools = (tools: string[]): string[] => {
+  const atlassianWriteTools = new Set([
+    ...ATLASSIAN_COMMON_WRITE_TOOLS,
+    ...ATLASSIAN_PM_WRITE_TOOLS,
+    ...CONFLUENCE_COMMENT_TOOLS,
+  ]);
+  return tools.filter(
+    (t) => !WRITE_ONLY_TOOL_PATTERNS.has(t) && !atlassianWriteTools.has(t),
+  );
+};
+
+/**
  * 에이전트별 허용 도구 목록 반환
  * @param agentName - 에이전트 이름
  * @returns 허용 도구 문자열 배열
@@ -1303,6 +1343,8 @@ export interface DelegationTarget {
 export interface HandleMessageResult {
   text: string;
   postedTs?: string;
+  /** "작업중" 상태 메시지의 ts — 호출자가 결과를 직접 업데이트할 때 사용 */
+  statusMessageTs?: string;
   /** PM delegate 도구로 지정된 위임 대상 에이전트 목록 (병렬) */
   delegationTargets: DelegationTarget[];
   /** PM delegate_sequential 도구로 지정된 순차 위임 단계 */
@@ -1564,7 +1606,16 @@ export const handleMessage = async (
       botToken,
     );
     const fullTools = getToolsForAgent(agentName);
-    const baseTools = filterToolsByRouting(fullTools, routingMethod);
+    let baseTools = filterToolsByRouting(fullTools, routingMethod);
+
+    // readonly 요청 감지: "검토만 하세요", "확인만 해주세요", "수정 작업은 진행하지 말고" 등
+    const readonlyMode = isReadonlyRequest(event.text ?? '');
+    if (readonlyMode) {
+      baseTools = filterReadonlyTools(baseTools);
+      console.log(
+        `[readonly] ${agentName}: write 도구 비활성화 (readonly 모드 감지)`,
+      );
+    }
 
     if (agentName === 'pm') {
       const delegationServer = createSdkMcpServer({
@@ -2116,6 +2167,7 @@ export const handleMessage = async (
     console.log(`[runtime] ${agentName} 모델 선택: ${selectedModel} (tier=${modelTier})`);
 
     const queryOptions: Parameters<typeof query>[0]['options'] = {
+      ...getClaudeSdkQueryAuthOptions(agentName),
       cwd: PROJECT_DIR,
       systemPrompt: session.systemPrompt,
       model: selectedModel,
@@ -2336,47 +2388,73 @@ export const handleMessage = async (
     }
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
+    // statusMessageTs가 있으면 "작업중" 메시지를 결과로 업데이트, 없으면 새 메시지 포스팅
     let postedTs: string | undefined;
     if (resultText && !skipPosting) {
-      try {
-        const fullText = resultText + metaFooter;
-        const messageBlocks = buildMessageBlocks(fullText);
+      const fullText = resultText + metaFooter;
+      const messageBlocks = buildMessageBlocks(fullText);
 
-        // 디버그: 테이블 블록 여부 로깅
-        const hasTableBlock = messageBlocks?.some((b) => b.type === 'table');
-        if (hasTableBlock) {
-          console.log(
-            `[runtime] ${agentName} 테이블 블록 포함 — blocks 전달`,
-          );
-        }
-
-        const postResult =
-          await rateLimited(() =>
-            slackApp.client.chat.postMessage({
-              channel: event.channel,
-              text: fullText,
-              thread_ts: event.thread_ts ?? event.ts,
-              ...(messageBlocks ? { blocks: messageBlocks } : {}),
-            }),
-          );
-        postedTs = postResult.ts;
-
-        // 디버그: Slack API 응답에서 warning 확인
-        if ((postResult as { warning?: string }).warning) {
-          console.warn(
-            `[runtime] ${agentName} Slack API warning:`,
-            (postResult as { warning?: string }).warning,
-          );
-        }
-
+      // 디버그: 테이블 블록 여부 로깅
+      const hasTableBlock = messageBlocks?.some((b) => b.type === 'table');
+      if (hasTableBlock) {
         console.log(
-          `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
+          `[runtime] ${agentName} 테이블 블록 포함 — blocks 전달`,
         );
-      } catch (postErr) {
-        console.error(
-          `[runtime] ${agentName} Slack 포스팅 실패:`,
-          postErr,
+      }
+
+      if (statusMessageTs) {
+        // "작업중" 메시지를 완료 + 결과 내용으로 업데이트 (별도 postMessage 없음)
+        await updateStatusMessage(
+          slackApp,
+          event.channel,
+          statusMessageTs,
+          'completed',
+          agentName,
+          {
+            resultText: fullText,
+            resultBlocks: messageBlocks
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              ? (messageBlocks as unknown as Array<Record<string, unknown>>)
+              : undefined,
+          },
         );
+        const ctx = findContextByEventTs(event.ts);
+        if (ctx) {
+          deleteRunContext(ctx.controlId);
+        }
+        console.log(
+          `[runtime] ${agentName} 상태 메시지 업데이트 완료 (결과 포함)`,
+        );
+      } else {
+        // statusMessageTs 없는 경우 기존 방식으로 새 메시지 포스팅
+        try {
+          const postResult =
+            await rateLimited(() =>
+              slackApp.client.chat.postMessage({
+                channel: event.channel,
+                text: fullText,
+                thread_ts: event.thread_ts ?? event.ts,
+                ...(messageBlocks ? { blocks: messageBlocks } : {}),
+              }),
+            );
+          postedTs = postResult.ts;
+
+          if ((postResult as { warning?: string }).warning) {
+            console.warn(
+              `[runtime] ${agentName} Slack API warning:`,
+              (postResult as { warning?: string }).warning,
+            );
+          }
+
+          console.log(
+            `[runtime] ${agentName} Slack 포스팅 완료 (bridge)`,
+          );
+        } catch (postErr) {
+          console.error(
+            `[runtime] ${agentName} Slack 포스팅 실패:`,
+            postErr,
+          );
+        }
       }
     } else if (!resultText) {
       console.warn(
@@ -2384,8 +2462,8 @@ export const handleMessage = async (
       );
     }
 
-    // 상태 메시지 → "완료" (버튼 제거)
-    if (statusMessageTs) {
+    // statusMessageTs 없는 경우에만 별도 상태 업데이트 (결과 있으면 위에서 이미 처리)
+    if (statusMessageTs && (!resultText || skipPosting)) {
       await updateStatusMessage(
         slackApp,
         event.channel,
@@ -2438,6 +2516,7 @@ export const handleMessage = async (
     return {
       text: resultText,
       postedTs,
+      statusMessageTs: statusMessageTs ?? undefined,
       delegationTargets: [...delegationQueue],
       delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,
       escalationReason,
