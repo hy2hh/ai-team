@@ -2971,10 +2971,17 @@ const main = async () => {
     apps.push(app);
   }
 
-  // 앱 순차 시작 (연결 간 2초 딜레이로 Slack pong 타임아웃 방지)
-  const CONNECTION_DELAY_MS = 2000;
+  // 앱 순차 시작 (연결 간 5초 딜레이로 Slack pong 타임아웃 방지)
+  const CONNECTION_DELAY_MS = 5000;
+  const CLIENT_PING_TIMEOUT_MS = 15000;
   console.log('[start] Socket Mode 연결 중...');
   for (let i = 0; i < apps.length; i++) {
+    // Bolt가 clientPingTimeout을 노출하지 않으므로 내부 SocketModeClient에 직접 패치
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const receiver = (apps[i] as any).receiver;
+    if (receiver?.client?.clientPingTimeoutMS != null) {
+      receiver.client.clientPingTimeoutMS = CLIENT_PING_TIMEOUT_MS;
+    }
     await apps[i].start();
     // 봇 온라인 상태(초록 불) 설정
     try {
