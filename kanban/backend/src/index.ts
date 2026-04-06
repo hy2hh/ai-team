@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import boardsRouter from './routes/boards';
 import cardsRouter from './routes/cards';
 import { getDb } from './db';
+import { startupCleanup } from './startup-cleanup';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3001', 10);
@@ -44,4 +45,5 @@ export function broadcast(data: unknown): void {
 
 server.listen(PORT, () => {
   console.log(`Kanban backend running on port ${PORT}`);
+  startupCleanup();
 });
