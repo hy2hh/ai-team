@@ -4,6 +4,20 @@
 <!-- 이 백로그는 현재 진행 중인 요구사항과 연결된 대기 작업만 보관합니다. -->
 <!-- 진행 중인 요구사항이 없으면 백로그도 비워두세요. -->
 
+## 칸반 UI — 미완료 (코드 검증 기준, 2026-04-06)
+
+- [ ] 모바일 반응형 — Bottom Sheet, Tab Bar, safe-area CSS 미구현 | P0 | sid | 2026-04-06
+- [ ] WCAG 자동 검증 도구 통합 (Lighthouse CI 또는 axe-core) | P2 | sid | 2026-04-06
+- [ ] 키보드 접근성 — Tab 순서, Enter/Space 트리거 부분 미구현 | P1 | sid | 2026-04-06
+- [ ] 스크린리더 접근성 — live region, 동적 콘텐츠 알림 부분 미구현 | P1 | sid | 2026-04-06
+- [ ] 스트리밍 응답 UI — 부분 구현, 에러 복구 미완 | P1 | sid | 2026-04-06
+- [ ] 결제 배너 — 부분 구현 | P2 | sid | 2026-04-06
+
+## SecOps — 미완료
+
+- [ ] Slack Bot Token 권한 범위 검토 (Slack App 관리 콘솔 직접 확인 필요) | MEDIUM | Wiggum | 2026-03-27
+- [ ] 에이전트 실행 샌드박스 검토 — 런타임 격리 가능 여부 (장기 과제) | MEDIUM | Wiggum | 2026-03-27
+
 ## 에이전트 자율 진화 시스템 (Adaptive Harness 리서치 기반)
 > 출처: docs/2026-04-04_adaptive-harness-research.md
 
