@@ -85,23 +85,50 @@ function parseTableLines(tableLines: string[]): SlackTableBlock | null {
     return null;
   }
 
-  // 셀 파싱
-  const parseCells = (line: string): RawTextCell[] =>
-    line
-      .split('|')
-      .slice(1, -1)
-      .map((cell) => {
-        const sanitized = cell
-          .trim()
-          .replace(/[\x00-\x1F\x7F]/g, '')
-          .slice(0, 500);
-        return { type: 'raw_text' as const, text: sanitized };
-      });
+  // 셀 파싱 — backtick 코드 스팬 안의 | 를 무시하여 정확한 열 분리
+  const parseCells = (line: string): RawTextCell[] => {
+    // 선행/후행 | 제거
+    const inner = line.replace(/^\|/, '').replace(/\|$/, '');
+    const cells: string[] = [];
+    let current = '';
+    let inCode = false;
+
+    for (let ci = 0; ci < inner.length; ci++) {
+      const ch = inner[ci];
+      if (ch === '`') {
+        inCode = !inCode;
+        current += ch;
+      } else if (ch === '|' && !inCode) {
+        cells.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    cells.push(current); // 마지막 셀
+
+    return cells.map((cell) => {
+      const sanitized = cell
+        .trim()
+        .replace(/[\x00-\x1F\x7F]/g, '')
+        .slice(0, 500);
+      return { type: 'raw_text' as const, text: sanitized };
+    });
+  };
 
   const headerRow = parseCells(tableLines[0]);
+  const colCount = headerRow.length;
   const dataRows = tableLines.slice(sepIdx + 1).map(parseCells);
 
-  const rows = [headerRow, ...dataRows].filter(
+  // Slack 요구사항: 모든 행의 열 수가 동일해야 함 (uneven_table_rows_not_allowed 방지)
+  const normalizeRow = (row: RawTextCell[]): RawTextCell[] => {
+    if (row.length === colCount) return row;
+    if (row.length > colCount) return row.slice(0, colCount);
+    // 부족한 열은 빈 셀로 채움
+    return [...row, ...Array(colCount - row.length).fill({ type: 'raw_text' as const, text: '' })];
+  };
+
+  const rows = [headerRow, ...dataRows.map(normalizeRow)].filter(
     (r) => r.length > 0 && r.some((c) => c.text.length > 0),
   );
 

@@ -1308,15 +1308,17 @@ const executeSingle = async (
 
     if (targets.length === 0) {
       // PM이 완료 판단 — "작업중" 메시지를 결과로 업데이트 (별도 postMessage 없음)
+      // hub-review는 skipPosting=true이므로 statusMessageTs가 없음 → 원본 PM 상태 메시지(result.statusMessageTs)로 fallback
       if (pmReview.text) {
         try {
           const pmBlocks = buildMessageBlocks(pmReview.text);
-          if (pmReview.statusMessageTs) {
+          const finalStatusTs = pmReview.statusMessageTs ?? result.statusMessageTs;
+          if (finalStatusTs) {
             // "작업중" 메시지를 PM 최종 답변으로 업데이트
             await updateStatusMessage(
               pmApp,
               event.channel,
-              pmReview.statusMessageTs,
+              finalStatusTs,
               'completed',
               'Marge',
               {
@@ -1326,7 +1328,7 @@ const executeSingle = async (
                   : undefined,
               },
             );
-            lastPmReview = { text: pmReview.text, postedTs: pmReview.statusMessageTs };
+            lastPmReview = { text: pmReview.text, postedTs: finalStatusTs };
             console.log('[hub] PM 최종 답변을 "작업중" 메시지 업데이트로 반영');
           } else {
             // fallback: statusMessageTs 없으면 기존 방식으로 새 메시지 포스팅
@@ -2733,7 +2735,12 @@ const main = async () => {
               }
             }
           } catch (err) {
-            console.error(`[table] 자체 봇 chat.update 실패: ${ts}`, err);
+            const errCode = (err as { data?: { error?: string } }).data?.error;
+            if (errCode === 'invalid_blocks') {
+              console.warn(`[table] 자체 봇 invalid_blocks (uneven rows 등) — 테이블 변환 건너뜀: ${ts}`);
+            } else {
+              console.error(`[table] 자체 봇 chat.update 실패: ${ts}`, err);
+            }
           }
         }
         console.log(`[filter] 자체 봇 메시지 무시: ${ts}`);

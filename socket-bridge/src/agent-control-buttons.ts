@@ -448,6 +448,41 @@ export const updateStatusMessage = async (
   } catch (err) {
     const errCode = (err as { data?: { error?: string } }).data?.error;
 
+    if (errCode === 'invalid_blocks') {
+      // 테이블 블록 등이 Slack에서 거부됨 — 테이블 제외하고 mrkdwn section만으로 재시도
+      console.warn(
+        `[control-buttons] invalid_blocks — 테이블 블록 제거 후 재시도 (${agentName})`,
+      );
+      const resultText = options?.resultText;
+      const fallbackChunks = resultText
+        ? splitTextIntoChunks(resultText)
+        : [];
+      const fallbackBlocks: Array<Record<string, unknown>> = [
+        { type: 'section', text: { type: 'mrkdwn', text: headerText } },
+        ...(fallbackChunks.length > 0
+          ? [
+              { type: 'divider' } as Record<string, unknown>,
+              ...fallbackChunks.map((chunk) => ({
+                type: 'section',
+                text: { type: 'mrkdwn', text: chunk },
+              })),
+            ]
+          : []),
+      ];
+      try {
+        await slackApp.client.chat.update({
+          channel,
+          ts: messageTs,
+          text: notificationText,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          blocks: fallbackBlocks.slice(0, 50) as any,
+        });
+      } catch (retryErr) {
+        console.error('[control-buttons] invalid_blocks 폴백 재시도 실패:', retryErr);
+      }
+      return;
+    }
+
     if (errCode !== 'msg_too_long') {
       console.error('[control-buttons] 상태 업데이트 실패:', err);
       return;
