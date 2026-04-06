@@ -36,8 +36,6 @@ import {
   cleanupOrphanClaims,
   recoverProcessingClaimsOnStartup,
   recoverRecentFailedClaimsOnStartup,
-  requeueClaim,
-  MAX_REQUEUE_ATTEMPTS,
 } from './claim-db.js';
 import {
   writeHeartbeat,
@@ -996,7 +994,7 @@ const executeSingle = async (
       new Set(seqResults.map((r) => r.agent)),
     );
     console.log('[hub] 순차 위임 전체 완료 → PM 리뷰');
-    const pmReview = await handleMessage(
+    await handleMessage(
       'pm',
       reviewEvent,
       'hub-review',
@@ -1054,14 +1052,7 @@ const executeSingle = async (
       }
     }
 
-    // recommend nudge
-    if (!pmReview.delegationTargets.length && pmReview.text && !pmReview.text.includes('recommend_next_phase')) {
-      console.log('[hub] PM이 recommend_next_phase 미호출 — 재요청');
-      await handleMessage('pm', {
-        ...event,
-        text: '[Bridge 자동 요청] 작업 완료. 다음 단계가 있다면 recommend_next_phase로 등록하세요. 없으면 "완료, 추가 작업 없음"이라고 답하세요.',
-      }, 'hub-review', pmApp, true, true, 'high');
-    }
+    // PM이 순차 위임 전체 완료 후 리뷰했으므로 recommend_next_phase 재요청 불필요
 
     // ✅ 사용자 원본 메시지 완료 리액션 전환
     await safeSwapReaction(app, event.channel, event.ts, 'hammer_and_pick', 'white_check_mark');
@@ -1422,34 +1413,7 @@ const executeSingle = async (
         }
       }
 
-      // ─── recommend_next_phase 강제 요청 ──────────────────
-      // PM이 recommend_next_phase를 호출하지 않았으면 bridge가 재요청
-      if (
-        !pmReview.delegationTargets.length &&
-        pmReview.text &&
-        !pmReview.text.includes('recommend_next_phase')
-      ) {
-        console.log(
-          '[hub] PM이 recommend_next_phase 미호출 — 다음 단계 추천 재요청',
-        );
-        const nudgeEvent: SlackEvent = {
-          ...event,
-          text: [
-            '[Bridge 자동 요청] 작업이 완료되었습니다.',
-            '다음 단계가 있다면 recommend_next_phase 도구로 등록하세요.',
-            '더 이상 할 일이 없다면 "완료, 추가 작업 없음"이라고 답하세요.',
-          ].join('\n'),
-        };
-        await handleMessage(
-          'pm',
-          nudgeEvent,
-          'hub-review',
-          pmApp,
-          true,
-          true,
-          'high',
-        );
-      }
+      // PM이 targets.length === 0으로 완료를 선언했으므로 recommend_next_phase 재요청 불필요
     } else {
       // 계속 위임 — 중간 리뷰는 skipPosting이므로 currentPmTs 업데이트 없음
       console.log(
@@ -3143,6 +3107,7 @@ const main = async () => {
   startQueueProcessor(apps[0]);
 
   // ── 오펀 claim 처리 공통 함수 (재시작 복구 + 주기 감지 공유) ──
+  // 자동 재라우팅 없음 — 미처리 작업 목록을 메시지로 공유하여 수동 처리 유도
   const processOrphanList = async (
     orphans: import('./claim-db.js').OrphanClaimInfo[],
     label: string,
@@ -3150,156 +3115,88 @@ const main = async () => {
     if (orphans.length === 0 || apps.length === 0) {
       return;
     }
-    console.log(`[${label}] ${orphans.length}개 오펀 claim 처리 시작`);
+    console.log(`[${label}] ${orphans.length}개 미처리 작업 감지 — 수동 처리 알림`);
 
-    for (const orphan of orphans) {
-      const canRequeue =
-        orphan.version < MAX_REQUEUE_ATTEMPTS &&
-        Boolean(orphan.channel);
+    const notifyChannel =
+      orphans.find((o) => o.channel)?.channel ??
+      (process.env.SLACK_NOTIFY_CHANNEL || '');
 
-      if (canRequeue) {
-        const newVersion = requeueClaim(
-          orphan.messageTs,
-          orphan.channel,
-        );
+    if (!notifyChannel) {
+      console.warn(`[${label}] 알림 채널 없음 — Slack 알림 생략`);
+      return;
+    }
 
-        if (newVersion !== null) {
+    // chat.getPermalink으로 thread_ts 포함된 정확한 링크 획득
+    const taskLines = await Promise.all(
+      orphans.map(async (orphan, i) => {
+        const ageMin = Math.round(orphan.ageMs / 60000);
+        let msgLink: string;
+        if (orphan.channel) {
           try {
-            // 원본 메시지 Slack에서 조회
-            const fetchResult =
-              await apps[0].client.conversations.history({
-                channel: orphan.channel!,
-                oldest: orphan.messageTs,
-                latest: orphan.messageTs,
-                inclusive: true,
-                limit: 1,
-              });
-
-            const originalMsg = fetchResult.messages?.[0] as
-              | Record<string, unknown>
-              | undefined;
-
-            if (originalMsg?.text) {
-              const requeuedEvent: SlackEvent = {
-                type: 'message',
-                channel: orphan.channel!,
-                channel_name: '',
-                user: (originalMsg.user as string) ?? '',
-                text: originalMsg.text as string,
-                ts: orphan.messageTs,
-                thread_ts:
-                  (originalMsg.thread_ts as string | undefined) ??
-                  null,
-                mentions: [],
-                raw: {},
-              };
-
-              // 재라우팅
-              const routing = await routeMessage(requeuedEvent.text);
-              const agentNames = routing.agents
-                .map((a) => a.name)
-                .join(', ');
-              console.log(
-                `[${label}] ${orphan.messageTs} 재라우팅: [${agentNames}] (v${newVersion}/${MAX_REQUEUE_ATTEMPTS})`,
-              );
-
-              if (routing.execution === 'parallel') {
-                await executeParallel(
-                  routing.agents.map((a) => a.name),
-                  requeuedEvent,
-                  'orphan-requeue',
-                  apps,
-                );
-              } else {
-                const primaryAgent = routing.agents[0];
-                const agentApp = findAgentApp(
-                  primaryAgent.name,
-                  apps,
-                );
-                await executeSingle(
-                  primaryAgent.name,
-                  requeuedEvent,
-                  'orphan-requeue',
-                  agentApp,
-                  apps,
-                );
-              }
-
-              updateClaim(orphan.messageTs, 'completed');
-
-              try {
-                await apps[0].client.chat.postMessage({
-                  channel: orphan.channel!,
-                  thread_ts: orphan.messageTs,
-                  text: `🔄 *${agentDisplayName(orphan.agent)} 미응답 작업 재시도 중 (${newVersion}/${MAX_REQUEUE_ATTEMPTS}회)* — 다른 에이전트에게 재배정했습니다`,
-                });
-              } catch {
-                // 알림 실패 무시
-              }
-              continue;
-            }
-          } catch (requeueErr) {
-            console.error(
-              `[${label}] 재라우팅 실패: ${orphan.messageTs}`,
-              requeueErr,
-            );
-            updateClaim(orphan.messageTs, 'failed');
+            const result = await apps[0].client.chat.getPermalink({
+              channel: orphan.channel,
+              message_ts: orphan.messageTs,
+            });
+            msgLink = result.permalink
+              ? `<${result.permalink}|원본 메시지>`
+              : slackMsgLink(orphan.channel, orphan.messageTs);
+          } catch {
+            msgLink = slackMsgLink(orphan.channel, orphan.messageTs);
           }
+        } else {
+          msgLink = `\`${orphan.messageTs}\``;
         }
-      }
+        return `${i + 1}. ${msgLink} — ${agentDisplayName(orphan.agent)} — ${ageMin}분 경과`;
+      }),
+    );
 
-      // 재큐잉 불가 (한도 초과 또는 메시지 조회 실패) → Slack 알림
-      const notifyChannel =
-        orphan.channel ?? (process.env.SLACK_NOTIFY_CHANNEL || '');
-      if (notifyChannel) {
-        try {
-          const isMaxReached =
-            orphan.version >= MAX_REQUEUE_ATTEMPTS;
-          const msgLink = orphan.channel
-            ? slackMsgLink(orphan.channel, orphan.messageTs)
-            : `\`${orphan.messageTs}\``;
-          await apps[0].client.chat.postMessage({
-            channel: notifyChannel,
-            text: isMaxReached
-              ? `⚠️ *미처리 작업 자동 복구 실패* — ${msgLink}\n• 처리 에이전트: ${agentDisplayName(orphan.agent)}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재시도 ${orphan.version}/${MAX_REQUEUE_ATTEMPTS}회 모두 실패\n• 조치 필요: 해당 메시지를 재전송하거나 해당 에이전트를 직접 호출해주세요`
-              : `⚠️ *미처리 작업 감지* — ${msgLink}\n• 처리 에이전트: ${agentDisplayName(orphan.agent)}\n• 경과 시간: ${Math.round(orphan.ageMs / 60000)}분\n• 상태: 자동 재배정 시도 중`,
-          });
-        } catch {
-          // 알림 실패 무시
-        }
-      }
+    const text = [
+      `⚠️ *미처리 작업 ${orphans.length}건 감지*`,
+      '',
+      '수동 처리가 필요한 작업 목록:',
+      ...taskLines,
+      '',
+      '각 링크를 클릭하여 해당 메시지를 재전송하거나 에이전트를 직접 호출하세요.',
+    ].join('\n');
+
+    try {
+      await apps[0].client.chat.postMessage({
+        channel: notifyChannel,
+        text,
+      });
+    } catch (err) {
+      console.error(`[${label}] Slack 알림 실패:`, err);
     }
   };
 
-  // 재시작 시 즉시 복구: 이전 세션에서 처리 중이던 claim 전체 재라우팅 (age 무관)
-  const startupOrphans = recoverProcessingClaimsOnStartup();
-  if (startupOrphans.length > 0) {
-    console.log(
-      `[startup-recovery] ${startupOrphans.length}개 미완료 태스크 감지 — 즉시 재라우팅 시작`,
-    );
-    // 앱이 완전히 연결된 직후 실행 (이벤트 루프에서 비동기 처리)
-    void processOrphanList(startupOrphans, 'startup-recovery');
-  } else {
-    console.log('[startup-recovery] 미완료 태스크 없음');
-  }
-
+  // 재시작 시 미처리 claim 수동 처리 알림 — 중복 방지를 위해 두 목록을 합산 후 단일 호출
   // 칸반 카드 정리는 kanban backend startup-cleanup에서 task_queue 동기화 기반으로 처리
   // bridge에서 중복 실행하면 retry 중인 카드를 잘못 삭제할 수 있음
-
-  // 재시작 직전 10분 이내에 실패한 claim 복구 (브리지 불안정 구간에서 재시도 소진된 항목)
-  const recentFailed = recoverRecentFailedClaimsOnStartup();
-  if (recentFailed.length > 0) {
-    console.log(
-      `[startup-recovery] ${recentFailed.length}개 최근 failed claim 재처리 대상 — 재라우팅 시작`,
-    );
-    void processOrphanList(recentFailed, 'failed-recovery');
+  {
+    const startupOrphans = recoverProcessingClaimsOnStartup();
+    const recentFailed = recoverRecentFailedClaimsOnStartup();
+    // messageTs 기준 중복 제거 (processing → failed 전환된 항목이 두 목록에 모두 포함될 수 있음)
+    const seen = new Set<string>();
+    const allOrphans = [...startupOrphans, ...recentFailed].filter((o) => {
+      if (seen.has(o.messageTs)) {
+        return false;
+      }
+      seen.add(o.messageTs);
+      return true;
+    });
+    if (allOrphans.length > 0) {
+      console.log(`[startup-recovery] ${allOrphans.length}개 미처리 태스크 감지 — 수동 처리 알림`);
+      void processOrphanList(allOrphans, 'startup-recovery');
+    } else {
+      console.log('[startup-recovery] 미처리 태스크 없음');
+    }
   }
 
-  // 오펀 claim 감지 + 자동 재라우팅 — 30분마다 실행 (2시간 이상 고착 감지)
+  // 오펀 claim 감지 — 5분마다 실행 + 재시작 시 startup-recovery에서도 실행
   const orphanCheckInterval = setInterval(async () => {
     const orphans = cleanupOrphanClaims();
     await processOrphanList(orphans, 'orphan-requeue');
-  }, 30 * 60 * 1000);
+  }, 5 * 60 * 1000);
 
   // DB 유지보수: 24시간마다 VACUUM + ANALYZE
   const maintenanceInterval = setInterval(
