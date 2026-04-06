@@ -70,7 +70,7 @@ import {
   agentDisplayName,
 } from './queue-processor.js';
 import { cancelQueueByThread } from './queue-manager.js';
-import { moveToDone, moveToBlocked, cleanupOrphanCards, updateCard } from './kanban-sync.js';
+import { moveToDone, moveToBlocked, updateCard } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
 import {
   getRunContext,
@@ -241,6 +241,9 @@ const botUserIdToName = new Map<string, string>();
 
 /** bot_id → 에이전트 표시 이름 (히스토리 포맷용) */
 const botIdToName = new Map<string, string>();
+
+/** bot_id → Bolt App 인스턴스 (자체 봇 메시지 chat.update용) */
+const botIdToApp = new Map<string, App>();
 
 /** botUserId → 에이전트 이름 (스레드 참여자 추적용) */
 const botUserIdToAgentName = new Map<string, string>();
@@ -750,34 +753,16 @@ const executeSingle = async (
   while (result.isMaxTurns && retryCount < MAX_MENTION_RETRIES) {
     retryCount++;
     console.log(
-      `[mention-retry] ${agentName} max_turns 도달 — 체크포인트 재시도 ${retryCount}/${MAX_MENTION_RETRIES}`,
+      `[mention-retry] ${agentName} max_turns 도달 — 세션 재개 재시도 ${retryCount}/${MAX_MENTION_RETRIES}`,
     );
-    const checkpoint = result.partialResult?.slice(0, 3000);
-    const retryParts = [
-      `[이어서 작업 — 대화 한도 초과로 자동 재시도 ${retryCount}/${MAX_MENTION_RETRIES}]`,
-      '',
-    ];
-    if (checkpoint) {
-      retryParts.push(
-        '*이전 진행 상태:*',
-        checkpoint,
-        '',
-      );
-    }
-    retryParts.push(
-      '*원래 작업:*',
-      event.text,
-      '',
-      '*지시사항:*',
-      '1. 이전에 수정한 파일들을 확인하고 남은 작업을 이어서 완료하세요',
-      '2. 이미 완료된 작업을 반복하지 마세요',
-      '3. 결과를 간결하게 보고하세요',
-    );
+    // 기존 세션을 재개(resume)하여 이전 컨텍스트 유지.
+    // threadTopic을 제거해야 agent-runtime이 threadSessions에서 기존 세션 ID를 조회하고
+    // resume 모드로 실행 — 새 세션 생성 시 에이전트가 이전 작업을 모르고 턴을 낭비하는 문제 방지.
     const retryEvent: SlackEvent = {
       ...event,
       user: 'mention-retry',
-      threadTopic: `mention-retry-${retryCount}:${event.ts}`,
-      text: retryParts.join('\n'),
+      threadTopic: undefined,
+      text: `이전 작업을 이어서 완료하세요. (자동 재시도 ${retryCount}/${MAX_MENTION_RETRIES})`,
     };
     try {
       await rateLimited(() =>
@@ -2147,6 +2132,7 @@ const main = async () => {
       registerBotUser(agent.botUserId, agent.name);
       registerAgentBotUserId(agent.name, agent.botUserId);
       ownBotIds.add(botId);
+      botIdToApp.set(botId, app);
       const displayName =
         AGENT_DISPLAY_NAMES[agent.name] ?? agent.name;
       botUserIdToName.set(agent.botUserId, displayName);
@@ -2755,6 +2741,28 @@ const main = async () => {
       // 우리 봇 메시지 무시 (테스트 모드에서는 통과)
       const msgBotId = msg.bot_id as string | undefined;
       if (!TEST_MODE && msgBotId && ownBotIds.has(msgBotId)) {
+        // 테이블 문법이 있는 자체 봇 메시지 → chat.update로 Block Kit 변환
+        const selfChannel = (msg.channel as string) ?? '';
+        if (selfChannel && text && /^\|.+\|$/m.test(text)) {
+          try {
+            const tableBlocks = buildMessageBlocks(text);
+            if (tableBlocks) {
+              const botApp = botIdToApp.get(msgBotId);
+              if (botApp) {
+                await botApp.client.chat.update({
+                  channel: selfChannel,
+                  ts,
+                  text,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  blocks: tableBlocks as any,
+                });
+                console.log(`[table] 자체 봇 메시지 테이블 변환 완료: ${ts}`);
+              }
+            }
+          } catch (err) {
+            console.error(`[table] 자체 봇 chat.update 실패: ${ts}`, err);
+          }
+        }
         console.log(`[filter] 자체 봇 메시지 무시: ${ts}`);
         return;
       }
@@ -3236,10 +3244,8 @@ const main = async () => {
     console.log('[startup-recovery] 미완료 태스크 없음');
   }
 
-  // 칸반 고아 카드 정리 (In Progress → Blocked)
-  cleanupOrphanCards().catch((err) =>
-    console.warn('[startup-recovery] 칸반 고아 카드 정리 실패:', err),
-  );
+  // 칸반 카드 정리는 kanban backend startup-cleanup에서 task_queue 동기화 기반으로 처리
+  // bridge에서 중복 실행하면 retry 중인 카드를 잘못 삭제할 수 있음
 
   // 재시작 직전 10분 이내에 실패한 claim 복구 (브리지 불안정 구간에서 재시도 소진된 항목)
   const recentFailed = recoverRecentFailedClaimsOnStartup();

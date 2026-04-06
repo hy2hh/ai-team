@@ -2122,7 +2122,7 @@ export const handleMessage = async (
       allowedTools: baseTools,
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
-      maxTurns: 30,
+      maxTurns: 50,
       persistSession: true,
       mcpServers: baseMcpServers,
       abortController,
