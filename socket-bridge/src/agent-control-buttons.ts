@@ -162,17 +162,19 @@ export const purgeExpiredRunContexts = (): number => {
  */
 export const restoreRunContextsFromDb = (
   appResolver: (agentName: string) => App,
-): number => {
+): AgentRunContext[] => {
   try {
     const now = Date.now();
     const rows = getDb()
       .prepare('SELECT * FROM run_contexts WHERE expires_at > ?')
       .all(now) as DbRunContextRow[];
 
+    const restored: AgentRunContext[] = [];
     for (const row of rows) {
       try {
         const ctx = hydrateContext(row, appResolver);
         runContexts.set(ctx.controlId, ctx);
+        restored.push(ctx);
         // 남은 TTL로 인메모리 자동 정리 타이머 재등록
         const remainingTtl = row.expires_at - now;
         setTimeout(() => {
@@ -184,10 +186,10 @@ export const restoreRunContextsFromDb = (
         console.warn(`[control-buttons] 컨텍스트 복원 스킵 (${row.control_id}):`, err);
       }
     }
-    return rows.length;
+    return restored;
   } catch (err) {
     console.error('[control-buttons] DB 복원 실패:', err);
-    return 0;
+    return [];
   }
 };
 
@@ -304,7 +306,7 @@ export const updateStatusMessage = async (
   slackApp: App,
   channel: string,
   messageTs: string,
-  status: 'completed' | 'cancelled' | 'error' | 'rerunning',
+  status: 'completed' | 'cancelled' | 'error' | 'rerunning' | 'interrupted',
   agentName: string,
   options?: {
     resultText?: string;
@@ -316,6 +318,7 @@ export const updateStatusMessage = async (
     cancelled: `🛑 *${agentName}* 취소됨`,
     error: `❌ *${agentName}* 오류 발생`,
     rerunning: `🔄 *${agentName}* 재실행 중...`,
+    interrupted: `⚡ *${agentName}* 중단됨 (bridge 재시작) — 🔄 재실행하려면 버튼을 누르세요`,
   };
 
   const headerText = statusText[status] ?? `${agentName} ${status}`;

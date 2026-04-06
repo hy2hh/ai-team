@@ -2774,6 +2774,12 @@ const main = async () => {
         return;
       }
 
+      // x/X 시작 메시지 무시 (에이전트 실행 차단)
+      if (/^[xX]\s/.test(text) || text === 'x' || text === 'X') {
+        console.log(`[filter] x/X 접두사 메시지 무시: ${ts}`);
+        return;
+      }
+
       // 1차 필터: 인메모리 중복 방지 (빠른 체크)
       if (processingMessages.has(ts)) {
         console.log(`[filter] 중복 메시지 무시: ${ts}`);
@@ -2976,10 +2982,19 @@ const main = async () => {
   if (purgedCount > 0) {
     console.log(`[init] 만료된 runContexts ${purgedCount}개 삭제`);
   }
-  const restoredCount = restoreRunContextsFromDb((agentName) =>
+  const restoredContexts = restoreRunContextsFromDb((agentName) =>
     findAgentApp(agentName, apps),
   );
-  console.log(`[init] runContexts 복원: ${restoredCount}개`);
+  console.log(`[init] runContexts 복원: ${restoredContexts.length}개`);
+  // 복원된 컨텍스트는 에이전트가 죽은 상태 → Slack 메시지를 "중단됨"으로 업데이트
+  if (restoredContexts.length > 0) {
+    void Promise.allSettled(
+      restoredContexts.map((ctx) =>
+        updateStatusMessage(ctx.slackApp, ctx.channel, ctx.statusMessageTs, 'interrupted', ctx.agentName)
+          .catch((err) => console.warn(`[init] interrupted 업데이트 실패 (${ctx.agentName}):`, err)),
+      ),
+    ).then(() => console.log(`[init] ${restoredContexts.length}개 "중단됨" 메시지 업데이트 완료`));
+  }
 
   // 앱 순차 시작 (연결 간 5초 딜레이로 Slack pong 타임아웃 방지)
   const CONNECTION_DELAY_MS = 5000;

@@ -28,5 +28,13 @@ else
   echo "  ⏭ bridge 실행 중 아님"
 fi
 
+# 좀비 bridge 프로세스 정리 (tmux kill로 안 죽은 경우)
+ZOMBIE_COUNT=$(pgrep -f "tsx src/index.ts" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$ZOMBIE_COUNT" -gt 0 ]; then
+  pkill -f "tsx src/index.ts" 2>/dev/null || true
+  echo "  🧹 좀비 bridge 프로세스 ${ZOMBIE_COUNT}개 정리"
+  STOPPED=$((STOPPED + ZOMBIE_COUNT))
+fi
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ ${STOPPED}개 프로세스 종료 완료"
