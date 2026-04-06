@@ -111,16 +111,22 @@ if [[ "$TOOL_NAME" == "Bash" ]]; then
   fi
 fi
 
-# .env 직접 수정 (시크릿 노출 위험)
+# .env 직접 수정 및 guard/설정 파일 자기 수정 금지
 if [[ "$TOOL_NAME" == "Write" || "$TOOL_NAME" == "Edit" ]]; then
   if echo "$FILE_PATH" | grep -qE '(^|/)\.env(\.[^e]|$)' 2>/dev/null; then
     deny ".env 파일 직접 수정 금지. .env.example 업데이트 후 sid에게 보고하세요."
+  fi
+  # [이슈 2 수정] guard 훅 및 Claude 설정 파일 자기 수정 방지
+  if echo "$FILE_PATH" | grep -qE '\.claude/(hooks/|settings)' 2>/dev/null; then
+    deny "guard 훅 및 Claude 설정 파일 수정은 차단됩니다. sid에게 직접 수정을 요청하세요."
   fi
 fi
 
 # ============================================================
 # ALLOWLIST (hardcoded — agents cannot modify)
 # [주의] deny 이후에 위치 — allowlist가 deny를 우회하는 것을 방지
+# [이슈 1 수정] 체인 명령어(&&, ;, |)는 allowlist 스킵
+#   → ls && docker system prune 에서 ls가 allowlist 매칭 후 exit 0 하던 버그 방지
 # ============================================================
 ALLOWLIST_PATTERNS=(
   "^git (status|log|diff|show|fetch|stash list)\b"
@@ -132,11 +138,13 @@ ALLOWLIST_PATTERNS=(
   "^rm -rf (node_modules|dist|\.next|build|coverage|__pycache__|\.turbo)(/?\s*$|$)"
 )
 
-for pattern in "${ALLOWLIST_PATTERNS[@]}"; do
-  if echo "$COMMAND" | grep -qE "$pattern"; then
-    exit 0
-  fi
-done
+if ! echo "$COMMAND" | grep -qE '(&&|;|\|)'; then
+  for pattern in "${ALLOWLIST_PATTERNS[@]}"; do
+    if echo "$COMMAND" | grep -qE "$pattern"; then
+      exit 0
+    fi
+  done
+fi
 
 # ============================================================
 # HIGH → ask (hookSpecificOutput 경고, exit 0)
