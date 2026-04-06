@@ -35,7 +35,6 @@ import {
   cleanupExpiredClaims,
   cleanupOrphanClaims,
   recoverProcessingClaimsOnStartup,
-  recoverRecentFailedClaimsOnStartup,
 } from './claim-db.js';
 import {
   writeHeartbeat,
@@ -3169,24 +3168,14 @@ const main = async () => {
     }
   };
 
-  // 재시작 시 미처리 claim 수동 처리 알림 — 중복 방지를 위해 두 목록을 합산 후 단일 호출
+  // 재시작 시 미처리 claim 알림 — processing 상태 항목만 체크 (failed 재확인 제거)
+  // recoverRecentFailedClaimsOnStartup 제거: 재시작 반복 시 같은 claim을 중복 알림하는 원인
   // 칸반 카드 정리는 kanban backend startup-cleanup에서 task_queue 동기화 기반으로 처리
-  // bridge에서 중복 실행하면 retry 중인 카드를 잘못 삭제할 수 있음
   {
     const startupOrphans = recoverProcessingClaimsOnStartup();
-    const recentFailed = recoverRecentFailedClaimsOnStartup();
-    // messageTs 기준 중복 제거 (processing → failed 전환된 항목이 두 목록에 모두 포함될 수 있음)
-    const seen = new Set<string>();
-    const allOrphans = [...startupOrphans, ...recentFailed].filter((o) => {
-      if (seen.has(o.messageTs)) {
-        return false;
-      }
-      seen.add(o.messageTs);
-      return true;
-    });
-    if (allOrphans.length > 0) {
-      console.log(`[startup-recovery] ${allOrphans.length}개 미처리 태스크 감지 — 수동 처리 알림`);
-      void processOrphanList(allOrphans, 'startup-recovery');
+    if (startupOrphans.length > 0) {
+      console.log(`[startup-recovery] ${startupOrphans.length}개 미처리 태스크 감지 — 수동 처리 알림`);
+      void processOrphanList(startupOrphans, 'startup-recovery');
     } else {
       console.log('[startup-recovery] 미처리 태스크 없음');
     }
