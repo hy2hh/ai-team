@@ -3,6 +3,7 @@
 # 회의 #11 결정: 치명(Critical) → deny(exit 2), 높음(High) → ask(warn + exit 0)
 # allowlist: 하드코딩 (에이전트 편집 불가), 전 에이전트 동일 규칙
 # fail-closed: 파싱 오류 시 deny (exit 2)
+# 구조: deny → allowlist → warn (체인 우회 방지를 위해 allowlist는 deny 이후)
 
 # ============================================================
 # FAIL-CLOSED: jq/파싱 실패 시 deny
@@ -26,26 +27,7 @@ COMMAND=$(echo "$TOOL_INPUT" | jq -r '.command // empty') || {
 }
 
 # ============================================================
-# ALLOWLIST (hardcoded — agents cannot modify)
-# ============================================================
-ALLOWLIST_PATTERNS=(
-  "^git (status|log|diff|show|fetch|stash list)\b"
-  "^git branch(\s*$|\s+-[avrl])"
-  "^(ls|cat|echo|pwd|which|head|tail|wc|find|grep)\b"
-  "^(npm (run|test|install|ci|list)|node )"
-  "^(curl|wget) .*(localhost|127\.0\.0\.1)"
-  # 빌드 아티팩트 삭제 허용
-  "^rm -rf (node_modules|dist|\.next|build|coverage|__pycache__|\.turbo)(/?\s*$|$)"
-)
-
-for pattern in "${ALLOWLIST_PATTERNS[@]}"; do
-  if echo "$COMMAND" | grep -qE "$pattern"; then
-    exit 0
-  fi
-done
-
-# ============================================================
-# CRITICAL → deny (exit 2)
+# HELPER FUNCTIONS
 # ============================================================
 
 deny() {
@@ -54,9 +36,22 @@ deny() {
   exit 2
 }
 
+warn() {
+  local msg="$1"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[Guard:WARN] %s 의도한 작업인지 다시 확인하세요."}}\n' "$msg"
+  exit 0
+}
+
+# ============================================================
+# CRITICAL → deny (exit 2)
+# [주의] allowlist보다 먼저 실행 — 체인 우회(ls && rm -rf /) 방지
+# ============================================================
+
 if [[ "$TOOL_NAME" == "Bash" ]]; then
-  # git force push
-  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\s.*(--force\b|-f\b)'; then
+  # git force push (--force-with-lease 제외)
+  # macOS grep -E는 negative lookahead 미지원 → 두 조건으로 분리
+  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\s.*(--force\b|-f\b)' && \
+     [[ "$COMMAND" != *"--force-with-lease"* ]]; then
     deny "git force push는 원격 히스토리를 파괴합니다. sid에게 명시적 승인을 받으세요."
   fi
 
@@ -124,14 +119,28 @@ if [[ "$TOOL_NAME" == "Write" || "$TOOL_NAME" == "Edit" ]]; then
 fi
 
 # ============================================================
+# ALLOWLIST (hardcoded — agents cannot modify)
+# [주의] deny 이후에 위치 — allowlist가 deny를 우회하는 것을 방지
+# ============================================================
+ALLOWLIST_PATTERNS=(
+  "^git (status|log|diff|show|fetch|stash list)\b"
+  "^git branch(\s*$|\s+-[avrl])"
+  "^(ls|cat|echo|pwd|which|head|tail|wc|find|grep)\b"
+  "^(npm (run|test|install|ci|list)|node )"
+  "^(curl|wget) .*(localhost|127\.0\.0\.1)"
+  # 빌드 아티팩트 삭제 허용
+  "^rm -rf (node_modules|dist|\.next|build|coverage|__pycache__|\.turbo)(/?\s*$|$)"
+)
+
+for pattern in "${ALLOWLIST_PATTERNS[@]}"; do
+  if echo "$COMMAND" | grep -qE "$pattern"; then
+    exit 0
+  fi
+done
+
+# ============================================================
 # HIGH → ask (hookSpecificOutput 경고, exit 0)
 # ============================================================
-
-warn() {
-  local msg="$1"
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","additionalContext":"[Guard:WARN] %s 의도한 작업인지 다시 확인하세요."}}\n' "$msg"
-  exit 0
-}
 
 if [[ "$TOOL_NAME" == "Bash" ]]; then
   # docker system prune
