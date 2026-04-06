@@ -19,6 +19,20 @@ done
 echo "🔄 Bridge 재시작 (모드: ${START_MODE:-default}, WebSocket 대기: ${WEBSOCKET_COOLDOWN}s)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# 0. 활성 작업 확인 (실행 중인 에이전트/큐 태스크가 있으면 재시작 중단)
+DB_PATH="$PROJECT_DIR/.memory/memory.db"
+if [ -f "$DB_PATH" ]; then
+  ACTIVE_CLAIMS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM claims WHERE status='processing'" 2>/dev/null || echo "0")
+  ACTIVE_QUEUE=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM queue_tasks WHERE status='running'" 2>/dev/null || echo "0")
+  ACTIVE_TOTAL=$((ACTIVE_CLAIMS + ACTIVE_QUEUE))
+
+  if [ "$ACTIVE_TOTAL" -gt 0 ]; then
+    echo "❌ 재시작 중단 — 실행 중인 작업이 있습니다 (claims: ${ACTIVE_CLAIMS}, queue: ${ACTIVE_QUEUE})"
+    echo "   작업 완료 후 재시작하거나, 취소 버튼으로 작업을 중단하세요."
+    exit 1
+  fi
+fi
+
 # 1. 종료
 echo "  🛑 기존 프로세스 종료..."
 bash "$PROJECT_DIR/scripts/stop-all.sh" 2>/dev/null || true
