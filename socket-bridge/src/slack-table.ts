@@ -202,8 +202,15 @@ export function buildMessageBlocks(text: string): SlackBlock[] | null {
         blocks.push(tableBlock);
         hasTable = true;
       } else {
-        // 유효한 테이블이 아니거나 두 번째 이상 테이블이면 텍스트로 처리
-        textBuffer.push(...tableLines);
+        // 유효한 테이블이 아니거나 두 번째 이상 테이블이면 코드블록으로 처리
+        // (raw markdown은 section에서 깨지므로 monospace로 정렬 유지)
+        if (tableBlock) {
+          textBuffer.push('```');
+          textBuffer.push(...tableLines);
+          textBuffer.push('```');
+        } else {
+          textBuffer.push(...tableLines);
+        }
       }
     } else {
       textBuffer.push(lines[i]);

@@ -296,6 +296,9 @@ export const postRunningMessage = async (
 
 /**
  * 상태 메시지 업데이트 (버튼 제거 + 상태 텍스트 변경)
+ *
+ * resultText / resultBlocks 를 전달하면 상태 헤더 아래에 결과 내용을 포함하여 업데이트.
+ * 별도 postMessage 없이 단일 메시지로 완료 상태 + 답변을 표현할 때 사용.
  */
 export const updateStatusMessage = async (
   slackApp: App,
@@ -303,6 +306,10 @@ export const updateStatusMessage = async (
   messageTs: string,
   status: 'completed' | 'cancelled' | 'error' | 'rerunning',
   agentName: string,
+  options?: {
+    resultText?: string;
+    resultBlocks?: Array<Record<string, unknown>>;
+  },
 ): Promise<void> => {
   const statusText: Record<string, string> = {
     completed: `✅ *${agentName}* 완료`,
@@ -310,20 +317,45 @@ export const updateStatusMessage = async (
     error: `❌ *${agentName}* 오류 발생`,
     rerunning: `🔄 *${agentName}* 재실행 중...`,
   };
+
+  const headerText = statusText[status] ?? `${agentName} ${status}`;
+
+  // 결과가 있으면 헤더 + 구분선 + 결과 블록으로 구성
+  let blocks: Array<Record<string, unknown>>;
+  let fullText: string;
+
+  if (options?.resultText) {
+    fullText = `${headerText}\n\n${options.resultText}`;
+    blocks = [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: headerText },
+      },
+      { type: 'divider' },
+      ...(options.resultBlocks ?? [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: options.resultText },
+        },
+      ]),
+    ];
+  } else {
+    fullText = headerText;
+    blocks = [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: headerText },
+      },
+    ];
+  }
+
   try {
     await slackApp.client.chat.update({
       channel,
       ts: messageTs,
-      text: statusText[status] ?? `${agentName} ${status}`,
-      blocks: [
-        {
-          type: 'section',
-          text: {
-            type: 'mrkdwn',
-            text: statusText[status] ?? `${agentName} ${status}`,
-          },
-        },
-      ],
+      text: fullText,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      blocks: blocks as any,
     });
   } catch (err) {
     console.error('[control-buttons] 상태 업데이트 실패:', err);

@@ -26,6 +26,10 @@ import {
   resolveResearchMode,
 } from './agent-runtime.js';
 import {
+  getClaudeSdkQueryAuthOptions,
+  validateAnthropicAuthOrExit,
+} from './anthropic-auth.js';
+import {
   tryClaim,
   updateClaim,
   cleanupExpiredClaims,
@@ -194,6 +198,7 @@ const validateEnvVars = (): void => {
 
 // 애플리케이션 시작 전 환경변수 검증
 validateEnvVars();
+validateAnthropicAuthOrExit();
 
 const AGENTS: AgentConfig[] = [
   {
@@ -388,6 +393,7 @@ const summarizeThreadTopic = async (
 대화:
 ${conversationHistory}`,
       options: {
+        ...getClaudeSdkQueryAuthOptions(),
         model: 'claude-haiku-4-5-20251001',
         maxTurns: 1,
         permissionMode: 'bypassPermissions',
@@ -457,6 +463,7 @@ const compressConversationHistory = async (
 대화:
 ${olderHistory}`,
       options: {
+        ...getClaudeSdkQueryAuthOptions(),
         model: 'claude-haiku-4-5-20251001',
         maxTurns: 1,
         permissionMode: 'bypassPermissions',
@@ -1308,20 +1315,40 @@ const executeSingle = async (
     );
 
     if (targets.length === 0) {
-      // PM이 완료 판단 — 최종 요약을 Slack에 포스팅
+      // PM이 완료 판단 — "작업중" 메시지를 결과로 업데이트 (별도 postMessage 없음)
       if (pmReview.text) {
         try {
           const pmBlocks = buildMessageBlocks(pmReview.text);
-          const postResult = await pmApp.client.chat.postMessage({
-            channel: event.channel,
-            text: pmReview.text,
-            thread_ts: event.thread_ts ?? event.ts,
-            ...(pmBlocks ? { blocks: pmBlocks } : {}),
-          });
-          lastPmReview = { text: pmReview.text, postedTs: postResult.ts as string | undefined };
-          console.log('[hub] PM 최종 요약 포스팅 완료');
+          if (pmReview.statusMessageTs) {
+            // "작업중" 메시지를 PM 최종 답변으로 업데이트
+            await updateStatusMessage(
+              pmApp,
+              event.channel,
+              pmReview.statusMessageTs,
+              'completed',
+              'Marge',
+              {
+                resultText: pmReview.text,
+                resultBlocks: pmBlocks
+                  ? (pmBlocks as unknown as Array<Record<string, unknown>>)
+                  : undefined,
+              },
+            );
+            lastPmReview = { text: pmReview.text, postedTs: pmReview.statusMessageTs };
+            console.log('[hub] PM 최종 답변을 "작업중" 메시지 업데이트로 반영');
+          } else {
+            // fallback: statusMessageTs 없으면 기존 방식으로 새 메시지 포스팅
+            const postResult = await pmApp.client.chat.postMessage({
+              channel: event.channel,
+              text: pmReview.text,
+              thread_ts: event.thread_ts ?? event.ts,
+              ...(pmBlocks ? { blocks: pmBlocks } : {}),
+            });
+            lastPmReview = { text: pmReview.text, postedTs: postResult.ts as string | undefined };
+            console.log('[hub] PM 최종 요약 포스팅 완료 (fallback)');
+          }
         } catch (err) {
-          console.error('[hub] PM 최종 요약 포스팅 실패:', err);
+          console.error('[hub] PM 최종 요약 반영 실패:', err);
         }
       }
       console.log('[hub] PM이 완료 판단 — Hub 루프 종료');

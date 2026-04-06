@@ -1,5 +1,6 @@
 import { query } from '@anthropic-ai/claude-agent-sdk';
 import type { SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
+import { getClaudeSdkQueryAuthOptions } from './anthropic-auth.js';
 import { z } from 'zod';
 import type {
   ExecutionMode,
@@ -174,6 +175,7 @@ export const queryLlm = async (
     for await (const message of query({
       prompt,
       options: {
+        ...getClaudeSdkQueryAuthOptions(),
         model: 'claude-haiku-4-5-20251001',
         systemPrompt:
           'JSON으로만 응답하세요. 설명이나 부가 텍스트 없이 순수 JSON만 출력하세요.',

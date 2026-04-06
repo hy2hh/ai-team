@@ -20,7 +20,7 @@ import {
 import { moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
 import { emit } from './hook-events.js';
-import { buildMessageBlocks } from './slack-table.js';
+// buildMessageBlocks — handleMessage 내부에서 처리하므로 별도 import 불필요
 
 // ─── 상수 ─────────────────────────────────────────────
 
@@ -201,7 +201,7 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
         'queue-task',
         slackApp,
         true,  // skipReaction
-        true,  // skipPosting (결과를 직접 게시)
+        false, // skipPosting=false — "작업중" 메시지를 결과로 직접 업데이트
         task.tier as 'high' | 'standard' | 'fast',
         kanbanCardId,
       ),
@@ -253,23 +253,7 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
       }
     }
 
-    await postTaskProgress(slackApp, task, 'completed', result.text);
-
-    // 에이전트 실제 응답을 스레드에 게시
-    if (result.text) {
-      try {
-        const messageBlocks = buildMessageBlocks(result.text);
-        await slackApp.client.chat.postMessage({
-          channel: task.channel,
-          thread_ts: task.thread_ts,
-          text: result.text,
-          ...(messageBlocks ? { blocks: messageBlocks } : {}),
-        });
-      } catch (err) {
-        console.error('[queue-processor] 에이전트 결과 게시 실패:', err);
-      }
-    }
-
+    // 결과는 handleMessage 내부에서 "작업중" 메시지를 업데이트하여 표시 (별도 postMessage 없음)
     console.log(`[queue-processor] 태스크 완료: ${task.id}`);
     emit({
       type: 'queue.step.completed',
