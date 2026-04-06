@@ -15,6 +15,7 @@
     "@upstash/context7-mcp": "^2.1.4",
     "better-sqlite3": "^12.8.0",
     "dotenv": "^16.4.7",
+    "langfuse": "^3.38.20",
     "mcp-remote": "^0.1.38"
   },
   "devDependencies": {

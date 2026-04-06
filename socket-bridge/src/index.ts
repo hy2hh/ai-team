@@ -108,6 +108,7 @@ import {
   resolveModelSelect,
   type ModelTier,
 } from './model-select.js';
+import { initLangfuseTracker, flushLangfuse } from './langfuse-tracker.js';
 
 /** Slack 메시지 딥링크 생성 (channel + ts → 클릭 가능 링크) */
 const slackMsgLink = (channel: string, ts: string): string => {
@@ -3101,6 +3102,9 @@ const main = async () => {
     60 * 60 * 1000,
   );
 
+  // Langfuse 트래커 초기화 (환경변수 없으면 no-op)
+  initLangfuseTracker();
+
   // Ralph Loop 테이블 초기화 + 오래된 상태 정리
   initQaLoopTable();
   cleanupOldLoopStates();
@@ -3284,6 +3288,7 @@ const main = async () => {
 
     // 5. 세션 저장소 flush
     flushSessionStore();
+    await flushLangfuse();
 
     // 6. Socket Mode 연결 종료
     const results = await Promise.allSettled(apps.map((app) => app.stop()));
