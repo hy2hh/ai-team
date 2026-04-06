@@ -37,7 +37,6 @@ import {
   updateStatusMessage,
   storeRunContext,
   findContextByEventTs,
-  deleteRunContext,
 } from './agent-control-buttons.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
@@ -2456,10 +2455,7 @@ export const handleMessage = async (
             threadTs: event.thread_ts ?? event.ts,
           },
         );
-        const ctx = findContextByEventTs(event.ts);
-        if (ctx) {
-          deleteRunContext(ctx.controlId);
-        }
+        // 완료 시 runContext 유지 — 30분 TTL 내 이모지(🔄)로 재실행 가능
         console.log(
           `[runtime] ${agentName} 상태 메시지 업데이트 완료 (결과 포함)`,
         );
@@ -2509,10 +2505,7 @@ export const handleMessage = async (
         'completed',
         agentName,
       );
-      const ctx = findContextByEventTs(event.ts);
-      if (ctx) {
-        deleteRunContext(ctx.controlId);
-      }
+      // 완료 시 runContext 유지 — 30분 TTL 내 이모지(🔄)로 재실행 가능
     }
 
     if (skipPosting && resultText) {

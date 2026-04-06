@@ -79,6 +79,7 @@ import {
   updateStatusMessage,
   buildRerunModal,
   findContextsByThread,
+  findContextByStatusMessageTs,
   restoreRunContextsFromDb,
   purgeExpiredRunContexts,
 } from './agent-control-buttons.js';
@@ -2943,6 +2944,61 @@ const main = async () => {
                 `[auto-proceed] ✅ 사용자 리액션으로 ${count}개 수동 승인`,
               );
             }
+            break;
+          }
+          case 'arrows_counterclockwise': {
+            // 🔄 버튼이 사라진 완료/중단 상태에서 이모지로 재실행
+            if (!isAuthorized) {
+              console.log(
+                `[control] 🔄 이모지 재실행 무시: 권한 없는 사용자 ${userId}`,
+              );
+              break;
+            }
+            const rerunCtx = findContextByStatusMessageTs(re.item.ts);
+            if (!rerunCtx) {
+              console.log(
+                `[control] 🔄 이모지 재실행: 컨텍스트 없음 (ts: ${re.item.ts}) — TTL 만료 또는 미등록 메시지`,
+              );
+              break;
+            }
+            console.log(
+              `[control] 🔄 이모지 재실행: ${rerunCtx.agentName} (${rerunCtx.eventTs})`,
+            );
+            // 상태 메시지 → "재실행 중"
+            await updateStatusMessage(
+              rerunCtx.slackApp,
+              rerunCtx.channel,
+              rerunCtx.statusMessageTs,
+              'rerunning',
+              rerunCtx.agentName,
+            );
+            deleteRunContext(rerunCtx.controlId);
+
+            const rerunEvent: SlackEvent = {
+              type: 'message',
+              text: rerunCtx.originalText,
+              user: process.env.SID_USER_ID ?? 'U0AJ3T423RU',
+              channel: rerunCtx.channel,
+              channel_name: '',
+              ts: `rerun_${Date.now()}`,
+              thread_ts: rerunCtx.threadTs,
+              mentions: [],
+              raw: {},
+            };
+
+            const agentAppForRerun = findAgentApp(rerunCtx.agentName, apps);
+            executeSingle(
+              rerunCtx.agentName,
+              rerunEvent,
+              'rerun',
+              agentAppForRerun,
+              apps,
+            ).catch((err) =>
+              console.error(
+                `[control] 🔄 이모지 재실행 오류: ${rerunCtx.agentName}`,
+                err,
+              ),
+            );
             break;
           }
           default:

@@ -205,6 +205,18 @@ export const findContextByEventTs = (
   return undefined;
 };
 
+/** statusMessageTs로 컨텍스트 조회 (이모지 재실행용) */
+export const findContextByStatusMessageTs = (
+  statusMessageTs: string,
+): AgentRunContext | undefined => {
+  for (const ctx of runContexts.values()) {
+    if (ctx.statusMessageTs === statusMessageTs) {
+      return ctx;
+    }
+  }
+  return undefined;
+};
+
 /** 같은 threadTs에 속한 모든 실행 컨텍스트 조회 (전체 중단용) */
 export const findContextsByThread = (
   threadTs: string,
