@@ -4,9 +4,19 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
 BRIDGE_SESSION="ai-team-bridge"
-WEBSOCKET_COOLDOWN=${1:-5}  # 기본 5초, 재시도 시 늘릴 수 있음
+# 인자 파싱: restart.sh [local] [cooldown]
+START_MODE=""
+WEBSOCKET_COOLDOWN=5
 
-echo "🔄 Bridge 재시작 (WebSocket 대기: ${WEBSOCKET_COOLDOWN}s)"
+for arg in "$@"; do
+  if [ "$arg" = "local" ]; then
+    START_MODE="local"
+  elif [[ "$arg" =~ ^[0-9]+$ ]]; then
+    WEBSOCKET_COOLDOWN="$arg"
+  fi
+done
+
+echo "🔄 Bridge 재시작 (모드: ${START_MODE:-default}, WebSocket 대기: ${WEBSOCKET_COOLDOWN}s)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 1. 종료
@@ -19,7 +29,7 @@ sleep "$WEBSOCKET_COOLDOWN"
 
 # 3. 시작
 echo "  🚀 Bridge 시작..."
-bash "$PROJECT_DIR/scripts/start-all.sh"
+bash "$PROJECT_DIR/scripts/start-all.sh" $START_MODE
 
 # 4. 연결 확인 (최대 60초 대기)
 echo ""
