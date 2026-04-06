@@ -929,6 +929,11 @@ const WRITE_ONLY_TOOL_PATTERNS = new Set([
   'Bash(node:*)',
   'Bash(rm:*.json)',
   'Bash(mkdir:*)',
+  // High fix #1: echo/cat 쉘 리다이렉션(>, >>)으로 파일 쓰기 우회 차단
+  'Bash(echo:*)',
+  'Bash(cat:*)',
+  // High fix #2: gh CLI로 GitHub 쓰기(pr create, issue create, pr merge 등) 우회 차단
+  'Bash(gh:*)',
 ]);
 
 /**
