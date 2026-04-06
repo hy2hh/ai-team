@@ -393,7 +393,7 @@ export const updateStatusMessage = async (
   options?: {
     resultText?: string;
     resultBlocks?: Array<Record<string, unknown>>;
-    /** 분할 전송 시 사용할 스레드 ts */
+    /** @deprecated 분할 전송 제거로 더 이상 사용하지 않음 */
     threadTs?: string;
   },
 ): Promise<void> => {
@@ -409,10 +409,8 @@ export const updateStatusMessage = async (
 
   // 결과가 있으면 헤더 + 구분선 + 결과 블록으로 구성
   let blocks: Array<Record<string, unknown>>;
-  let fullText: string;
 
   if (options?.resultText) {
-    fullText = `${headerText}\n\n${options.resultText}`;
     blocks = [
       {
         type: 'section',
@@ -427,7 +425,6 @@ export const updateStatusMessage = async (
       ]),
     ];
   } else {
-    fullText = headerText;
     blocks = [
       {
         type: 'section',
@@ -436,11 +433,15 @@ export const updateStatusMessage = async (
     ];
   }
 
+  // text 필드는 알림 미리보기 전용 — headerText만 사용하여 msg_too_long 방지
+  // (blocks에 전체 내용이 들어있으므로 text에 resultText까지 중복 포함 불필요)
+  const notificationText = headerText;
+
   try {
     await slackApp.client.chat.update({
       channel,
       ts: messageTs,
-      text: fullText,
+      text: notificationText,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       blocks: blocks as any,
     });
@@ -452,49 +453,38 @@ export const updateStatusMessage = async (
       return;
     }
 
+    // msg_too_long: blocks 자체가 너무 많은 극단적 케이스 — 첫 청크만 사용
     console.warn(
-      `[control-buttons] msg_too_long — 버튼 제거 후 결과 분할 전송 (${agentName})`,
+      `[control-buttons] msg_too_long (blocks 초과) — 첫 청크만 업데이트 (${agentName})`,
     );
 
-    // 1. 결과 없이 버튼만 제거한 상태로 chat.update 재시도
+    const resultText = options?.resultText;
+    const firstChunk = resultText
+      ? splitTextIntoChunks(resultText)[0]
+      : undefined;
+    const truncatedBlocks: Array<Record<string, unknown>> = [
+      { type: 'section', text: { type: 'mrkdwn', text: headerText } },
+      ...(firstChunk
+        ? [
+            { type: 'divider' },
+            { type: 'section', text: { type: 'mrkdwn', text: firstChunk } },
+          ]
+        : []),
+    ];
+
     try {
       await slackApp.client.chat.update({
         channel,
         ts: messageTs,
         text: headerText,
-        blocks: [{ type: 'section', text: { type: 'mrkdwn', text: headerText } }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        blocks: truncatedBlocks as any,
       });
     } catch (retryErr) {
       console.error('[control-buttons] 상태 업데이트 재시도 실패:', retryErr);
     }
 
-    // 2. 결과 텍스트를 분할하여 스레드에 순차 전송
-    const threadTs = options?.threadTs ?? messageTs;
-    const resultText = options?.resultText;
-
-    if (!resultText) { return; }
-
-    const chunks = splitTextIntoChunks(resultText);
-    const total = chunks.length;
-
-    for (let i = 0; i < chunks.length; i++) {
-      const suffix = total > 1 ? ` _(${i + 1}/${total})_` : '';
-      try {
-        await slackApp.client.chat.postMessage({
-          channel,
-          thread_ts: threadTs,
-          text: chunks[i] + suffix,
-          blocks: [
-            {
-              type: 'section',
-              text: { type: 'mrkdwn', text: chunks[i] + suffix },
-            },
-          ],
-        });
-      } catch (postErr) {
-        console.error(`[control-buttons] 분할 전송 실패 (chunk ${i + 1}/${total}):`, postErr);
-      }
-    }
+    // 새 메시지 생성 없음 — 초기 메시지에 인플레이스 업데이트만 수행
   }
 };
 
