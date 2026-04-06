@@ -78,6 +78,8 @@ import {
   updateStatusMessage,
   buildRerunModal,
   findContextsByThread,
+  restoreRunContextsFromDb,
+  purgeExpiredRunContexts,
 } from './agent-control-buttons.js';
 import { buildMessageBlocks } from './slack-table.js';
 import {
@@ -2978,6 +2980,16 @@ const main = async () => {
 
     apps.push(app);
   }
+
+  // 브리지 재시작 후 run_contexts 복원 (재실행/취소 버튼 영속성)
+  const purgedCount = purgeExpiredRunContexts();
+  if (purgedCount > 0) {
+    console.log(`[init] 만료된 runContexts ${purgedCount}개 삭제`);
+  }
+  const restoredCount = restoreRunContextsFromDb((agentName) =>
+    findAgentApp(agentName, apps),
+  );
+  console.log(`[init] runContexts 복원: ${restoredCount}개`);
 
   // 앱 순차 시작 (연결 간 5초 딜레이로 Slack pong 타임아웃 방지)
   const CONNECTION_DELAY_MS = 5000;

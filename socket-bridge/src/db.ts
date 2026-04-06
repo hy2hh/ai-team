@@ -227,6 +227,34 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       ALTER TABLE task_queue ADD COLUMN checkpoint TEXT;
     `,
   },
+  {
+    version: 8,
+    sql: `
+      -- 에이전트 제어 버튼 컨텍스트 영속화 (재시작 후 재실행/취소 버튼 복원)
+      CREATE TABLE IF NOT EXISTS run_contexts (
+        control_id        TEXT    PRIMARY KEY,
+        agent_name        TEXT    NOT NULL,
+        original_text     TEXT    NOT NULL,
+        channel           TEXT    NOT NULL,
+        thread_ts         TEXT    NOT NULL,
+        status_message_ts TEXT    NOT NULL,
+        event_ts          TEXT    NOT NULL,
+        routing_method    TEXT    NOT NULL,
+        model_tier        TEXT    NOT NULL CHECK(model_tier IN ('high','standard','fast')),
+        created_at        INTEGER NOT NULL,
+        expires_at        INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_run_contexts_expires_at
+        ON run_contexts(expires_at);
+
+      CREATE INDEX IF NOT EXISTS idx_run_contexts_event_ts
+        ON run_contexts(event_ts);
+
+      CREATE INDEX IF NOT EXISTS idx_run_contexts_thread_ts
+        ON run_contexts(thread_ts);
+    `,
+  },
 ];
 
 /**
