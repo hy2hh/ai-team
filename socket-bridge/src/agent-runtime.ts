@@ -33,6 +33,7 @@ import { buildMessageBlocks } from './slack-table.js';
 import {
   generateControlId,
   postRunningMessage,
+  updateToRunningMessage,
   updateStatusMessage,
   storeRunContext,
   findContextByEventTs,
@@ -412,20 +413,29 @@ const activeAgents = new Map<string, ActiveAgentEntry>();
 const pendingCancellations = new Set<string>();
 
 // ─── Lisa 리서치 모드 선택 대기 ────────────────────────────
-// key: threadTs, value: resolve 함수 (선택된 모드를 전달)
+// key: threadTs, value: resolve 함수 (선택된 모드 + 버튼 메시지 ts를 전달)
+export interface ResearchModeResult {
+  mode: 'academic' | 'practical';
+  /** 버튼이 포함된 기존 메시지 ts (인플레이스 업데이트용) */
+  messageTs: string;
+  channel: string;
+}
+
 const pendingResearchMode = new Map<
   string,
-  (mode: 'academic' | 'practical') => void
+  (result: ResearchModeResult) => void
 >();
 
 /** 버튼 클릭 시 호출 — 대기 중인 Promise를 resolve */
 export const resolveResearchMode = (
   threadTs: string,
   mode: 'academic' | 'practical',
+  messageTs: string,
+  channel: string,
 ): boolean => {
   const resolve = pendingResearchMode.get(threadTs);
   if (resolve) {
-    resolve(mode);
+    resolve({ mode, messageTs, channel });
     pendingResearchMode.delete(threadTs);
     return true;
   }
@@ -1379,6 +1389,8 @@ export const handleMessage = async (
 ): Promise<HandleMessageResult> => {
   // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
   // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
+  /** 선택된 모드 결과 (버튼 메시지 ts 포함) — 인플레이스 업데이트에 활용 */
+  let researchModeContext: ResearchModeResult | undefined;
   if (agentName === 'researcher' && isResearchRequest(event)) {
     const threadTs = event.thread_ts ?? event.ts;
     console.log(`[research-mode] 리서치 모드 선택 대기: ${threadTs}`);
@@ -1386,7 +1398,7 @@ export const handleMessage = async (
     // 버튼 클릭 핸들러 등록을 postMessage보다 먼저 수행
     // (Slack이 HTTP 응답 전에 클라이언트에 버튼을 전달할 수 있으므로
     //  postMessage await 이후에 등록하면 클릭 → resolve 미등록 → ⚠️ 경고 발생)
-    const selectedModePromise = new Promise<'academic' | 'practical'>(
+    const selectedModePromise = new Promise<ResearchModeResult>(
       (resolve) => {
         pendingResearchMode.set(threadTs, resolve);
       },
@@ -1446,7 +1458,7 @@ export const handleMessage = async (
     );
 
     // 사용자 선택 대기 (최대 5분 타임아웃)
-    const selectedMode = await Promise.race([
+    const selectedResult = await Promise.race([
       selectedModePromise,
       new Promise<null>((resolve) => {
         setTimeout(() => resolve(null), 5 * 60 * 1000);
@@ -1456,7 +1468,7 @@ export const handleMessage = async (
     // 타임아웃 시 정리
     pendingResearchMode.delete(threadTs);
 
-    if (!selectedMode) {
+    if (!selectedResult) {
       console.log(`[research-mode] 타임아웃: ${threadTs}`);
       await rateLimited(() =>
         slackApp.client.chat.postMessage({
@@ -1468,9 +1480,10 @@ export const handleMessage = async (
       return { text: '', delegationTargets: [] };
     }
 
-    // 선택된 모드를 원래 메시지에 주입
-    console.log(`[research-mode] ${selectedMode} 선택됨: ${threadTs}`);
-    event.text = `${event.text}\n\ndepth=${selectedMode}`;
+    // 선택된 모드를 원래 메시지에 주입 + 인플레이스 업데이트 컨텍스트 저장
+    console.log(`[research-mode] ${selectedResult.mode} 선택됨: ${threadTs}`);
+    event.text = `${event.text}\n\ndepth=${selectedResult.mode}`;
+    researchModeContext = selectedResult;
   }
   // ─── 가로채기 끝 ────────────────────────────────────────
 
@@ -1547,16 +1560,35 @@ export const handleMessage = async (
   }
 
   // 🎛️ 컨트롤 버튼 메시지 게시 (취소/재실행)
+  // Lisa 리서치 모드: 선택 버튼 메시지를 새 메시지 없이 인플레이스 업데이트
   const controlId = generateControlId();
   const threadTs = event.thread_ts ?? event.ts;
-  const statusMessageTs = await postRunningMessage(
-    slackApp,
-    event.channel,
-    threadTs,
-    agentName,
-    controlId,
-    stepInfo,
-  );
+  let statusMessageTs: string | undefined;
+  if (researchModeContext) {
+    const modeLabel =
+      researchModeContext.mode === 'academic'
+        ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
+        : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
+    await updateToRunningMessage(
+      slackApp,
+      researchModeContext.channel,
+      researchModeContext.messageTs,
+      agentName,
+      controlId,
+      modeLabel,
+      stepInfo,
+    );
+    statusMessageTs = researchModeContext.messageTs;
+  } else {
+    statusMessageTs = await postRunningMessage(
+      slackApp,
+      event.channel,
+      threadTs,
+      agentName,
+      controlId,
+      stepInfo,
+    );
+  }
   if (statusMessageTs) {
     storeRunContext({
       controlId,
@@ -2421,6 +2453,7 @@ export const handleMessage = async (
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               ? (messageBlocks as unknown as Array<Record<string, unknown>>)
               : undefined,
+            threadTs: event.thread_ts ?? event.ts,
           },
         );
         const ctx = findContextByEventTs(event.ts);

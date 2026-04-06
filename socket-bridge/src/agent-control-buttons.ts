@@ -297,10 +297,80 @@ export const postRunningMessage = async (
 };
 
 /**
+ * 기존 메시지를 "작업 중" 상태로 업데이트 (모드 선택 메시지 재활용)
+ *
+ * Lisa 리서치 모드 선택 후 동일 메시지에서 진행 상황을 표시할 때 사용.
+ * prefix로 모드 확인 텍스트를 포함하고, 하단에 제어 버튼을 붙인다.
+ */
+export const updateToRunningMessage = async (
+  slackApp: App,
+  channel: string,
+  messageTs: string,
+  agentName: string,
+  controlId: string,
+  prefix: string,
+  stepInfo?: { current: number; total: number },
+): Promise<void> => {
+  const resolved = stepInfo ?? { current: 1, total: 1 };
+  const stepSuffix = ` (${resolved.current}/${resolved.total}단계)`;
+  const showCancelAll = resolved.total > 1;
+  try {
+    await slackApp.client.chat.update({
+      channel,
+      ts: messageTs,
+      text: `${prefix} 작업 중...${stepSuffix}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: `${prefix}\n🏃 *${agentName}* 작업 중...${stepSuffix}`,
+          },
+        },
+        buildControlActions(controlId, showCancelAll),
+      ],
+    });
+  } catch (err) {
+    console.error('[control-buttons] running 메시지 업데이트 실패:', err);
+  }
+};
+
+/** Slack section block 텍스트 최대 길이 */
+const SLACK_BLOCK_TEXT_LIMIT = 2900;
+
+/**
+ * 텍스트를 Slack section block 크기 단위로 분할
+ * 줄바꿈 경계에서 자르되, 최대 길이 초과 시 강제 분할
+ */
+const splitTextIntoChunks = (text: string, maxLen = SLACK_BLOCK_TEXT_LIMIT): string[] => {
+  if (text.length <= maxLen) { return [text]; }
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > maxLen) {
+    // maxLen 이내에서 마지막 줄바꿈 위치 탐색
+    const slice = remaining.slice(0, maxLen);
+    const lastNewline = slice.lastIndexOf('\n');
+    const cutAt = lastNewline > maxLen / 2 ? lastNewline + 1 : maxLen;
+    chunks.push(remaining.slice(0, cutAt));
+    remaining = remaining.slice(cutAt);
+  }
+
+  if (remaining.length > 0) {
+    chunks.push(remaining);
+  }
+
+  return chunks;
+};
+
+/**
  * 상태 메시지 업데이트 (버튼 제거 + 상태 텍스트 변경)
  *
  * resultText / resultBlocks 를 전달하면 상태 헤더 아래에 결과 내용을 포함하여 업데이트.
- * 별도 postMessage 없이 단일 메시지로 완료 상태 + 답변을 표현할 때 사용.
+ * 메시지가 너무 길어 msg_too_long 에러 발생 시:
+ * 1. 결과 없이 버튼만 제거한 상태 메시지로 chat.update 재시도
+ * 2. 결과 텍스트를 2900자 단위로 분할하여 스레드에 postMessage 순차 전송
  */
 export const updateStatusMessage = async (
   slackApp: App,
@@ -311,6 +381,8 @@ export const updateStatusMessage = async (
   options?: {
     resultText?: string;
     resultBlocks?: Array<Record<string, unknown>>;
+    /** 분할 전송 시 사용할 스레드 ts */
+    threadTs?: string;
   },
 ): Promise<void> => {
   const statusText: Record<string, string> = {
@@ -361,7 +433,56 @@ export const updateStatusMessage = async (
       blocks: blocks as any,
     });
   } catch (err) {
-    console.error('[control-buttons] 상태 업데이트 실패:', err);
+    const errCode = (err as { data?: { error?: string } }).data?.error;
+
+    if (errCode !== 'msg_too_long') {
+      console.error('[control-buttons] 상태 업데이트 실패:', err);
+      return;
+    }
+
+    console.warn(
+      `[control-buttons] msg_too_long — 버튼 제거 후 결과 분할 전송 (${agentName})`,
+    );
+
+    // 1. 결과 없이 버튼만 제거한 상태로 chat.update 재시도
+    try {
+      await slackApp.client.chat.update({
+        channel,
+        ts: messageTs,
+        text: headerText,
+        blocks: [{ type: 'section', text: { type: 'mrkdwn', text: headerText } }],
+      });
+    } catch (retryErr) {
+      console.error('[control-buttons] 상태 업데이트 재시도 실패:', retryErr);
+    }
+
+    // 2. 결과 텍스트를 분할하여 스레드에 순차 전송
+    const threadTs = options?.threadTs ?? messageTs;
+    const resultText = options?.resultText;
+
+    if (!resultText) { return; }
+
+    const chunks = splitTextIntoChunks(resultText);
+    const total = chunks.length;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const suffix = total > 1 ? ` _(${i + 1}/${total})_` : '';
+      try {
+        await slackApp.client.chat.postMessage({
+          channel,
+          thread_ts: threadTs,
+          text: chunks[i] + suffix,
+          blocks: [
+            {
+              type: 'section',
+              text: { type: 'mrkdwn', text: chunks[i] + suffix },
+            },
+          ],
+        });
+      } catch (postErr) {
+        console.error(`[control-buttons] 분할 전송 실패 (chunk ${i + 1}/${total}):`, postErr);
+      }
+    }
   }
 };
 
