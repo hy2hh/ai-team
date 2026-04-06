@@ -39,7 +39,7 @@ const MODEL_SELECT_TIMEOUT_MS = 3 * 60 * 1000;
  * - "tier high", "tier=fast", "tier standard" 등 tier 직접 지정
  */
 const MODEL_SELECT_PATTERN =
-  /(?:모델\s*(?:변경|바꿔|바꾸|선택|골라|골라줘|바꿔줘))|(?:claude[\s-]?(?:opus|sonnet|haiku))|(?:(?:opus|haiku|sonnet)\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))|(?:(?:고성능|빠른|빠르게|저렴한)\s*모델)|(?:tier[\s=]*(?:high|fast|standard|opus|haiku|sonnet))/i;
+  /(?:모델\s*(?:변경|바꿔|바꾸|선택|골라|골라줘|바꿔줘))|(?:claude[\s-]?(?:opus|sonnet|haiku))|(?:(?:opus|haiku|sonnet|오푸스|하이쿠)\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))|(?:(?:고성능|빠른|빠르게|저렴한)\s*모델)|(?:tier[\s=]*(?:high|fast|standard|opus|haiku|sonnet))/i;
 
 /**
  * 메시지 텍스트에서 모델 변경 의도를 감지한다
@@ -61,12 +61,12 @@ export const detectModelSelectRequest = (text: string): boolean =>
  */
 export const extractModelTierFromText = (text: string): ModelTier | null => {
   const lower = text.toLowerCase();
-  // opus 명시
-  if (/(?:claude[\s-]?opus|opus\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))/i.test(lower)) {
+  // opus 명시 (영문 + 한글 오푸스)
+  if (/(?:claude[\s-]?opus|(?:opus|오푸스)\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))/i.test(lower)) {
     return 'high';
   }
-  // haiku 명시
-  if (/(?:claude[\s-]?haiku|haiku\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))/i.test(lower)) {
+  // haiku 명시 (영문 + 한글 하이쿠)
+  if (/(?:claude[\s-]?haiku|(?:haiku|하이쿠)\s*(?:로|으로|써줘|사용|쓰고|쓸게|써|씀|사용해줘|사용할게|모델)?(?:\s|$))/i.test(lower)) {
     return 'fast';
   }
   // sonnet 명시
