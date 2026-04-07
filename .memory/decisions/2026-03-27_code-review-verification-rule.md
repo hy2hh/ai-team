@@ -1,3 +1,10 @@
+---
+date: 2026-03-27
+topic: process
+roles: [all]
+summary: 코드 리뷰 시 실제 파일 직접 확인 필수 — 구조 추론·오탐 금지
+---
+
 # Decision: 코드 리뷰 시 반드시 실제 파일 확인 후 판단
 
 Date: 2026-03-27

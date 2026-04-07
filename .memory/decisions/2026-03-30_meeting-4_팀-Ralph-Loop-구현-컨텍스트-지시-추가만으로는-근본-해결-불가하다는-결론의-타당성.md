@@ -1,3 +1,10 @@
+---
+date: 2026-03-30
+topic: quality
+roles: [all]
+summary: Ralph Loop 근본 해결은 코드 강제 필요 — 컨텍스트 지시 추가만으로는 불충분
+---
+
 # 회의 결정: 팀 Ralph Loop 구현 — 컨텍스트 지시 추가만으로는 근본 해결 불가하다는 결론의 타당성 검증
 > 회의 ID: 4
 > 유형: ad-hoc

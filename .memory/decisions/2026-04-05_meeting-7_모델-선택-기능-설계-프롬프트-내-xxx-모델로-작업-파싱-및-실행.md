@@ -1,3 +1,10 @@
+---
+date: 2026-04-05
+topic: architecture
+roles: [backend, frontend]
+summary: 프롬프트 내 "xxx 모델로 작업" 파싱·실행 설계 — 모델 선택 동적 라우팅
+---
+
 # 회의 결정: 모델 선택 기능 설계 — 프롬프트 내 "xxx 모델로 작업" 파싱 및 실행
 > 회의 ID: 7
 > 유형: planning

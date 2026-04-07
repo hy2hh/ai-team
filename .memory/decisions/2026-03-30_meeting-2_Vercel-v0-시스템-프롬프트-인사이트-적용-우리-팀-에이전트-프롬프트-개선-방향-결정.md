@@ -1,3 +1,10 @@
+---
+date: 2026-03-30
+topic: prompting
+roles: [all]
+summary: Vercel v0 인사이트 → 역할 특화·출력 형식 명확화·간결성 강화 방향 결정
+---
+
 # 회의 결정: Vercel v0 시스템 프롬프트 인사이트 적용 — 우리 팀 에이전트 프롬프트 개선 방향 결정
 > 회의 ID: 2
 > 유형: ad-hoc

@@ -1,3 +1,10 @@
+---
+date: 2026-04-06
+topic: team
+roles: [all]
+summary: Frink 신설 필요성 평가 회의 — 기존 에이전트 대체 가능성 검토, 보류 결론
+---
+
 # 회의 결정: AI 엔지니어 에이전트(Frink) 신설 필요성 평가 — 기존 에이전트 대체 가능성 vs 독립 전문 페르소나 효율성
 > 회의 ID: 12
 > 유형: architecture

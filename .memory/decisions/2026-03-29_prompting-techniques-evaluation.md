@@ -1,3 +1,10 @@
+---
+date: 2026-03-29
+topic: prompting
+roles: [all]
+summary: CoVe/SC/PoT 프롬프팅 기법 적용 가치 낮음 — "코드 강제 > 프롬프트 지시" 원칙 재확인
+---
+
 # Decision: 프롬프팅 기법 3개(CoVe, Self-Consistency, PoT) 적용 가치 검증
 Date: 2026-03-29
 Decided by: Meeting (PM, Backend, Frontend, Researcher, SecOps)

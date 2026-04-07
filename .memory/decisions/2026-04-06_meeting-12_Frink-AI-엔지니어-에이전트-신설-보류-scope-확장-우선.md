@@ -1,3 +1,10 @@
+---
+date: 2026-04-06
+topic: team
+roles: [all]
+summary: Frink AI 엔지니어 에이전트 신설 보류 — 기존 에이전트 scope 확장 3단계 점진 접근
+---
+
 # 회의 결정: AI 엔지니어 에이전트(Frink) 신설 보류 — scope 확장 우선
 > 회의 ID: 12
 > 유형: planning

@@ -1,3 +1,10 @@
+---
+date: 2026-03-30
+topic: architecture
+roles: [backend, researcher]
+summary: QA specPath 자동 전달 — parseQACommand() Slack 명령어 경로 파싱 로직 설계
+---
+
 # 회의 결정: QA 실행 명령어 파싱 로직 설계 — specPath 자동 전달 방안
 > 회의 ID: 6
 > 유형: architecture

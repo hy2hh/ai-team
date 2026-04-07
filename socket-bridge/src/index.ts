@@ -43,7 +43,7 @@ import {
   writeHeartbeat,
   cleanupStaleHeartbeats,
 } from './heartbeat.js';
-import { runMaintenance } from './db.js';
+import { runMaintenance, syncDecisionsFts } from './db.js';
 import {
   cancelAutoProceed,
   manuallyApprove,
@@ -1038,12 +1038,14 @@ const executeSingle = async (
       lastSeqResultPerAgent.set(agentResult.agent, agentResult);
     }
     const seqVerifyAgents = [...lastSeqResultPerAgent.values()].filter((r) => shouldVerify(r.agent));
+    let seqAllPassed = seqVerifyAgents.length > 0;
     for (const agentResult of seqVerifyAgents) {
       console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
       try {
         const verifyResults = await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
         const hasFail = verifyResults.some((r) => r.result === 'FAIL');
         if (hasFail) {
+          seqAllPassed = false;
           console.warn(`[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`);
           const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
           const agentApp = findAgentApp(agentResult.agent, apps);
@@ -1060,21 +1062,22 @@ const executeSingle = async (
           } catch (loopErr) {
             console.error(`[qa-loop] Ralph Loop 실패: ${agentResult.agent}`, loopErr);
           }
-        } else {
-          // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
-          const specPath = extractSpecPath(event.text);
-          if (specPath) {
-            console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-            try {
-              const qaApp = findAgentApp('qa', apps);
-              await runDirectQA(specPath, event, qaApp);
-            } catch (qaErr) {
-              console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
-            }
-          }
         }
       } catch (err) {
         console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
+      }
+    }
+    // QA 자동 트리거: 모든 에이전트 검증 완료 후 1회만 실행 (중복 방지)
+    if (seqAllPassed) {
+      const specPath = extractSpecPath(event.text);
+      if (specPath) {
+        console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+        try {
+          const qaApp = findAgentApp('qa', apps);
+          await runDirectQA(specPath, event, qaApp);
+        } catch (qaErr) {
+          console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+        }
       }
     }
 
@@ -1380,6 +1383,7 @@ const executeSingle = async (
         lastResultPerAgent.set(agentResult.agent, agentResult);
       }
       const hubVerifyAgents = [...lastResultPerAgent.values()].filter((r) => shouldVerify(r.agent) && r.changedFiles.length > 0);
+      let hubAllPassed = hubVerifyAgents.length > 0;
       for (const agentResult of hubVerifyAgents) {
         console.log(
           `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
@@ -1396,6 +1400,7 @@ const executeSingle = async (
             (r) => r.result === 'FAIL',
           );
           if (hasFail) {
+            hubAllPassed = false;
             console.warn(
               `[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`,
             );
@@ -1419,24 +1424,25 @@ const executeSingle = async (
                 loopErr,
               );
             }
-          } else {
-            // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
-            const specPath = extractSpecPath(event.text);
-            if (specPath) {
-              console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-              try {
-                const qaApp = findAgentApp('qa', apps);
-                await runDirectQA(specPath, event, qaApp);
-              } catch (qaErr) {
-                console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
-              }
-            }
           }
         } catch (err) {
           console.error(
             `[cross-verify] ${agentResult.agent} 검증 실패:`,
             err,
           );
+        }
+      }
+      // QA 자동 트리거: 모든 에이전트 검증 완료 후 1회만 실행 (중복 방지)
+      if (hubAllPassed) {
+        const specPath = extractSpecPath(event.text);
+        if (specPath) {
+          console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+          try {
+            const qaApp = findAgentApp('qa', apps);
+            await runDirectQA(specPath, event, qaApp);
+          } catch (qaErr) {
+            console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+          }
         }
       }
 
@@ -3243,6 +3249,9 @@ const main = async () => {
 
   // Langfuse 트래커 초기화 (환경변수 없으면 no-op)
   initLangfuseTracker();
+
+  // Decisions FTS 인덱스 동기화 (에이전트 Read 비용 절감)
+  syncDecisionsFts();
 
   // Ralph Loop 테이블 초기화 + 오래된 상태 정리
   initQaLoopTable();

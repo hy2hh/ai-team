@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 export const PROJECT_DIR = join(import.meta.dirname, '..', '..');
@@ -255,6 +255,21 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
         ON run_contexts(thread_ts);
     `,
   },
+  {
+    version: 9,
+    sql: `
+      -- Decisions FTS 인덱스 (파일시스템 기반 Read 비용 절감)
+      -- 에이전트가 파일 전체를 Read하지 않고 SQL로 관련 decisions만 조회
+      CREATE VIRTUAL TABLE IF NOT EXISTS decisions_fts USING fts5(
+        file_path,
+        date,
+        topic,
+        roles,
+        summary,
+        tokenize='unicode61 remove_diacritics 1'
+      );
+    `,
+  },
 ];
 
 /**
@@ -312,6 +327,115 @@ export const getDb = (): Database.Database => {
 
   _db = db;
   return db;
+};
+
+// ─── Decisions FTS 헬퍼 ──────────────────────────────────────
+
+interface DecisionFrontmatter {
+  file_path: string;
+  date: string;
+  topic: string;
+  roles: string;
+  summary: string;
+}
+
+/** frontmatter 블록에서 key: value 파싱 */
+const parseFrontmatter = (content: string, filePath: string): DecisionFrontmatter | null => {
+  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  if (!match) { return null; }
+
+  const lines = match[1].split('\n');
+  const meta: Record<string, string> = {};
+
+  for (const line of lines) {
+    const idx = line.indexOf(':');
+    if (idx === -1) { continue; }
+    const key = line.slice(0, idx).trim();
+    const val = line.slice(idx + 1).trim();
+    meta[key] = val.replace(/^\[|\]$/g, ''); // "[a, b]" → "a, b"
+  }
+
+  if (!meta['summary']) { return null; }
+
+  return {
+    file_path: filePath,
+    date: meta['date'] ?? '',
+    topic: meta['topic'] ?? '',
+    roles: meta['roles'] ?? '',
+    summary: meta['summary'] ?? '',
+  };
+};
+
+/**
+ * .memory/decisions/ 디렉토리의 모든 md 파일을 FTS 테이블에 동기화.
+ * bridge 시작 시 1회 호출.
+ */
+export const syncDecisionsFts = (): void => {
+  const db = getDb();
+  const decisionsDir = join(MEMORY_DIR, 'decisions');
+
+  if (!existsSync(decisionsDir)) { return; }
+
+  const files = readdirSync(decisionsDir).filter((f) => f.endsWith('.md') && !f.startsWith('_'));
+
+  const deleteStmt = db.prepare('DELETE FROM decisions_fts WHERE file_path = ?');
+  const insertStmt = db.prepare(
+    'INSERT INTO decisions_fts (file_path, date, topic, roles, summary) VALUES (?, ?, ?, ?, ?)',
+  );
+
+  let synced = 0;
+
+  db.transaction(() => {
+    for (const file of files) {
+      const filePath = join(decisionsDir, file);
+      const content = readFileSync(filePath, 'utf-8');
+      const meta = parseFrontmatter(content, file);
+      if (!meta) { continue; }
+
+      deleteStmt.run(file);
+      insertStmt.run(meta.file_path, meta.date, meta.topic, meta.roles, meta.summary);
+      synced++;
+    }
+  })();
+
+  console.log(`[db] decisions FTS 동기화 완료 — ${synced}/${files.length}개`);
+};
+
+/**
+ * FTS로 decisions 검색.
+ * @param role - 역할명 (예: 'frontend'). undefined면 역할 필터 없음.
+ * @param topic - 토픽 (예: 'architecture'). undefined면 토픽 필터 없음.
+ * @param limit - 최대 반환 수 (기본 5)
+ */
+export const queryDecisions = (
+  role?: string,
+  topic?: string,
+  limit = 5,
+): DecisionFrontmatter[] => {
+  const db = getDb();
+
+  const conditions: string[] = [];
+  const params: string[] = [];
+
+  if (role) {
+    conditions.push('(roles MATCH ? OR roles MATCH "all")');
+    params.push(role);
+  }
+  if (topic) {
+    conditions.push('topic MATCH ?');
+    params.push(topic);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const sql = `
+    SELECT file_path, date, topic, roles, summary
+    FROM decisions_fts
+    ${where}
+    ORDER BY date DESC
+    LIMIT ?
+  `;
+
+  return db.prepare(sql).all(...params, limit) as DecisionFrontmatter[];
 };
 
 /**

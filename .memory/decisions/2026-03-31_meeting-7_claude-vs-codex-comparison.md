@@ -1,3 +1,10 @@
+---
+date: 2026-03-31
+topic: tooling
+roles: [all]
+summary: Claude vs Codex 상세 비교 — 파일 조작·MCP·비용 효율에서 Claude Code 우위 확인
+---
+
 # 회의 결정: Claude vs Codex 비교 분석
 > 회의 ID: 7
 > 유형: ad-hoc

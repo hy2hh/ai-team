@@ -1,107 +1,34 @@
 # AI Team Memory Index
 
-> Entry point for all agents. Read this first on every session start.
+> 세션 시작 진입점. 상세 규칙 → `full-index.md`
 
-## Directory Structure
+## 빠른 참조
 
-```
-.memory/
-├── index.md              ← You are here
-├── facts/
-│   ├── team-profile.md   — Team members, roles, Slack bots
-│   ├── project-context.md — Goals, tech stack, constraints
-│   ├── services.md       — External service identifiers per project
-│   ├── {topic}.md        — Add as needed (e.g., api-contracts.md)
-│   └── agents/
-│       ├── pm/           — PM agent's own facts (직접 쓰기 가능)
-│       ├── backend/      — Backend agent's own facts
-│       ├── frontend/     — Frontend agent's own facts
-│       ├── designer/     — Designer agent's own facts
-│       ├── researcher/   — Researcher agent's own facts
-│       └── secops/       — SecOps agent's own facts
-├── heartbeats/
-│   └── (SQLite memory.db에 저장됨 — bridge가 10분마다 갱신)
-├── tasks/
-│   ├── active.md         — Index (역할별 파일 링크)
-│   ├── active-{role}.md  — 역할별 진행 중 태스크 (6개)
-│   ├── backlog.md        — Queued tasks (prioritized)
-│   └── done.md           — Completed (rotate monthly)
-├── handoff/
-│   └── {from}-to-{to}_{topic}.md — 에이전트 간 인수인계 문서
-├── decisions/
-│   └── YYYY-MM-DD_{topic}.md — Architectural/strategic decisions
-├── conversations/
-│   └── YYYY-MM-DD_{channel}.md — Important cross-agent discussions
-└── research/
-    ├── index.md              — 리서치 목록 (제목, 날짜, 파일 링크)
-    └── YYYY-MM-DD_{topic}.md — 리서치 원본 결과 (Lisa 작성)
-```
+| 경로 | 용도 |
+|------|------|
+| `facts/project-context.md` | 기술스택, 포트, 현재 Phase |
+| `facts/team-profile.md` | 팀원, 역할, Slack 봇 |
+| `tasks/active-{role}.md` | 내 진행 중 태스크 |
+| `decisions/_index.md` | 전체 결정사항 한줄 요약 테이블 |
+| `decisions/archive/2026-03/summary.md` | 3월 결정사항 압축 요약 |
+| `handoff/index.md` | 핸드오프 목록 |
+| `research/index.md` | 리서치 목록 |
 
 ## Session Start Checklist
-1. Read `tasks/active-{your-role}.md` — your current tasks
-2. Read `facts/project-context.md` — current project state
-3. Scan `decisions/` — recent architectural choices
-4. Check `handoff/` — pending handoffs for you
-5. Check Slack #ai-team for unread mentions
 
-## Writing Rules
+1. Read `tasks/active-{your-role}.md`
+2. Read `facts/project-context.md`
+3. Check `handoff/index.md` → 본인 role 포함 파일만 Read
+4. Check Slack #ai-team for unread mentions
 
-### heartbeats/
-- Heartbeats are stored in `memory.db` (SQLite), NOT as `.json` files
-- Bridge calls `writeHeartbeat(role, status, currentTask?)` at task start/end
-- Bridge refreshes its own heartbeat every 5 minutes automatically
-- Heartbeats not updated in 10 minutes are considered stale (`cleanupStaleHeartbeats`)
-- The `heartbeats/` directory is kept for legacy compatibility — do NOT write `.json` files there
+> decisions 조회·작성 필요 시 → `/decision-ops` 스킬 호출
 
-### facts/ (root)
-- Persistent knowledge only (team changes, tech stack, API contracts)
-- Owner: PM only — others propose via Slack, PM updates
-- Keep files under 200 lines — split if growing
+## 쓰기 규칙 요약
 
-### facts/agents/{role}/
-- Each agent can write their own facts directly — no PM approval needed
-- Use for role-specific knowledge: local decisions, component notes, domain-specific context
-- Keep files under 200 lines — split if growing
+- **facts/**: PM만 작성, 역할별 하위는 본인 직접
+- **tasks/**: 본인 `active-{role}.md`만 수정
+- **decisions/**: frontmatter(`date/topic/roles/summary`) 필수 + `_index.md` 테이블 추가
+- **handoff/**: `handoff/index.md` 업데이트 필수, 7일 후 삭제
+- **heartbeats/**: `memory.db` SQLite 저장 — `.json` 파일 금지
 
-### tasks/
-- Each agent updates ONLY their own `active-{role}.md`
-- Format: `- [ ] task description | created | priority`
-- Move to done.md with completion date when finished
-- Backlog sorted by priority: HIGH → MEDIUM → LOW
-
-### handoff/
-- 에이전트 간 작업 인수인계 시 사용
-- Format: `{from}-to-{to}_{topic}.md`
-- 7일 이상 된 문서는 승격 또는 삭제
-
-### decisions/
-- One file per decision
-- Template:
-  ```
-  # Decision: {title}
-  Date: YYYY-MM-DD
-  Decided by: {agent or sid}
-  Status: accepted | superseded | deprecated
-
-  ## Context
-  ## Options Considered
-  ## Decision
-  ## Consequences
-  ```
-
-### conversations/
-- Only log discussions with actionable outcomes
-- Auto-expire after 7 days unless promoted to facts/ or decisions/
-- Don't log: greetings, small talk, debug sessions
-
-### research/
-- Owner: Lisa (Researcher) — 리서치 완료 후 직접 저장
-- Format: `YYYY-MM-DD_{topic}.md` (예: `2026-04-07_toss-design-system.md`)
-- 저장 내용: 리서치 원본 전문 (검증 마커 포함), 출처 목록, 핵심 인사이트 요약
-- `research/index.md` 업데이트 필수 (제목, 날짜, 모드, 파일 링크 한 줄)
-- 만료 없음 — 장기 보관 (facts/와 동일 정책)
-
-## Conflict Resolution
-- Each agent writes only to their own active file (동시쓰기 방지)
-- If facts conflict: escalate to sid
-- If task ownership is unclear: PM Donald assigns
+> 상세 규칙 필요 시 → `full-index.md`

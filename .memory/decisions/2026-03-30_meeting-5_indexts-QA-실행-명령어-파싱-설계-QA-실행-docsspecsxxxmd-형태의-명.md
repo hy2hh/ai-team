@@ -1,3 +1,10 @@
+---
+date: 2026-03-30
+topic: architecture
+roles: [backend]
+summary: index.ts QA 명령어 파싱 설계 — "QA 실행 docs/specs/xxx.md" → specPath 자동 추출
+---
+
 # 회의 결정: index.ts QA 실행 명령어 파싱 설계 — "QA 실행 docs/specs/xxx.md" 형태의 명령어를 인식하여 specPath를 runRalphLoop()에 전달하는 라우팅/파싱 로직 설계
 > 회의 ID: 5
 > 유형: architecture

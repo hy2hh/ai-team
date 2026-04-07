@@ -7,13 +7,32 @@
 - **React Process**: `shared/react-process.md`
 - **Code Quality**: `shared/code-quality-standards.md`
 
+## Shared 파일 로딩 정책 (토큰 절약)
+
+**항상 로드 (모든 에이전트):**
+- `shared/collision-prevention.md` — 단일 응답 보장 규칙
+
+**역할별 로드 (해당 역할만):**
+- `shared/routing-rules.md` → **Triage 전용**
+- `shared/react-process.md` → Frontend / Backend / Designer만
+- `shared/code-quality-standards.md` → Frontend / Backend만
+
+**On-demand (작업 시작 시에만):**
+- `shared/collaboration-rules.md` → 위임·핸드오프 수행 시
+- `shared/processes/systematic-debugging.md` → 버그 디버깅 시
+- `shared/processes/code-review-protocol.md` → 코드 리뷰 시
+- `shared/processes/verification-before-completion.md` → 완료 직전
+- `shared/api-contracts-protocol.md` → API 설계·변경 시
+- `shared/cross-domain-coordination.md` → 크로스 도메인 작업 시
+
 ## Session Start Protocol
 1. `git pull --rebase origin main` (충돌 시: `git rebase --abort` → `git pull --no-rebase`)
 2. Read `.memory/tasks/active-{role}.md`
 3. Read `.memory/facts/project-context.md`
 4. Check `.memory/facts/qa-metrics.md` — 자기 역할의 FAIL 빈도 확인 (자가 리뷰 우선순위 조정)
-5. Check `.memory/decisions/lesson-*` — 자기 역할 관련 학습 항목 로드 (임시 체크리스트 추가)
-6. Check `.memory/handoff/` — 대기 중인 핸드오프 확인
+5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
+
+> decisions 조회·작성 → `/decision-ops` 스킬 호출
 
 ## Session End Protocol
 1. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)

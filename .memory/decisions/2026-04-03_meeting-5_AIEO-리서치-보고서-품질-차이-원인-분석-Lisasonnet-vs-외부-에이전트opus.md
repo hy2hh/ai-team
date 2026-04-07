@@ -1,3 +1,10 @@
+---
+date: 2026-04-03
+topic: quality
+roles: [researcher, qa]
+summary: Lisa(sonnet) vs 외부(opus) 리서치 품질 차이 원인 — 모델 능력·프롬프트 구조 차이 분석
+---
+
 # 회의 결정: AIEO 리서치 보고서 품질 차이 원인 분석 — Lisa(sonnet) vs 외부 에이전트(opus)
 > 회의 ID: 5
 > 유형: ad-hoc

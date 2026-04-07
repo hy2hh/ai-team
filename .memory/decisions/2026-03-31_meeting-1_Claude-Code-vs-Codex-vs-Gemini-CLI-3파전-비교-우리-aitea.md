@@ -1,3 +1,10 @@
+---
+date: 2026-03-31
+topic: tooling
+roles: [all]
+summary: Claude Code vs Codex vs Gemini CLI 비교 → Claude Code 유지 (멀티에이전트·MCP 우위)
+---
+
 # 회의 결정: Claude Code vs Codex vs Gemini CLI 3파전 비교 — 우리 ai-team 시스템 관점에서 코딩 에이전트 성능, 멀티 에이전트 협업 지원, MCP 호환성, 비용, 컨텍스트 길이, 도구 사용 능력, 통합 용이성을 포함한 3자 비교 분석. 회의 #7(Claude vs Codex) 결론을 기반으로 Gemini CLI를 추가 비교 대상으로 포함.
 > 회의 ID: 1
 > 유형: ad-hoc

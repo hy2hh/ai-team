@@ -1,13 +1,18 @@
-# Handoff Directory
+# Handoff Index
 
-에이전트 간 작업 인수인계 문서를 저장합니다.
+> **에이전트 사용 규칙**: `to` 컬럼에 본인 역할이 포함된 행만 해당 파일 Read. 전체 파일 일괄 로드 금지.
+
+## 현재 핸드오프 목록
+
+| 파일 | from | to | topic | 날짜 | 상태 |
+|------|------|----|-------|------|------|
+| `designer-to-frontend_kanban-design-spec.md` | designer | frontend | 칸반 디자인 스펙 핸드오프 | 2026-04-06 | 대기중 |
 
 ## 파일 형식
 `{from}-to-{to}_{topic}.md`
-
-예시: `backend-to-frontend_api-v2-contract.md`
 
 ## 규칙
 - 인수인계 시 핵심 컨텍스트, 결정 사항, 미결 이슈를 기록
 - 수신 에이전트가 확인 후 불필요한 파일은 정리
 - 7일 이상 된 핸드오프 문서는 decisions/ 또는 facts/로 승격하거나 삭제
+- **이 index.md에 행 추가/삭제 필수** — 에이전트가 전체 파일을 스캔하지 않도록

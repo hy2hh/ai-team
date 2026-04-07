@@ -1,3 +1,10 @@
+---
+date: 2026-04-07
+topic: testing
+roles: [qa, backend, frontend]
+summary: Chalmers e2e 테스트 도구 — Playwright CLI 채택, MCP 미채택 (토큰 4배 차이)
+---
+
 # 회의 결정: Chalmers QA 에이전트 e2e 테스트 도구 설계 — Playwright CLI 채택 (MCP 미채택)
 > 회의 ID: 13
 > 유형: planning

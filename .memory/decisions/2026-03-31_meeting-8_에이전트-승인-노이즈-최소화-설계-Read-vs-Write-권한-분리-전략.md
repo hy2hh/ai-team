@@ -1,3 +1,10 @@
+---
+date: 2026-03-31
+topic: architecture
+roles: [backend, secops]
+summary: Read 자동 허용·Write만 승인 요청 — 승인 노이즈 최소화 권한 분리 전략
+---
+
 # 회의 결정: 에이전트 승인 노이즈 최소화 설계 — Read vs Write 권한 분리 전략
 > 회의 ID: 8
 > 유형: architecture

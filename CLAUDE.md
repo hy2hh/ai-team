@@ -64,14 +64,12 @@ All agents share `.memory/`. Entry point: `.memory/index.md`.
 ### Session Start Protocol
 1. Read `.memory/tasks/active-{your-role}.md` — your current tasks
 2. Read `.memory/facts/project-context.md` — project state
-3. Read `.memory/facts/team-profile.md` — team roster
-4. Check `.memory/decisions/` for recent architectural decisions
-5. Check `.memory/handoff/` for pending handoffs addressed to you
+3. Check `.memory/handoff/index.md` → 본인 role 포함 파일만 Read
 
 ### Memory Read/Write Rules
 - **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: Marge.
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
-- **decisions/**: Format `YYYY-MM-DD_{topic}.md`. The deciding agent writes it.
+- **decisions/**: 조회·작성 시 `/decision-ops` 스킬 호출.
 - **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
 - **claims/**: Deprecated `.md` file directory (kept for `.gitkeep` only). Actual claim state lives in `memory.db` SQLite claims table.
 

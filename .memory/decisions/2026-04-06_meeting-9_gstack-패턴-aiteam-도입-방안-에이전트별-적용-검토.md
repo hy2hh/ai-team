@@ -1,3 +1,10 @@
+---
+date: 2026-04-06
+topic: architecture
+roles: [all]
+summary: gstack 패턴 ai-team 도입 방안 — 에이전트별 적용 범위 검토 및 단계적 도입 결정
+---
+
 # 회의 결정: gstack 패턴 ai-team 도입 방안 — 에이전트별 적용 검토
 > 회의 ID: 9
 > 유형: planning
