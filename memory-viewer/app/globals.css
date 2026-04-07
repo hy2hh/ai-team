@@ -1,0 +1,536 @@
+@import "tailwindcss";
+
+/* =============================================
+   Toss Design System — Web 적용
+   폰트: Pretendard (Toss Product Sans 대체, CDN 미제공)
+   타입 스케일: TDS Mobile T1~T7 실측값 (Lisa 리서치 2026-04-07)
+   ============================================= */
+
+/* ─── Pretendard Variable 로드 지원 ─── */
+@font-face {
+  font-family: 'Pretendard Variable';
+  font-display: swap;
+}
+
+:root {
+  /* ─── 폰트 패밀리 (TDS Mobile 스택 + Pretendard 대체) ─── */
+  --font-family: 'Pretendard Variable', 'Pretendard',
+    'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont,
+    'Noto Sans KR', Roboto, sans-serif;
+
+  /* ─── 타이포그래피 토큰 (TDS Mobile T스케일 실측값) ─── */
+  /* T1: 최대 헤딩 */
+  --text-t1-size:   30px;
+  --text-t1-lh:     40px;
+  /* T2: 대형 헤딩 */
+  --text-t2-size:   26px;
+  --text-t2-lh:     35px;
+  /* T3: 일반 헤딩 */
+  --text-t3-size:   22px;
+  --text-t3-lh:     31px;
+  /* T4: 소형 헤딩 */
+  --text-t4-size:   20px;
+  --text-t4-lh:     29px;
+  /* T5: 본문 Regular */
+  --text-t5-size:   17px;
+  --text-t5-lh:     25.5px;
+  /* T6: 본문 Small */
+  --text-t6-size:   15px;
+  --text-t6-lh:     22.5px;
+  /* T7: Caption */
+  --text-t7-size:   13px;
+  --text-t7-lh:     19.5px;
+
+  /* ─── 편의 별칭 (컴포넌트에서 사용) ─── */
+  --text-h1:       var(--text-t3-size);   /* 22px — 페이지 헤딩 */
+  --text-h2:       var(--text-t4-size);   /* 20px */
+  --text-body:     var(--text-t6-size);   /* 15px — 기본 본문 */
+  --text-body-sm:  var(--text-t7-size);   /* 13px */
+  --text-caption:  11px;                  /* TDS ST 최소값 */
+  --text-label:    var(--text-t7-size);   /* 13px */
+
+  --lh-t5:         var(--text-t5-lh);    /* 25.5px */
+  --lh-t6:         var(--text-t6-lh);    /* 22.5px */
+  --lh-t7:         var(--text-t7-lh);    /* 19.5px */
+  --line-height-tight:   1.3;
+  --line-height-normal:  1.5;
+  --line-height-relaxed: 1.7;
+
+  /* ─── 폰트 웨이트 (TDS: Light / Regular 400 / Bold 700) ─── */
+  --font-weight-normal:   400;
+  --font-weight-medium:   500;   /* TDS 미정의, UI 보조용 */
+  --font-weight-semibold: 600;   /* TDS 미정의, UI 보조용 */
+  --font-weight-bold:     700;
+
+  /* ─── 스페이싱 스케일 (4px 기준) ─── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+
+  /* ─── Border Radius ─── */
+  --radius-xs:  4px;   /* 기본 UI 요소 */
+  --radius-sm:  8px;   /* 카드 내부 */
+  --radius-md: 12px;   /* CTA 버튼, 인풋 */
+  --radius-lg: 16px;   /* 카드 */
+  --radius-xl: 24px;   /* 대형 카드 */
+
+  /* ─── 배경 레이어 (Toss 라이트) ─── */
+  --color-bg-base:     #FFFFFF;   /* 메인 콘텐츠 영역 */
+  --color-bg-surface:  #F9FAFB;   /* 사이드바 / 보조 배경 */
+  --color-bg-elevated: #F2F4F6;   /* hover / 인라인 코드 배경 (TDS grey100) */
+  --color-bg-card:     #F9FAFB;   /* 카드 배경 */
+  --color-bg-input:    #FFFFFF;   /* 인풋 배경 */
+  --color-bg-overlay:  rgba(0, 0, 0, 0.4);
+
+  /* ─── 테두리 (1px solid, 무채색) ─── */
+  --color-border:        #E5E8EB;
+  --color-border-strong: #D1D6DB;
+
+  /* ─── 텍스트 6단계 ─── */
+  --color-text-primary:   #191F28;   /* 제목·본문 */
+  --color-text-secondary: #8B95A1;   /* 보조·설명 */
+  --color-text-tertiary:  #B0B8C1;   /* 힌트·중요도 낮음 */
+  --color-text-muted:     #B0B8C1;   /* 내부 호환 */
+  --color-text-disabled:  #D1D6DB;   /* 비활성 */
+  --color-text-inverse:   #FFFFFF;
+
+  /* ─── 브랜드 블루 (TDS 실측 토큰) ─── */
+  --color-blue-50:   #E8F3FF;   /* TDS blue50 */
+  --color-blue-100:  #C9E2FF;   /* TDS blue100 */
+  --color-blue-300:  #64A8FF;   /* TDS blue300 */
+  --color-blue-400:  #4593FC;   /* TDS blue400 */
+  --color-blue-500:  #3182F6;   /* Toss 대표 블루 */
+
+  --color-point:        #3182F6;   /* Primary CTA */
+  --color-point-light:  #4593FC;   /* TDS blue400 */
+  --color-point-hover:  #1B64DA;
+  --color-point-subtle: #E8F3FF;   /* TDS blue50 */
+  --color-point-border: #3182F6;
+
+  /* ─── 포커스 ─── */
+  --color-focus-ring: rgba(49, 130, 246, 0.25);
+
+  /* ─── 시맨틱 ─── */
+  --color-negative: #F04452;   /* 에러·삭제 */
+  --color-warning:  #F5A623;
+  --color-positive: #0BB151;
+  --color-info:     #3182F6;
+
+  /* ─── 폴더 색상 (무채색 계열) ─── */
+  --color-folder-facts:     #8B95A1;
+  --color-folder-decisions: #8B95A1;
+  --color-folder-tasks:     #8B95A1;
+  --color-folder-handoff:   #8B95A1;
+  --color-folder-design:    #8B95A1;
+  --color-folder-logs:      #B0B8C1;
+  --color-folder-default:   #8B95A1;
+}
+
+/* ─── 기본 리셋 ─── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--text-body);        /* 15px — TDS T6 */
+  line-height: var(--lh-t6);          /* 22.5px */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── 키보드 포커스 ─── */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ─── 스크롤바 ─── */
+::-webkit-scrollbar        { width: 4px; height: 4px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
+
+/* =============================================
+   마크다운 렌더링
+   ============================================= */
+.markdown-body {
+  font-family: var(--font-family);
+  font-size: var(--text-body);       /* 15px TDS T6 */
+  line-height: var(--lh-t6);         /* 22.5px */
+  color: var(--color-text-primary);
+}
+
+/* 헤딩 — TDS T스케일 적용 */
+.markdown-body h1 {
+  font-size: var(--text-t3-size);    /* 22px TDS T3 */
+  line-height: var(--text-t3-lh);    /* 31px */
+  font-weight: var(--font-weight-bold);
+  margin: var(--space-6) 0 var(--space-3);
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-3);
+}
+.markdown-body h2 {
+  font-size: var(--text-t4-size);    /* 20px TDS T4 */
+  line-height: var(--text-t4-lh);    /* 29px */
+  font-weight: var(--font-weight-bold);
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--color-text-primary);
+}
+.markdown-body h3 {
+  font-size: var(--text-t5-size);    /* 17px TDS T5 */
+  line-height: var(--text-t5-lh);    /* 25.5px */
+  font-weight: var(--font-weight-bold);
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--color-text-primary);
+}
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  font-size: var(--text-body);       /* 15px TDS T6 */
+  font-weight: var(--font-weight-bold);
+  margin: var(--space-3) 0 var(--space-2);
+}
+
+.markdown-body p {
+  margin: var(--space-2) 0;
+  line-height: var(--lh-t6);        /* 22.5px */
+}
+.markdown-body ul, .markdown-body ol {
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
+}
+.markdown-body li {
+  margin: var(--space-1) 0;
+  line-height: var(--lh-t6);
+}
+
+/* 인라인 코드 */
+.markdown-body code {
+  background: var(--color-bg-elevated);
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-xs);
+  font-size: 0.875em;
+  color: var(--color-point);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+}
+
+/* 코드 블록 */
+.markdown-body pre {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  overflow-x: auto;
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--color-text-primary);
+  font-size: var(--text-t7-size);    /* 13px TDS T7 */
+  line-height: var(--lh-t7);        /* 19.5px */
+}
+
+/* 인용 */
+.markdown-body blockquote {
+  border-left: 2px solid var(--color-point);
+  padding-left: var(--space-4);
+  margin: var(--space-3) 0;
+  color: var(--color-text-secondary);
+}
+
+/* 표 */
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--space-3) 0;
+  font-size: var(--text-body-sm);    /* 13px TDS T7 */
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+.markdown-body th {
+  background: var(--color-bg-surface);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--text-caption);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* 링크 */
+.markdown-body a {
+  color: var(--color-point);
+  text-decoration: none;
+}
+.markdown-body a:hover {
+  color: var(--color-point-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* 구분선 */
+.markdown-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-6) 0;
+}
+
+/* 체크박스 */
+.markdown-body input[type="checkbox"] {
+  margin-right: var(--space-2);
+  accent-color: var(--color-point);
+}
+
+/* 강조 */
+.markdown-body strong {
+  color: var(--color-text-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+/* =============================================
+   파일트리 (List Item)
+   TDS 기준: 터치 타겟 44px, padding 수평 12px
+   ============================================= */
+.tree-node {
+  min-height: 36px;
+  padding: 0 var(--space-3);         /* 0 12px — 4배수 */
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-xs);   /* 4px */
+  font-size: var(--text-t7-size);    /* 13px TDS T7 */
+  line-height: var(--lh-t7);        /* 19.5px */
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+.tree-node:hover:not(.tree-node-selected) {
+  background: var(--color-bg-elevated);   /* #F2F4F6 TDS grey100 */
+}
+.tree-node-selected {
+  background: var(--color-point-subtle);  /* #E8F3FF TDS blue50 */
+  color: var(--color-point);
+}
+
+/* ─── 검색 결과 행 hover ─── */
+.search-result-row:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* ─── 백링크 행 hover ─── */
+.backlink-row:hover {
+  background: var(--color-bg-elevated);
+}
+
+/* ─── 헤더 아이콘 버튼 hover ─── */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-xs);   /* 4px */
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+.icon-btn:hover {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+/* ─── 모바일 드로어 오버레이 ─── */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-bg-overlay);
+  z-index: 40;
+}
+
+/* ─── 사이드바 드로어 트랜지션 ─── */
+.sidebar-drawer {
+  transition: transform 250ms ease;
+}
+
+/* =============================================
+   컴포넌트 유틸리티 클래스
+   TDS 기준 수치 적용
+   ============================================= */
+
+/* ─── CTA 버튼 (TDS 기준: height 56px, radius 12px, full-width) ─── */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);               /* 8px */
+  height: var(--space-14);           /* 56px */
+  width: 100%;
+  border-radius: var(--radius-md);   /* 12px */
+  background: var(--color-point);
+  color: var(--color-text-inverse);
+  font-size: var(--text-body);       /* 15px TDS T6 */
+  font-weight: var(--font-weight-bold);
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-point-hover);
+}
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn-primary:disabled {
+  background: var(--color-bg-elevated);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}
+
+/* ─── 보조 버튼 (인라인 액션용) ─── */
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);               /* 4px */
+  height: 28px;
+  padding: 0 var(--space-3);         /* 0 12px */
+  border-radius: var(--radius-xs);   /* 4px */
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: var(--text-t7-size);    /* 13px TDS T7 */
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-bg-elevated);
+  border-color: var(--color-border-strong);
+}
+.btn-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ─── 저장 버튼 (brand fill, 인라인 크기) ─── */
+.btn-save {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);               /* 4px */
+  height: 28px;
+  padding: 0 var(--space-3);         /* 0 12px */
+  border-radius: var(--radius-xs);   /* 4px */
+  background: var(--color-point);
+  color: var(--color-text-inverse);
+  font-size: var(--text-t7-size);    /* 13px TDS T7 */
+  font-weight: var(--font-weight-medium);
+  border: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.btn-save:hover:not(:disabled) {
+  background: var(--color-point-hover);
+}
+.btn-save:disabled {
+  opacity: 0.8;
+  cursor: not-allowed;
+}
+
+/* ─── 인풋 (TDS 기준: height 52px, radius 12px) ─── */
+.input-base {
+  height: 52px;
+  width: 100%;
+  padding: 0 var(--space-4);         /* 0 16px */
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);   /* 12px */
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--text-body);       /* 15px TDS T6 */
+  line-height: var(--lh-t6);
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.input-base::placeholder {
+  color: var(--color-text-tertiary);
+}
+.input-base:focus {
+  border-color: var(--color-point);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+.input-base.input-error {
+  border-color: var(--color-negative);
+}
+.input-base.input-error:focus {
+  border-color: var(--color-negative);
+  box-shadow: 0 0 0 3px rgba(240, 68, 82, 0.15);
+}
+
+/* ─── 편집 텍스트에어리어 ─── */
+.textarea-editor {
+  width: 100%;
+  padding: var(--space-4);
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);   /* 8px */
+  color: var(--color-text-primary);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: var(--text-t7-size);    /* 13px TDS T7 */
+  line-height: var(--lh-t7);        /* 19.5px */
+  outline: none;
+  resize: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.textarea-editor:focus {
+  border-color: var(--color-point);
+  box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+/* ─── 스켈레톤 로딩 (TDS: Spinner 금지) ─── */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+.skeleton {
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-xs);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* ─── 비밀번호 토글 버튼 (터치 타겟 44px) ─── */
+.btn-eye {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 44px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.btn-eye:hover {
+  color: var(--color-text-secondary);
+}
