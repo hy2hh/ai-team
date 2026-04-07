@@ -92,6 +92,7 @@ export default function AddCardModal({ onAdd, onClose }: Props) {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="input-field"
+                data-testid="card-title-input"
               />
             </div>
 

@@ -97,6 +97,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
     <div
       ref={setNodeRef}
       style={style}
+      data-testid="card-item"
       {...attributes}
       {...listeners}
       aria-label={`카드: ${card.title}. 우선순위 ${priorityCfg.label}${card.assignee ? `. 담당자 ${card.assignee}` : ''}${card.due_date ? `. ${dueDateAriaLabel}` : ''}. Enter 키로 상세 보기.`}
@@ -110,6 +111,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
       <div
         onClick={() => onCardClick(card)}
         className={`card-item${isFiltered ? ' card-base--filtered-out' : ''}${isDragging ? ' card-item--dragging' : ''}`}
+        data-testid="card-edit-btn"
         style={{
           background: 'var(--color-bg-card)',
           border: '1px solid var(--color-border)',
@@ -155,6 +157,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
             onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
             aria-label={`${card.title} 카드 삭제`}
             className="delete-btn"
+            data-testid="card-delete-btn"
             style={{
               width: 20,
               height: 20,

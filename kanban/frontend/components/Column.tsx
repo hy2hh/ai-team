@@ -93,6 +93,7 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
     <>
       <div
         className={`column-container${isWipExceeded ? ' column-wip-exceeded' : ''}`}
+        data-testid="column-container"
         role="region"
         aria-label={`${column.name} 컬럼, 카드 ${column.cards.length}개${column.wip_limit ? `, WIP 한도 ${column.wip_limit}` : ''}`}
         style={{
@@ -269,6 +270,7 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
             disabled={isWipExceeded}
             aria-label={`${column.name} 컬럼에 카드 추가${isWipExceeded ? ' (WIP 한도 도달)' : ''}`}
             className="add-card-btn"
+            data-testid="card-create-btn"
             style={{
               width: '100%',
               color: isWipExceeded ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',

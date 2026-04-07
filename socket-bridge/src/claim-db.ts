@@ -267,6 +267,27 @@ export const recoverProcessingClaimsOnStartup = (): OrphanClaimInfo[] => {
 };
 
 /**
+ * 브리지 종료 시 모든 processing claim을 failed로 전환
+ * shutdown 함수에서 호출 — 재시작 시 claim 체크 차단 방지
+ * @returns 정리된 claim 수
+ */
+export const cancelAllProcessingClaims = (): number => {
+  const db = getDb();
+  const now = Date.now();
+
+  const result = db.prepare(`
+    UPDATE claims SET status = 'failed', updated_at = ?
+    WHERE status = 'processing'
+  `).run(now);
+
+  if (result.changes > 0) {
+    console.log(`[claim] shutdown: ${result.changes}개 processing claim → failed 전환`);
+  }
+
+  return result.changes;
+};
+
+/**
  * 오펀 claim을 재큐잉용으로 초기화
  * 현재 버전이 MAX_REQUEUE_ATTEMPTS 미만인 경우에만 재큐잉 허용.
  *

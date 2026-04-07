@@ -1,18 +1,30 @@
 {
   "permissions": {
     "allow": [
-      "Read(/Users/hangheejo/git/ai-team/**)",
-      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/**)",
-      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
-      "Edit(/Users/hangheejo/git/ai-team/.claude/settings.json)",
-      "Edit(/Users/hangheejo/git/ai-team/.memory/**)",
-      "Write(/Users/hangheejo/git/ai-team/.memory/**)",
-      "Write(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
-      "Write(/Users/hangheejo/git/ai-team/.claude/agents/**)",
-      "Write(/Users/hangheejo/git/ai-team/.claude/settings.json)"
+      "Read(/Users/sid/git/ai-team/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/agents/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/agents/shared/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/settings.json)",
+      "Edit(/Users/sid/git/ai-team/.memory/**)",
+      "Write(/Users/sid/git/ai-team/.memory/**)",
+      "Write(/Users/sid/git/ai-team/.claude/agents/shared/**)",
+      "Write(/Users/sid/git/ai-team/.claude/agents/**)",
+      "Write(/Users/sid/git/ai-team/.claude/settings.json)"
     ]
   },
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/sid/git/ai-team/.claude/hooks/guard-check.sh",
+            "statusMessage": "Guard Hook 검사 중..."
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write",

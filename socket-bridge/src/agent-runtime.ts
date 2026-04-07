@@ -514,6 +514,20 @@ export const cancelAllAgents = (): void => {
   activeAgents.clear();
 };
 
+/** shutdown 알림용: 현재 실행 중인 에이전트 정보 스냅샷 반환 */
+export const getActiveAgentsSnapshot = (): Array<{
+  eventTs: string;
+  agentName: string;
+  channel: string;
+  slackApp: App;
+}> =>
+  Array.from(activeAgents.entries()).map(([eventTs, entry]) => ({
+    eventTs,
+    agentName: entry.agentName,
+    channel: entry.channel,
+    slackApp: entry.slackApp,
+  }));
+
 /** 만료된 세션 엔트리 정리 (런타임 주기적 실행) */
 export const cleanupExpiredSessions = (): number => {
   const now = Date.now();
@@ -1541,11 +1555,23 @@ export const handleMessage = async (
     startedAt: Date.now(),
   });
 
-  // ⚒️ 리액션으로 처리 중 표시 — 에이전트 메시지에만
-  // 디바운스 배치 시 모든 원본 메시지에 리액션 추가
+  // ⚒️ 리액션으로 처리 중 표시 — 마지막 메시지(🧠)만 ⚒️로 전환
+  // earlier 메시지(👀)는 건드리지 않음
   if (canReact) {
     const timestamps = event.batchTs ?? [event.ts];
     for (const ts of timestamps) {
+      // earlier 메시지는 👀 유지, 마지막 메시지만 처리
+      if (ts !== event.ts) continue;
+      try {
+        // 🧠 brain 제거 후 ⚒️ 추가 (마지막 메시지만)
+        await slackApp.client.reactions.remove({
+          channel: event.channel,
+          timestamp: ts,
+          name: 'brain',
+        });
+      } catch {
+        // brain 리액션이 없을 수도 있음 — 무시
+      }
       try {
         await slackApp.client.reactions.add({
           channel: event.channel,
@@ -1565,22 +1591,24 @@ export const handleMessage = async (
   const controlId = generateControlId();
   const threadTs = event.thread_ts ?? event.ts;
   let statusMessageTs: string | undefined;
-  // if (researchModeContext) {
-  //   const modeLabel =
-  //     researchModeContext.mode === 'academic'
-  //       ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
-  //       : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
-  //   await updateToRunningMessage(
-  //     slackApp,
-  //     researchModeContext.channel,
-  //     researchModeContext.messageTs,
-  //     agentName,
-  //     controlId,
-  //     modeLabel,
-  //     stepInfo,
-  //   );
-  //   statusMessageTs = researchModeContext.messageTs;
-  // } else if (!skipPosting) {
+  if (researchModeContext) {
+    // 리서치 모드 버튼 메시지를 선택 결과로 인플레이스 업데이트
+    const modeLabel =
+      researchModeContext.mode === 'academic'
+        ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
+        : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
+    await updateToRunningMessage(
+      slackApp,
+      researchModeContext.channel,
+      researchModeContext.messageTs,
+      agentName,
+      controlId,
+      modeLabel,
+      stepInfo,
+    );
+    statusMessageTs = researchModeContext.messageTs;
+  }
+  // else if (!skipPosting) {
   //   // skipPosting=true(cross-verify 등)는 텍스트 상태 메시지 불필요 — 이모지 리액션으로만 처리
   //   statusMessageTs = await postRunningMessage(
   //     slackApp,
@@ -2325,27 +2353,43 @@ export const handleMessage = async (
       `[runtime] ${agentName} 완료 (${elapsed}s): ${resultText.slice(0, 100)}...`,
     );
 
-    // ⚒️ → ✅/❌ 완료 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
+    // 완료 리액션 전환
+    // - 마지막 메시지(event.ts): ⚒️ → ✅/❌
+    // - earlier 메시지(batchTs 중 event.ts 외): 👀 제거
     const doneReaction = sdkFailed ? 'x' : 'white_check_mark';
     if (canReact) {
       const timestamps = event.batchTs ?? [event.ts];
       for (const ts of timestamps) {
-        try {
-          await slackApp.client.reactions.remove({
-            channel: event.channel,
-            timestamp: ts,
-            name: 'hammer_and_pick',
-          });
-          await slackApp.client.reactions.add({
-            channel: event.channel,
-            timestamp: ts,
-            name: doneReaction,
-          });
-        } catch (err) {
-          console.error(
-            `[reaction] ${sdkFailed ? '❌' : '✅'} 완료 리액션 전환 실패:`,
-            err,
-          );
+        if (ts !== event.ts) {
+          // earlier 메시지: 👀 제거 (완료됐으므로)
+          try {
+            await slackApp.client.reactions.remove({
+              channel: event.channel,
+              timestamp: ts,
+              name: 'eyes',
+            });
+          } catch {
+            // eyes 리액션이 없을 수도 있음 — 무시
+          }
+        } else {
+          // 마지막 메시지: ⚒️ → ✅/❌
+          try {
+            await slackApp.client.reactions.remove({
+              channel: event.channel,
+              timestamp: ts,
+              name: 'hammer_and_pick',
+            });
+            await slackApp.client.reactions.add({
+              channel: event.channel,
+              timestamp: ts,
+              name: doneReaction,
+            });
+          } catch (err) {
+            console.error(
+              `[reaction] ${sdkFailed ? '❌' : '✅'} 완료 리액션 전환 실패:`,
+              err,
+            );
+          }
         }
       }
     }
@@ -2448,10 +2492,10 @@ export const handleMessage = async (
 
     // bridge가 resultText를 Slack에 1회만 포스팅 (에이전트 직접 포스팅 제거)
     // statusMessageTs가 있으면 "작업중" 메시지를 결과로 업데이트, 없으면 새 메시지 포스팅
-    // PM이 delegation을 포함한 경우: 상태 메시지를 "완료"로 바꾸지 않고 "작업중" 유지 (hub 루프가 최종 업데이트)
+    // PM이 delegation을 포함한 경우: 메시지는 포스팅하되 status 업데이트는 hub 루프가 최종 처리
     const hasDelegation = delegationQueue.length > 0 || sequentialSteps.length > 0;
     let postedTs: string | undefined;
-    if (resultText && !skipPosting && !hasDelegation) {
+    if (resultText && !skipPosting) {
       const fullText = resultText + metaFooter;
       const messageBlocks = buildMessageBlocks(fullText);
 
@@ -2463,8 +2507,9 @@ export const handleMessage = async (
         );
       }
 
-      if (statusMessageTs) {
+      if (statusMessageTs && !hasDelegation) {
         // "작업중" 메시지를 완료 + 결과 내용으로 업데이트 (별도 postMessage 없음)
+        // delegation 중에는 hub 루프가 최종 업데이트하므로 여기서는 완료 처리 안 함
         await updateStatusMessage(
           slackApp,
           event.channel,
@@ -2485,7 +2530,8 @@ export const handleMessage = async (
           `[runtime] ${agentName} 상태 메시지 업데이트 완료 (결과 포함)`,
         );
       } else {
-        // statusMessageTs 없는 경우 기존 방식으로 새 메시지 포스팅
+        // statusMessageTs 없거나 delegation 중인 경우 새 메시지 포스팅
+        // delegation 시 이 postedTs가 hub 루프의 currentPmTs(리액션 대상)로 사용됨
         try {
           const postResult =
             await rateLimited(() =>
@@ -2598,7 +2644,7 @@ export const handleMessage = async (
 
     return {
       text: resultText,
-      postedTs,
+      postedTs: postedTs ?? statusMessageTs,
       statusMessageTs: statusMessageTs ?? undefined,
       delegationTargets: [...delegationQueue],
       delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,

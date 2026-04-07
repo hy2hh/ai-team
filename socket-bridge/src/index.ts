@@ -21,6 +21,7 @@ import {
   flushSessionStore,
   cancelAgent,
   cancelAllAgents,
+  getActiveAgentsSnapshot,
   cleanupStaleAgents,
   cleanupExpiredSessions,
   resolveResearchMode,
@@ -35,6 +36,7 @@ import {
   cleanupExpiredClaims,
   cleanupOrphanClaims,
   recoverProcessingClaimsOnStartup,
+  cancelAllProcessingClaims,
 } from './claim-db.js';
 import {
   writeHeartbeat,
@@ -863,8 +865,9 @@ const executeSingle = async (
       `[hub] 순차 위임 시작: ${result.delegationSteps.length} steps`,
     );
     const pmApp = findAgentApp('pm', apps);
-    // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가
-    await safeAddReaction(app, event.channel, event.ts, 'hammer_and_pick');
+    // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가 (🧠 또는 ✅ 제거 후)
+    try { await app.client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'brain' }); } catch { /* 없으면 무시 */ }
+    await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'hammer_and_pick');
     console.log(`[reaction] ⚒️ 순차 위임 시작 → 사용자 메시지: ${event.ts}`);
     const seqResults: Array<{ agent: string; text: string; changedFiles: string[] }> = [];
 
@@ -1074,8 +1077,9 @@ const executeSingle = async (
     changedFiles: string[];
   }> = [];
   let agentExecutionCount = 0;
-  // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가
-  await safeAddReaction(app, event.channel, event.ts, 'hammer_and_pick');
+  // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가 (🧠 또는 ✅ 제거 후)
+  try { await app.client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'brain' }); } catch { /* 없으면 무시 */ }
+  await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'hammer_and_pick');
   console.log(`[reaction] ⚒️ 허브 루프 시작 → 사용자 메시지: ${event.ts}`);
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
   let currentPmTs = result.postedTs;
@@ -1951,14 +1955,14 @@ const flushDebounceBuffer = async (
     routing.method,
   );
 
-  // 🧠 → 라우팅 완료, 에이전트 실행 시작 (🧠 제거)
-  // 디바운스 배치 시 모든 원본 메시지의 🧠 제거
-  for (const m of messages) {
+  // 👀 제거 (그룹 내 이전 메시지들 — 마지막 제외)
+  // 🧠는 마지막 메시지에 남겨두고 hub에서 ⚒️ 전환 후 ✅로 마무리
+  for (const m of messages.slice(0, -1)) {
     try {
       await apps[0].client.reactions.remove({
         channel,
         timestamp: m.ts,
-        name: 'brain',
+        name: 'eyes',
       });
     } catch {
       // 리액션 제거 실패 무시
@@ -2787,17 +2791,6 @@ const main = async () => {
         return;
       }
 
-      // 🧠 즉시 리액션 (라우팅 중 표시)
-      try {
-        await apps[0].client.reactions.add({
-          channel,
-          timestamp: ts,
-          name: 'brain',
-        });
-      } catch {
-        // 리액션 실패 무시
-      }
-
       const channelName = await getChannelName(
         apps,
         channel,
@@ -2811,6 +2804,38 @@ const main = async () => {
       const existing = debounceBuffer.get(debounceKey);
 
       if (existing) {
+        // 기존 그룹의 이전 마지막 메시지: 🧠 → 👀 교체 (같이 처리될 메시지 표시)
+        const prevLast = existing.messages[existing.messages.length - 1];
+        try {
+          await apps[0].client.reactions.remove({
+            channel,
+            timestamp: prevLast.ts,
+            name: 'brain',
+          });
+        } catch {
+          // 제거 실패 무시
+        }
+        try {
+          await apps[0].client.reactions.add({
+            channel,
+            timestamp: prevLast.ts,
+            name: 'eyes',
+          });
+        } catch {
+          // 추가 실패 무시
+        }
+
+        // 새 메시지(그룹의 새 마지막)에 🧠 추가
+        try {
+          await apps[0].client.reactions.add({
+            channel,
+            timestamp: ts,
+            name: 'brain',
+          });
+        } catch {
+          // 리액션 실패 무시
+        }
+
         // 기존 타이머 리셋, 메시지 추가
         clearTimeout(existing.timer);
         existing.messages.push({ ts, text: text + fileContext, user });
@@ -2825,6 +2850,17 @@ const main = async () => {
           DEBOUNCE_DELAY,
         );
       } else {
+        // 🧠 즉시 리액션 (새 그룹 첫 메시지, 라우팅 중 표시)
+        try {
+          await apps[0].client.reactions.add({
+            channel,
+            timestamp: ts,
+            name: 'brain',
+          });
+        } catch {
+          // 리액션 실패 무시
+        }
+
         // 새 디바운스 엔트리 생성
         const entry: DebounceEntry = {
           messages: [{ ts, text: text + fileContext, user }],
@@ -3177,6 +3213,23 @@ const main = async () => {
     }
     console.log(`[${label}] ${orphans.length}개 미처리 작업 감지 — 수동 처리 알림`);
 
+    // ⚒️ 리액션 제거 — 고착 claim 원본 메시지에서 처리 중 이모지 정리
+    await Promise.allSettled(
+      orphans
+        .filter((o) => o.channel)
+        .map((orphan) =>
+          apps[0].client.reactions.remove({
+            channel: orphan.channel!,
+            timestamp: orphan.messageTs,
+            name: 'hammer_and_pick',
+          }).then(() => {
+            console.log(`[${label}] ⚒️ 제거: ${orphan.messageTs}`);
+          }).catch(() => {
+            // 이미 제거됐거나 없는 경우 무시
+          }),
+        ),
+    );
+
     const notifyChannel =
       orphans.find((o) => o.channel)?.channel ??
       (process.env.SLACK_NOTIFY_CHANNEL || '');
@@ -3320,7 +3373,20 @@ const main = async () => {
     }
     console.log('[shutdown] debounce 타이머 정리 완료');
 
-    // 3. 활성 에이전트 중단
+    // 3. 활성 에이전트 Slack 알림 후 중단
+    const activeSnapshot = getActiveAgentsSnapshot();
+    if (activeSnapshot.length > 0) {
+      console.log(`[shutdown] 실행 중 에이전트 ${activeSnapshot.length}개 중단 알림 전송`);
+      await Promise.allSettled(
+        activeSnapshot.map(({ eventTs, agentName, channel, slackApp }) =>
+          slackApp.client.chat.postMessage({
+            channel,
+            thread_ts: eventTs,
+            text: `⚠️ Bridge 재시작으로 인해 *${agentName}* 작업이 중단되었습니다. 필요 시 재실행해 주세요.`,
+          }).catch((err) => console.warn(`[shutdown] 알림 전송 실패: ${agentName}`, err)),
+        ),
+      );
+    }
     cancelAllAgents();
     console.log('[shutdown] 활성 에이전트 중단 완료');
 
@@ -3328,11 +3394,14 @@ const main = async () => {
     cancelAllPendingTimers();
     console.log('[shutdown] pending approval 타이머 정리 완료');
 
-    // 5. 세션 저장소 flush
+    // 5. processing claim 정리 (재시작 시 차단 방지)
+    cancelAllProcessingClaims();
+
+    // 6. 세션 저장소 flush
     flushSessionStore();
     await flushLangfuse();
 
-    // 6. Socket Mode 연결 종료
+    // 7. Socket Mode 연결 종료
     const results = await Promise.allSettled(apps.map((app) => app.stop()));
     results.forEach((result, idx) => {
       if (result.status === 'rejected') {

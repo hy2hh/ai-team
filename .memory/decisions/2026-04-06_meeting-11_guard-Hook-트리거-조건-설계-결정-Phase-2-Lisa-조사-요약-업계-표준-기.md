@@ -166,3 +166,10 @@ fail-closed: Hook 스크립트 실패 시 deny 반환 (Wiggum 제안 수용)
 • 2주 후: warn 로그 분석 → Tier 2 deny 전환 여부 결정
 
 Homer에게 Phase 1(Learnings JSONL) + Phase 2(guard Hook) 통합 위임 진행합니다.
+
+## 구현 완료 (2026-04-06)
+- **Status**: ✅ 완료
+- **커밋**: `e7f1dd9` — guard-check.sh 7개 Critical 이슈 수정 + allowlist 오버매치 버그 수정
+- **QA 검증**: 15/15 PASS (Tier1 deny 8건, Tier2 warn 2건, allowlist 2건, 일반 삭제 1건, fail-closed 1건, 플래그 분리 우회 1건)
+- **settings.json 등록**: `settings.json:16-26` PreToolUse hook으로 등록 완료 (Bash|Write|Edit 매칭)
+- **다음 마일스톤**: 2주 후 Tier 2 warn 로그 분석 → deny 전환 여부 결정

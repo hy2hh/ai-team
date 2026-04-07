@@ -23,6 +23,19 @@ app.use('/cards', cardsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
+// ── TEST-ONLY: DB 초기화 엔드포인트 (ALLOW_TEST_RESET=true 환경변수 필수) ──
+if (process.env.ALLOW_TEST_RESET === 'true') {
+  app.post('/test/reset', (_req, res) => {
+    const db = getDb();
+    db.transaction(() => {
+      db.prepare('DELETE FROM cards').run();
+    })();
+    broadcast({ type: 'card:deleted', boardId: 1 });
+    const columns = db.prepare('SELECT id, name, position, wip_limit FROM columns ORDER BY position').all();
+    res.json({ ok: true, columns });
+  });
+}
+
 const server = createServer(app);
 const wss = new WebSocketServer({ server });
 

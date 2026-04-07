@@ -43,7 +43,9 @@
 | API 계약 변경 | @Bart + @Homer | @Wiggum | 양측 호환성 / 보안 |
 | 보안 관련 코드 | @Wiggum | @Homer | 취약점 / 아키텍처 |
 | UI 구현 | @Krusty | @Bart | 디자인 스펙 일치 / 접근성 |
+| Frontend 디자인 전용 변경 | @Krusty | — | 디자인 스펙 일치 |
 
+> **디자인 전용 프론트 변경 판정 기준**: CSS/스타일링 변경만 포함되고 API 호출·비즈니스 로직·컴포넌트 구조 변경이 없는 경우. 이 경우 리뷰어는 @Krusty(Designer)만 포함하고, @Homer(Backend)·@Chalmers(QA) 제외. `recommend_next_phase`에서 `hasCodeChanges: false` 설정. 코드 로직 변경이 1줄이라도 있으면 이 규칙 적용 불가.
 ---
 
 ## Part 2: 리뷰 응답 (Receiving)
