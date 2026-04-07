@@ -1,8 +1,8 @@
 # Designer Conventions
 
-Bifrost/PiLab 계열 서비스 디자인 규칙.
-색상 토큰·컴포넌트 스펙·레이아웃 원칙 → `bifrost-design-system.md` 참조.
-이 파일은 bifrost-design-system.md에 없는 기술 요구사항과 프로세스 규칙만 담는다.
+서비스 유형별 디자인 가이드 기반 공통 규칙.
+색상 토큰·컴포넌트 스펙·레이아웃 원칙 → 서비스 타입에 맞는 디자인 가이드(§0 참조) 로드.
+이 파일은 각 디자인 가이드에 없는 기술 요구사항과 프로세스 규칙만 담는다.
 
 ---
 
@@ -16,7 +16,7 @@ Bifrost/PiLab 계열 서비스 디자인 규칙.
 | Bifrost/PiLab 서비스 (Network, Biquid, Boost, Pockie) | `.claude/context/designer/bifrost-design-system.md` |
 
 **ai-team 내부 툴 = Toss 스타일이 기본값**
-- Primary: `#0064FF` (Toss Blue)
+- Primary: `#3182f6` (Toss Blue — 웹 구현값)
 - 폰트: Pretendard (Toss Product Sans 대체)
 - 카드 radius: 16/12/8px
 - 화면 좌우 패딩: 20px

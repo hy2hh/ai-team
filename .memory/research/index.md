@@ -4,4 +4,4 @@
 
 | 날짜 | 주제 | 모드 | 파일 |
 |------|------|------|------|
-| <!-- YYYY-MM-DD | 주제 | academic/practical | [파일명](파일명.md) --> |
+| 2026-04-07 | TDS Mobile 전체 컴포넌트 스펙 크롤링 | academic | [tds-mobile-components.md](tds-mobile-components.md) |
