@@ -2513,9 +2513,9 @@ export const handleMessage = async (
         );
       }
 
-      if (statusMessageTs && !hasDelegation) {
-        // "작업중" 메시지를 완료 + 결과 내용으로 업데이트 (별도 postMessage 없음)
-        // delegation 중에는 hub 루프가 최종 업데이트하므로 여기서는 완료 처리 안 함
+      if (statusMessageTs) {
+        // 리서치 모드 선택 메시지가 있으면 hasDelegation 여부 무관하게 항상 인플레이스 업데이트
+        // (delegation 중이라도 선택 버튼 메시지를 결과로 교체 — 중복 메시지 방지)
         await updateStatusMessage(
           slackApp,
           event.channel,
@@ -2531,9 +2531,9 @@ export const handleMessage = async (
             threadTs: event.thread_ts ?? event.ts,
           },
         );
-        // 완료 시 runContext 유지 — 30분 TTL 내 이모지(🔄)로 재실행 가능
+        postedTs = statusMessageTs;
         console.log(
-          `[runtime] ${agentName} 상태 메시지 업데이트 완료 (결과 포함)`,
+          `[runtime] ${agentName} 상태 메시지 업데이트 완료 (결과 포함, hasDelegation=${hasDelegation})`,
         );
       } else {
         // statusMessageTs 없거나 delegation 중인 경우 새 메시지 포스팅

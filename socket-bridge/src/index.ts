@@ -871,6 +871,9 @@ const executeSingle = async (
     console.log(`[reaction] ⚒️ 순차 위임 시작 → 사용자 메시지: ${event.ts}`);
     const seqResults: Array<{ agent: string; text: string; changedFiles: string[] }> = [];
 
+    // PM 위임 발표 메시지 ts (리액션 대상)
+    const seqPmTs = result.postedTs;
+
     for (let si = 0; si < result.delegationSteps.length; si++) {
       const step = result.delegationSteps[si];
       console.log(
@@ -879,6 +882,13 @@ const executeSingle = async (
 
       // git diff 스냅샷 (step 전)
       const beforeSnapshot = snapshotChangedFiles();
+
+      // ⚒️ PM 위임 메시지에 작업 중 리액션 추가 (step 시작)
+      if (seqPmTs) {
+        const firstTargetApp = findAgentApp(step.agents[0], apps);
+        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'white_check_mark', 'hammer_and_pick');
+        console.log(`[reaction] ⚒️ 순차 위임 step ${si + 1} 시작 → PM 메시지: ${seqPmTs}`);
+      }
 
       // step 내 에이전트는 병렬 실행
       const stepResults = await Promise.allSettled(
@@ -939,6 +949,13 @@ const executeSingle = async (
             console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
           );
         }
+      }
+
+      // ✅ PM 위임 메시지에 완료 리액션 (step 완료, 실패 시 제외)
+      if (seqPmTs && !stepHasFailure) {
+        const firstTargetApp = findAgentApp(step.agents[0], apps);
+        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'hammer_and_pick', 'white_check_mark');
+        console.log(`[reaction] ✅ 순차 위임 step ${si + 1} 완료 → PM 메시지: ${seqPmTs}`);
       }
 
       // step 실패 시 후속 step 중단 — 선행 step 실패한 상태로 후행 step 실행하면
