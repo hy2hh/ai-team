@@ -8,9 +8,12 @@ BRIDGE_SESSION="ai-team-bridge"
 START_MODE=""
 WEBSOCKET_COOLDOWN=5
 
+FORCE=false
 for arg in "$@"; do
   if [ "$arg" = "local" ]; then
     START_MODE="local"
+  elif [ "$arg" = "force" ] || [ "$arg" = "--force" ]; then
+    FORCE=true
   elif [[ "$arg" =~ ^[0-9]+$ ]]; then
     WEBSOCKET_COOLDOWN="$arg"
   fi
@@ -20,8 +23,9 @@ echo "🔄 Bridge 재시작 (모드: ${START_MODE:-default}, WebSocket 대기: $
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 0. 활성 작업 확인 (실행 중인 에이전트/큐 태스크가 있으면 재시작 중단)
+# --force 시 가드 건너뜀 — 재시작 후 startup-recovery가 ⚒️ 자동 정리
 DB_PATH="$PROJECT_DIR/.memory/memory.db"
-if [ -f "$DB_PATH" ]; then
+if [ -f "$DB_PATH" ] && [ "$FORCE" = false ]; then
   ACTIVE_CLAIMS=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM claims WHERE status='processing'" 2>/dev/null || echo "0")
   ACTIVE_QUEUE=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM queue_tasks WHERE status='running'" 2>/dev/null || echo "0")
   ACTIVE_TOTAL=$((ACTIVE_CLAIMS + ACTIVE_QUEUE))
@@ -29,8 +33,11 @@ if [ -f "$DB_PATH" ]; then
   if [ "$ACTIVE_TOTAL" -gt 0 ]; then
     echo "❌ 재시작 중단 — 실행 중인 작업이 있습니다 (claims: ${ACTIVE_CLAIMS}, queue: ${ACTIVE_QUEUE})"
     echo "   작업 완료 후 재시작하거나, 취소 버튼으로 작업을 중단하세요."
+    echo "   강제 재시작(⚒️ 자동 정리): bash $0 ${START_MODE:-} force"
     exit 1
   fi
+elif [ "$FORCE" = true ]; then
+  echo "  ⚠️  강제 재시작 — 재시작 후 startup-recovery가 미완료 작업의 ⚒️를 자동 정리합니다"
 fi
 
 # 1. 종료

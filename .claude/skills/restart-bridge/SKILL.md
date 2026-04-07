@@ -17,6 +17,17 @@ bash .claude/skills/restart-bridge/scripts/restart.sh local
 
 스크립트가 stop → WebSocket 대기(5초) → start → 연결 확인(최대 60초 폴링)을 자동 처리.
 
+## 활성 작업 있을 때 강제 재시작
+
+실행 중인 작업이 있어 재시작이 차단된 경우 `force` 옵션 사용:
+
+```bash
+bash .claude/skills/restart-bridge/scripts/restart.sh force
+bash .claude/skills/restart-bridge/scripts/restart.sh local force
+```
+
+재시작 후 startup-recovery가 미완료 작업의 ⚒️ 리액션을 자동 정리하고 Slack에 알림.
+
 ## 연결 실패 시 재시도
 
 pong 타임아웃으로 일부 에이전트가 연결 안 되면 대기 시간을 늘려서 재시도:
