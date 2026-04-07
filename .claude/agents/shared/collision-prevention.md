@@ -6,7 +6,7 @@
 
 ## Claim Lock 메커니즘 (SQLite 기반)
 
-SQLite `memory.db`의 `claims` 테이블이 단일 소스다. `.memory/claims/*.md` 파일 방식은 폐기됨.
+SQLite `memory.db`의 `claims` 테이블이 단일 소스다.
 
 ### 동작 흐름
 
@@ -47,7 +47,7 @@ CREATE TABLE claims (
 ## 정리 규칙
 
 - **24시간 후 만료**: `completed` 또는 `failed` 상태 claim은 bridge `cleanupExpiredClaims()`가 자동 삭제
-- 에이전트가 직접 claim을 삭제하거나 `.md` 파일을 생성하지 않는다
+- 에이전트가 claim을 직접 관리하지 않는다 — bridge가 전담
 
 ## @mention Override
 
@@ -69,5 +69,4 @@ SQLite INSERT OR IGNORE가 **원자적 잠금**으로, 다음 시나리오에서
 
 1. **@mention 없는 일반 메시지에 직접 반응하지 않는다** — Bridge/Triage의 라우팅을 대기
 2. Bridge로부터 위임받았을 때만 작업 시작
-3. `.memory/claims/*.md` 파일 생성 절대 금지 — SQLite가 단일 소스
-4. 작업 완료 시 bridge의 `updateClaim(ts, 'completed')` 호출 (bridge가 처리)
+3. 작업 완료 시 bridge의 `updateClaim(ts, 'completed')` 호출 (bridge가 처리)

@@ -71,7 +71,7 @@ QA(Chalmers)는 도메인이 아닌 **검증 계층**이다. QA 키워드가 다
 
 1. Triage가 체인 파일 생성 (`.memory/handoff/chain-{id}.md`)
 2. 첫 번째 에이전트에게 위임
-3. 이후 순서는 `cross-domain-coordination.md` 프로토콜을 따름
+3. 이후 순서는 `/agent-handoff` 스킬 프로토콜을 따름
 
 ## 미분류 Fallback
 

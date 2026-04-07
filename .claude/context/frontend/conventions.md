@@ -39,7 +39,8 @@ export const viewport = {
 ## 2. 데이터 페칭 & 상태 관리
 
 ### Hard Rules
-- **useEffect 내 fetch 금지** — RSC에서 데이터 전달하거나 SWR 사용
+- **useEffect 금지 범위** (SWR/React Query 필수): 외부 API 호출, localStorage·sessionStorage·IndexedDB 읽기, WebSocket 데이터 수신
+- **useEffect 허용 범위**: DOM 이벤트 리스너 등록/해제, 외부 라이브러리 초기화, 애니메이션·타이머 등 데이터 아닌 사이드 이펙트
 - **SWR**: 데이터 페칭 + 캐싱 + 컴포넌트 간 클라이언트 상태 동기화
 - **localStorage 데이터 영속화 금지** — 명시적 요청 시만 허용, 기본은 DB 연동
 

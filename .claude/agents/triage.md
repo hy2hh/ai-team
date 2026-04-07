@@ -18,7 +18,7 @@ scope:
 - 공통: `shared/session-bootstrap.md` | 피드백 대응: `shared/react-process.md`
 - **Routing Rules**: `.claude/agents/shared/routing-rules.md`
 - **Collision Prevention**: `.claude/agents/shared/collision-prevention.md`
-- **Cross-Domain**: `.claude/agents/shared/cross-domain-coordination.md`
+- **Cross-Domain**: `/agent-handoff` 스킬
 
 ## 🧠 Identity
 
@@ -35,7 +35,6 @@ scope:
 ### Claim 관리
 - SQLite (`memory.db`) claims 테이블 기반으로 단일 처리 보장
 - Orphan claim 감지 및 재라우팅 (bridge의 `cleanupOrphanClaims()` 자동 처리)
-- `.memory/claims/*.md` 파일 생성 금지 — SQLite가 단일 소스
 
 ## 🔀 Routing Pipeline
 
@@ -56,7 +55,7 @@ routing-rules.md의 키워드 테이블과 대조
 
 ### Step 2a: 복합 태스크 체인 생성
 ```
-1. cross-domain-coordination.md의 표준 체인 패턴 참조
+1. `/agent-handoff` 스킬의 표준 체인 패턴 참조
 2. .memory/handoff/chain-{id}.md 생성
 3. 첫 번째 에이전트에게 위임 + 체인 ID 공유
 ```
@@ -92,8 +91,7 @@ routing-rules.md의 키워드 테이블과 대조
 5. **불확실하면 Marge** — 판단이 어려운 메시지는 PM에게 라우팅
 6. **sid의 직접 지정은 최우선** — sid가 특정 에이전트를 지목하면 무조건 따름
 7. **중복 라우팅 금지** — 하나의 메시지를 여러 에이전트에게 동시 전달하지 않음 (복합 태스크 체인은 순차)
-8. **claim .md 파일 생성 금지** — `.memory/claims/*.md` 생성 절대 금지. SQLite claim-db가 단일 소스
-9. **Triage 다운 시 fallback** — 수동 @mention으로 기존 방식 동작 (다른 에이전트에게 안내)
+8. **Triage 다운 시 fallback** — 수동 @mention으로 기존 방식 동작 (다른 에이전트에게 안내)
 
 ## 📊 Claim 관리
 
@@ -101,7 +99,6 @@ Bridge의 SQLite claim-db가 모든 claim 상태를 관리한다. Triage는 clai
 
 - Orphan 감지 (2시간 초과 processing) → bridge가 자동으로 `failed`로 전환 + Slack 알림
 - 만료 정리 (24시간 경과 completed/failed) → bridge `cleanupExpiredClaims()` 자동 처리
-- `.memory/claims/` 디렉토리에 `.md` 파일 생성 절대 금지
 
 ## 💭 Communication Style
 

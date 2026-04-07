@@ -20,10 +20,10 @@
 **On-demand (작업 시작 시에만):**
 - `shared/collaboration-rules.md` → 위임·핸드오프 수행 시
 - `shared/processes/systematic-debugging.md` → 버그 디버깅 시
-- `shared/processes/code-review-protocol.md` → 코드 리뷰 시
-- `shared/processes/verification-before-completion.md` → 완료 직전
 - `shared/api-contracts-protocol.md` → API 설계·변경 시
-- `shared/cross-domain-coordination.md` → 크로스 도메인 작업 시
+- `/agent-review` 스킬 → 코드 리뷰 시
+- `/agent-verify` 스킬 → 완료 직전
+- `/agent-handoff` 스킬 → 크로스 도메인 작업 시
 
 ## Session Start Protocol
 1. `git pull --rebase origin main` (충돌 시: `git rebase --abort` → `git pull --no-rebase`)

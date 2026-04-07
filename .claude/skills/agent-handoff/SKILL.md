@@ -45,7 +45,7 @@ Step 1a: Homer — API 설계     ┐
 Step 1b: Krusty — UI 디자인    ┘ (병렬)
 Step 2:  Bart — 구현         (1a + 1b 완료 후)
 ```
-**통합 에이전트** (보통 Marge)가 병렬 결과 확인 후 다음 step 트리거.
+**통합 에이전트는 반드시 Marge**. 병렬 결과 확인 후 다음 step 트리거.
 
 ## 표준 체인 패턴
 

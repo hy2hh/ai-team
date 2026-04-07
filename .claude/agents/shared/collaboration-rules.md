@@ -66,7 +66,7 @@
 5. 반복 이슈 학습 → `decisions/YYYY-MM-DD_lesson-{topic}.md` (react-process.md §8)
 
 ### File Ownership
-- `facts/`: Marge 소유 (다른 에이전트는 제안만)
+- `facts/`: 모든 에이전트가 직접 읽고 쓸 수 있음
 - `tasks/active-{role}.md`: 각자 자기 파일만 수정
 - `decisions/`, `conversations/`, `handoff/`: 관련 에이전트가 작성
 
