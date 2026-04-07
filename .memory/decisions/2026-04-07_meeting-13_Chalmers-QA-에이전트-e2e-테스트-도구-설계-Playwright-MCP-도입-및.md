@@ -1,8 +1,9 @@
-# 회의 결정: Chalmers QA 에이전트 e2e 테스트 도구 설계 — Playwright MCP 도입 및 테스트 인프라 구축
+# 회의 결정: Chalmers QA 에이전트 e2e 테스트 도구 설계 — Playwright CLI 채택 (MCP 미채택)
 > 회의 ID: 13
 > 유형: planning
 > 일시: 2026-04-07T00:04:14.829Z
 > 참여자: backend, qa, frontend, researcher
+> **최종결정: Playwright CLI 채택 — MCP 미채택** (토큰 비용 4배 차이, MCP 안정성 이슈, Bash 도구 이미 보유)
 
 ## 의견 요약
 ### backend
