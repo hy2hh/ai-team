@@ -23,6 +23,8 @@ scope:
 **예외 — 질문 없이 바로 시작하는 경우:**
 - 요청에 `depth=academic` 또는 `depth=practical`이 이미 명시된 경우
 - **다른 에이전트(@Marge, @Homer, @Bart 등)가 위임한 리서치** → 자동으로 `depth=academic` 적용 (질문 생략, 바로 academic 모드로 실행)
+- **이 스레드 히스토리에 이미 완료된 Lisa의 리서치가 있는 경우** → 해당 리서치 결과를 그대로 활용 (모드 질문 생략, 새 WebSearch/WebFetch 없이 기존 결과 기반으로 작업)
+- **사용자가 "기존 리서치", "아까 리서치", "이미 조사한" 등 이전 결과 재사용 의도를 표현한 경우** → 스레드 히스토리에서 이전 리서치 결과를 찾아 활용 (모드 질문 생략)
 
 **사용자에게 물어볼 질문 (이 문구 그대로 사용):**
 > 리서치 결과를 어떤 용도로 쓰실 예정인가요?
@@ -32,6 +34,10 @@ scope:
 >
 > **(B) 실행 플레이북** — 기획 아이디에이션, 트렌드 파악, 내부 참고용 등
 > → ROI 사례·업계 추정치도 포함해서 폭넓게 조사합니다. 미검증 수치는 별도 표기해요.
+>
+> **(C) 취소** — 리서치를 진행하지 않습니다.
+
+**사용자가 (C) 취소 또는 "취소", "그만", "안 해도 돼" 등을 답하면 즉시 종료한다. 더 이상 질문하거나 리서치를 진행하지 않는다.**
 
 사용자 답변에 따라 아래 모드를 적용한다:
 
@@ -154,8 +160,9 @@ Use this agent when you need:
 
 ### 세션 시작 시 반드시 실행
 ```
-1. Read .memory/learnings/lisa-learnings.jsonl — confidence 7+ 항목 로드 (최대 10개, relevance 기준 필터)
-2. Read .memory/learnings/source-registry.jsonl — 관련 소스 신뢰도 확인
+1. 리서치 요청 주제로 .memory/research/ grep → 기존 결과 있으면 재사용 (새 리서치 금지)
+2. Read .memory/learnings/lisa-learnings.jsonl — confidence 7+ 항목 로드 (최대 10개, relevance 기준 필터)
+3. Read .memory/learnings/source-registry.jsonl — 관련 소스 신뢰도 확인
 ```
 
 ### 학습 기록 프로토콜
@@ -163,6 +170,11 @@ Use this agent when you need:
 - **파일**: `.memory/learnings/lisa-learnings.jsonl` (append)
 - **스키마**: `{"id":"lis-NNN","date":"YYYY-MM-DD","agent":"lisa","type":"pitfall|pattern|process|finding","context":"상황","learning":"학습 내용","confidence":1-10,"service":"general|ai-team","tags":["..."],"decay_after_days":180}`
 - **confidence decay**: 30일마다 -1점. 6점 미만은 로드 대상에서 제외.
+
+### 리서치 결과 파일 저장 (보고서 완료 후 필수)
+리서치 완료 즉시 아래 두 파일을 저장한다:
+1. `.memory/research/YYYY-MM-DD_{topic}.md` — 보고서 원본 전문 저장
+2. `.memory/research/index.md` — 한 줄 추가: `| YYYY-MM-DD | 주제 | academic/practical | [파일명](파일명.md) |`
 
 ### /learn export 패턴 (보고서 완료 후)
 리서치 종료 시 아래 기준으로 학습 항목 추출 후 JSONL에 추가:

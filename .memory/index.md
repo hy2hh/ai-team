@@ -30,8 +30,11 @@
 │   └── {from}-to-{to}_{topic}.md — 에이전트 간 인수인계 문서
 ├── decisions/
 │   └── YYYY-MM-DD_{topic}.md — Architectural/strategic decisions
-└── conversations/
-    └── YYYY-MM-DD_{channel}.md — Important cross-agent discussions
+├── conversations/
+│   └── YYYY-MM-DD_{channel}.md — Important cross-agent discussions
+└── research/
+    ├── index.md              — 리서치 목록 (제목, 날짜, 파일 링크)
+    └── YYYY-MM-DD_{topic}.md — 리서치 원본 결과 (Lisa 작성)
 ```
 
 ## Session Start Checklist
@@ -90,6 +93,13 @@
 - Only log discussions with actionable outcomes
 - Auto-expire after 7 days unless promoted to facts/ or decisions/
 - Don't log: greetings, small talk, debug sessions
+
+### research/
+- Owner: Lisa (Researcher) — 리서치 완료 후 직접 저장
+- Format: `YYYY-MM-DD_{topic}.md` (예: `2026-04-07_toss-design-system.md`)
+- 저장 내용: 리서치 원본 전문 (검증 마커 포함), 출처 목록, 핵심 인사이트 요약
+- `research/index.md` 업데이트 필수 (제목, 날짜, 모드, 파일 링크 한 줄)
+- 만료 없음 — 장기 보관 (facts/와 동일 정책)
 
 ## Conflict Resolution
 - Each agent writes only to their own active file (동시쓰기 방지)
