@@ -60,6 +60,8 @@
 1. `active-{role}.md` → `done.md` 이동
 2. 새 지식 → `facts/` 업데이트
 3. 결정 → `decisions/YYYY-MM-DD_{topic}.md`
+   - 회의록: `decisions/YYYY-MM-DD_meeting-N_{주제}-결정-{결론}.md` (예: `..._결정-CLI채택-MCP미채택.md`)
+   - 회의록 헤더 필수: `> 최종결정: [한 줄 결론]` — 요약 주입 시에도 결론이 보이도록
 4. 핸드오프 → `handoff/{from}-to-{to}_{topic}.md`
 5. 반복 이슈 학습 → `decisions/YYYY-MM-DD_lesson-{topic}.md` (react-process.md §8)
 
