@@ -32,12 +32,9 @@ import { postQueueStarted } from './queue-processor.js';
 import { buildMessageBlocks } from './slack-table.js';
 import {
   generateControlId,
-  postRunningMessage,
-  updateToRunningMessage,
   updateStatusMessage,
   storeRunContext,
   deleteRunContext,
-  findContextByEventTs,
 } from './agent-control-buttons.js';
 import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
@@ -423,7 +420,7 @@ export interface ResearchModeResult {
 
 const pendingResearchMode = new Map<
   string,
-  (result: ResearchModeResult) => void
+  (result: ResearchModeResult | null) => void
 >();
 
 /** 버튼 클릭 시 호출 — 대기 중인 Promise를 resolve */
@@ -436,6 +433,17 @@ export const resolveResearchMode = (
   const resolve = pendingResearchMode.get(threadTs);
   if (resolve) {
     resolve({ mode, messageTs, channel });
+    pendingResearchMode.delete(threadTs);
+    return true;
+  }
+  return false;
+};
+
+/** 취소 버튼 클릭 시 호출 — 대기 중인 Promise를 null로 resolve */
+export const cancelResearchMode = (threadTs: string): boolean => {
+  const resolve = pendingResearchMode.get(threadTs);
+  if (resolve) {
+    resolve(null);
     pendingResearchMode.delete(threadTs);
     return true;
   }
@@ -1058,7 +1066,8 @@ const getToolsForAgent = (agentName: string): string[] => {
       ];
     case 'researcher':
       return [
-        ...BASE_TOOLS,
+        // Agent 도구 제외: 서브에이전트는 allowedTools 필터 우회로 Slack 쓰기 가능 → 중복 메시지 발생
+        ...BASE_TOOLS.filter((t) => t !== 'Agent'),
         'Write',
         'Edit',
         'Glob',
@@ -1399,7 +1408,7 @@ export const handleMessage = async (
   skipPosting = false,
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
   existingKanbanCardId?: number | null,
-  stepInfo?: { current: number; total: number },
+  _stepInfo?: { current: number; total: number },
 ): Promise<HandleMessageResult> => {
   // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
   // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
@@ -1412,7 +1421,7 @@ export const handleMessage = async (
     // 버튼 클릭 핸들러 등록을 postMessage보다 먼저 수행
     // (Slack이 HTTP 응답 전에 클라이언트에 버튼을 전달할 수 있으므로
     //  postMessage await 이후에 등록하면 클릭 → resolve 미등록 → ⚠️ 경고 발생)
-    const selectedModePromise = new Promise<ResearchModeResult>(
+    const selectedModePromise = new Promise<ResearchModeResult | null>(
       (resolve) => {
         pendingResearchMode.set(threadTs, resolve);
       },
@@ -1463,6 +1472,17 @@ export const handleMessage = async (
                   emoji: true,
                 },
                 action_id: 'research_mode_practical',
+                value: threadTs,
+              },
+              {
+                type: 'button',
+                text: {
+                  type: 'plain_text',
+                  text: '취소',
+                  emoji: true,
+                },
+                style: 'danger',
+                action_id: 'research_mode_cancel',
                 value: threadTs,
               },
             ],
@@ -1592,20 +1612,32 @@ export const handleMessage = async (
   const threadTs = event.thread_ts ?? event.ts;
   let statusMessageTs: string | undefined;
   if (researchModeContext) {
-    // 리서치 모드 버튼 메시지를 선택 결과로 인플레이스 업데이트
+    // 선택 버튼 메시지를 단순 텍스트로 업데이트 (컨트롤 버튼 없음)
     const modeLabel =
       researchModeContext.mode === 'academic'
-        ? '✅ 📄 (A) 리서치 보고서 모드가 선택되었습니다.'
-        : '✅ 📋 (B) 실행 플레이북 모드가 선택되었습니다.';
-    await updateToRunningMessage(
-      slackApp,
-      researchModeContext.channel,
-      researchModeContext.messageTs,
-      agentName,
-      controlId,
-      modeLabel,
-      stepInfo,
-    );
+        ? '📄 (A) 리서치 보고서'
+        : '📋 (B) 실행 플레이북';
+    try {
+      await rateLimited(() =>
+        slackApp.client.chat.update({
+          channel: researchModeContext.channel,
+          ts: researchModeContext.messageTs,
+          text: `✅ ${modeLabel} 모드가 선택되었습니다.`,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `✅ ${modeLabel} 모드가 선택되었습니다.`,
+              },
+            },
+          ],
+        }),
+      );
+    } catch (err) {
+      console.error('[research-mode] 선택 메시지 업데이트 실패:', err);
+    }
+    // 선택 버튼 메시지 ts를 statusMessageTs로 설정 → 완료 시 인플레이스 업데이트 (새 메시지 방지)
     statusMessageTs = researchModeContext.messageTs;
   }
   // else if (!skipPosting) {
