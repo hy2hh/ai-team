@@ -43,7 +43,7 @@ function DragOverlayCard({ card }: { card: CardType }) {
       {/* 제목 — 우선순위 점 인라인 */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <span style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, display: 'inline-block', flexShrink: 0, marginTop: 5 }} />
-        <p style={{ color: 'var(--color-text-primary)', fontSize: 13, fontWeight: 500, lineHeight: 1.45, margin: 0, flex: 1 }}>
+        <p className="text-text-primary text-[13px] font-medium" style={{ lineHeight: 1.45, margin: 0, flex: 1 }}>
           {card.title}
         </p>
       </div>
@@ -58,7 +58,7 @@ function DragOverlayCard({ card }: { card: CardType }) {
             <span style={{ width: 20, height: 20, borderRadius: '50%', background: agentColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' }}>
               {card.assignee.charAt(0).toUpperCase()}
             </span>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{card.assignee}</span>
+            <span className="text-text-muted text-[11px]">{card.assignee}</span>
           </div>
         )}
       </div>
@@ -313,7 +313,7 @@ export default function Board() {
       }}
     >
       <div className="loading-spinner" />
-      <p style={{ color: 'var(--color-text-muted)', fontSize: 14, margin: 0 }}>보드 로딩 중...</p>
+      <p className="text-text-muted text-sm m-0">보드 로딩 중...</p>
     </div>
   );
 

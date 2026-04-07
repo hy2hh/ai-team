@@ -53,19 +53,15 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
           ))}
         </div>
       ) : error ? (
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+        <p className="text-text-muted text-center text-[13px]" style={{ padding: '12px 0' }}>
           WIP 데이터를 불러올 수 없습니다
         </p>
       ) : !board || board.columns.length === 0 ? (
         <div className="empty-state">카드가 없습니다</div>
       ) : exceededCols.length === 0 && wipColumns.length === 0 ? (
         <p
-          style={{
-            fontSize: 13,
-            color: 'var(--color-col-done)',
-            textAlign: 'center',
-            padding: '12px 0',
-          }}
+          className="text-col-done text-center text-[13px]"
+          style={{ padding: '12px 0' }}
         >
           ✅ WIP 한도 설정된 컬럼이 없습니다
         </p>
@@ -99,10 +95,10 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: hasLimit ? 6 : 0 }}>
                       <span
+                        className={isExceeded ? 'text-[color:var(--color-priority-high)]' : 'text-text-primary'}
                         style={{
                           fontSize: 13,
                           fontWeight: 500,
-                          color: isExceeded ? 'var(--color-priority-high)' : 'var(--color-text-primary)',
                           width: 90,
                           flexShrink: 0,
                           overflow: 'hidden',
@@ -114,13 +110,15 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
                       </span>
 
                       <span
+                        className={
+                          isExceeded
+                            ? 'text-[color:var(--color-priority-high)]'
+                            : isWarning
+                            ? 'text-[color:var(--color-priority-medium)]'
+                            : 'text-text-muted'
+                        }
                         style={{
                           fontSize: 12,
-                          color: isExceeded
-                            ? 'var(--color-priority-high)'
-                            : isWarning
-                            ? 'var(--color-priority-medium)'
-                            : 'var(--color-text-muted)',
                           fontWeight: isExceeded || isWarning ? 600 : 400,
                           marginLeft: 'auto',
                           flexShrink: 0,
@@ -161,12 +159,8 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
 
                     {isExceeded && (
                       <p
-                        style={{
-                          fontSize: 11,
-                          color: 'var(--color-priority-high)',
-                          margin: '4px 0 0',
-                          fontWeight: 600,
-                        }}
+                        className="text-[11px] font-semibold text-[color:var(--color-priority-high)]"
+                        style={{ margin: '4px 0 0' }}
                       >
                         WIP 초과! ({count - limit!}개 초과)
                       </p>
@@ -177,7 +171,7 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
           </div>
 
           {exceededCols.length === 0 && wipColumns.length > 0 && (
-            <p style={{ fontSize: 12, color: 'var(--color-col-done)', margin: 0, textAlign: 'center' }}>
+            <p className="text-col-done text-xs text-center m-0">
               ✅ 모든 컬럼 WIP 정상
             </p>
           )}
@@ -190,9 +184,9 @@ export default function WipMonitor({ board, loading = false, error = false }: Wi
                 marginTop: 4,
               }}
             >
-              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', margin: 0 }}>
+              <p className="text-text-muted text-xs m-0">
                 가장 부하 높은 컬럼:{' '}
-                <strong style={{ color: 'var(--color-text-primary)' }}>
+                <strong className="text-text-primary">
                   {busiestCol.name}
                 </strong>{' '}
                 ({busiestCol.count}장)

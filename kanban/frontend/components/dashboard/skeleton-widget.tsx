@@ -74,12 +74,7 @@ export function Widget({ title, children, role = 'region', ariaLabel, style, hea
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <h2
-          style={{
-            fontSize: 14,
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            margin: 0,
-          }}
+          className="text-text-primary text-sm font-semibold m-0"
         >
           {title}
         </h2>

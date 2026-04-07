@@ -52,10 +52,10 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
             📋
           </div>
           <span
-            style={{
+            className="text-text-primary"
+          style={{
               fontSize: 15,
               fontWeight: 700,
-              color: 'var(--color-text-primary)',
               letterSpacing: '-0.02em',
             }}
           >
@@ -70,6 +70,7 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
         >
           <Link
             href="/"
+            className={isBoard ? 'text-[color:var(--color-point)]' : 'text-text-secondary'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -77,7 +78,6 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
               padding: '0 14px',
               fontSize: 14,
               fontWeight: 500,
-              color: isBoard ? 'var(--color-point)' : 'var(--color-text-secondary)',
               textDecoration: 'none',
               borderBottom: isBoard ? '2px solid var(--color-point)' : '2px solid transparent',
               transition: 'color var(--duration-fast), border-color var(--duration-fast)',
@@ -88,6 +88,7 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
           </Link>
           <Link
             href="/dashboard"
+            className={isDashboard ? 'text-[color:var(--color-point)]' : 'text-text-secondary'}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -95,7 +96,6 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
               padding: '0 14px',
               fontSize: 14,
               fontWeight: 500,
-              color: isDashboard ? 'var(--color-point)' : 'var(--color-text-secondary)',
               textDecoration: 'none',
               borderBottom: isDashboard ? '2px solid var(--color-point)' : '2px solid transparent',
               transition: 'color var(--duration-fast), border-color var(--duration-fast)',

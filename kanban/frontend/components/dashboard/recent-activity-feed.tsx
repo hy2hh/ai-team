@@ -101,7 +101,7 @@ export default function RecentActivityFeed({
         </div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 8 }}>
+          <p className="text-text-muted text-[13px]" style={{ marginBottom: 8 }}>
             활동 내역을 불러오지 못했습니다
           </p>
           {onRetry && (
@@ -124,7 +124,7 @@ export default function RecentActivityFeed({
         </div>
       ) : displayActivities.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12 }}>
+          <p className="text-text-muted text-[13px]" style={{ marginBottom: 12 }}>
             아직 활동 내역이 없습니다
           </p>
           <a
@@ -193,21 +193,17 @@ export default function RecentActivityFeed({
                 {/* 이벤트 아이콘 */}
                 <span
                   aria-hidden="true"
-                  style={{
-                    fontSize: 13,
-                    flexShrink: 0,
-                    color: cfg.color,
-                  }}
+                  style={{ fontSize: 13, flexShrink: 0, color: cfg.color }}
                 >
                   {cfg.icon}
                 </span>
 
                 {/* 이벤트 텍스트 */}
                 <p
+                  className="text-text-primary"
                   style={{
                     flex: 1,
                     fontSize: 13,
-                    color: 'var(--color-text-primary)',
                     margin: 0,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -222,12 +218,8 @@ export default function RecentActivityFeed({
                 {/* 타임스탬프 */}
                 <time
                   dateTime={event.timestamp}
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--color-text-muted)',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                  }}
+                  className="text-text-muted text-[11px]"
+                  style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
                 >
                   {formatRelativeTime(event.timestamp)}
                 </time>

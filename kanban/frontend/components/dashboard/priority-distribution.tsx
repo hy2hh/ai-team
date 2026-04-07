@@ -85,7 +85,7 @@ export default function PriorityDistribution({
           </div>
         </div>
       ) : error ? (
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+        <p className="text-text-muted text-center text-[13px]" style={{ padding: '12px 0' }}>
           데이터를 불러올 수 없습니다
         </p>
       ) : total === 0 ? (
@@ -181,30 +181,20 @@ export default function PriorityDistribution({
                     }}
                   />
                   <span
-                    style={{
-                      fontSize: 13,
-                      color: 'var(--color-text-secondary)',
-                      flex: 1,
-                    }}
+                    className="text-text-secondary"
+                    style={{ fontSize: 13, flex: 1 }}
                   >
                     {cfg.label}
                   </span>
                   <span
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--color-text-primary)',
-                    }}
+                    className="text-text-primary"
+                    style={{ fontSize: 13, fontWeight: 600 }}
                   >
                     {count}장
                   </span>
                   <span
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--color-text-muted)',
-                      minWidth: 36,
-                      textAlign: 'right',
-                    }}
+                    className="text-text-muted text-[11px] text-right"
+                    style={{ minWidth: 36 }}
                   >
                     ({pct}%)
                   </span>

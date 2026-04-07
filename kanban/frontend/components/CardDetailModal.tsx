@@ -199,8 +199,8 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
         <div style={{ padding: '20px 24px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, borderBottom: '1px solid var(--color-border)' }}>
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>📋</span>
-              <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 500 }}>{columnName}</span>
+              <span className="text-text-muted text-[11px] font-medium">📋</span>
+              <span className="text-text-muted text-[11px] font-medium">{columnName}</span>
             </div>
             {/* 제목 인라인 편집 */}
             {editTitle ? (
@@ -211,8 +211,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                 onBlur={() => { setEditTitle(false); if (titleVal.trim()) void save({ title: titleVal.trim() }); else setTitleVal(card.title); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.currentTarget.blur(); } if (e.key === 'Escape') { setTitleVal(card.title); setEditTitle(false); } }}
                 aria-label="카드 제목 편집"
+                className="text-text-primary"
                 style={{
-                  fontSize: 17, fontWeight: 600, lineHeight: 1.4, color: 'var(--color-text-primary)',
+                  fontSize: 17, fontWeight: 600, lineHeight: 1.4,
                   background: 'var(--color-bg-elevated)', border: '1px solid var(--color-point)',
                   borderRadius: 6, padding: '4px 8px', width: '100%', outline: 'none',
                   boxShadow: '0 0 0 3px var(--color-point-subtle)',
@@ -223,9 +224,10 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                 <h2
                   id="detail-modal-title"
                   onClick={() => onUpdate && setEditTitle(true)}
+                  className="text-text-primary"
                   style={{
                     fontSize: 17, fontWeight: 600, lineHeight: 1.4,
-                    color: 'var(--color-text-primary)', margin: 0, letterSpacing: '-0.01em',
+                    margin: 0, letterSpacing: '-0.01em',
                     flex: 1,
                   }}
                 >
@@ -236,8 +238,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                     aria-hidden="true"
                     onClick={() => setEditTitle(true)}
                     title="클릭하여 제목 편집"
+                    className="text-text-muted"
                     style={{
-                      fontSize: 12, color: 'var(--color-text-muted)', cursor: 'text',
+                      fontSize: 12, cursor: 'text',
                       padding: '3px 5px', borderRadius: 4, flexShrink: 0, marginTop: 2,
                       background: 'var(--color-bg-card)', border: '1px solid var(--color-border)',
                       lineHeight: 1,
@@ -266,14 +269,15 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
             {/* 담당자 */}
             <div>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>담당자</p>
+              <p className="text-text-muted text-[11px] font-medium uppercase" style={{ margin: '0 0 6px', letterSpacing: '0.05em' }}>담당자</p>
               {onUpdate ? (
                 <select
                   value={assigneeVal}
                   onChange={(e) => { setAssigneeVal(e.target.value); void save({ assignee: e.target.value || null }); }}
                   aria-label="담당자 선택"
+                  className="text-text-primary"
                   style={{
-                    fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+                    fontSize: 13, fontWeight: 600,
                     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
                     borderRadius: 6, padding: '4px 8px', cursor: 'pointer', outline: 'none',
                   }}
@@ -284,9 +288,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   {card.assignee ? (
-                    <><AgentAvatar name={card.assignee} size={36} /><p style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', margin: 0 }}>{card.assignee}</p></>
+                    <><AgentAvatar name={card.assignee} size={36} /><p className="text-text-primary" style={{ fontSize: 14, fontWeight: 600, margin: 0 }}>{card.assignee}</p></>
                   ) : (
-                    <p style={{ fontSize: 13, color: 'var(--color-text-muted)', margin: 0, fontStyle: 'italic' }}>미배정</p>
+                    <p className="text-text-muted italic" style={{ fontSize: 13, margin: 0 }}>미배정</p>
                   )}
                 </div>
               )}
@@ -294,7 +298,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
 
             {/* 우선순위 */}
             <div>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>우선순위</p>
+              <p className="text-text-muted text-[11px] font-medium uppercase" style={{ margin: '0 0 6px', letterSpacing: '0.05em' }}>우선순위</p>
               {onUpdate ? (
                 <select
                   value={priorityVal}
@@ -322,19 +326,19 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
             {/* 날짜 */}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 20 }}>
               <div>
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>생성일</p>
-                <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0, fontWeight: 500 }}>{formatDate(card.created_at)}</p>
+                <p className="text-text-muted text-[11px] font-medium uppercase" style={{ margin: '0 0 3px', letterSpacing: '0.05em' }}>생성일</p>
+                <p className="text-text-secondary font-medium" style={{ fontSize: 13, margin: 0 }}>{formatDate(card.created_at)}</p>
               </div>
               <div>
-                <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 3px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 500 }}>수정일</p>
-                <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', margin: 0, fontWeight: 500 }}>{formatDate(card.updated_at)}</p>
+                <p className="text-text-muted text-[11px] font-medium uppercase" style={{ margin: '0 0 3px', letterSpacing: '0.05em' }}>수정일</p>
+                <p className="text-text-secondary font-medium" style={{ fontSize: 13, margin: 0 }}>{formatDate(card.updated_at)}</p>
               </div>
             </div>
           </div>
 
           {/* 마감일 */}
           <div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>마감일</p>
+            <p className="text-text-muted text-[11px] font-semibold uppercase" style={{ margin: '0 0 8px', letterSpacing: '0.06em' }}>마감일</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {onUpdate ? (
                 <input
@@ -342,17 +346,18 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                   value={dueDateVal}
                   onChange={(e) => { setDueDateVal(e.target.value); void save({ due_date: e.target.value || null }); }}
                   aria-label="마감일"
+                  className="text-text-primary"
                   style={{
-                    fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)',
+                    fontSize: 13, fontWeight: 500,
                     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
                     borderRadius: 8, padding: '6px 10px', outline: 'none', cursor: 'pointer',
                   }}
                 />
               ) : (
                 dueDateVal ? (
-                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontWeight: 500 }}>{formatDate(dueDateVal)}</span>
+                  <span className="text-text-secondary font-medium" style={{ fontSize: 13 }}>{formatDate(dueDateVal)}</span>
                 ) : (
-                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>마감일 미설정</span>
+                  <span className="text-text-muted italic" style={{ fontSize: 13 }}>마감일 미설정</span>
                 )
               )}
               {dueDateVal && dueDateStatus && (
@@ -370,10 +375,10 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
 
           {/* 태그 */}
           <div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 8px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>태그</p>
+            <p className="text-text-muted text-[11px] font-semibold uppercase" style={{ margin: '0 0 8px', letterSpacing: '0.06em' }}>태그</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: onUpdate ? 8 : 0 }}>
               {tagsVal.length === 0 && !onUpdate && (
-                <span style={{ fontSize: 13, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>태그 없음</span>
+                <span className="text-text-muted italic" style={{ fontSize: 13 }}>태그 없음</span>
               )}
               {tagsVal.map((tag) => (
                 <span key={tag} className="tag-pill">
@@ -382,7 +387,8 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                     <button
                       onClick={() => removeTag(tag)}
                       aria-label={`태그 ${tag} 삭제`}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-tag-text)', padding: 0, fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center' }}
+                      className="text-tag-text"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 12, lineHeight: 1, display: 'flex', alignItems: 'center' }}
                     >
                       ×
                     </button>
@@ -399,8 +405,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                   placeholder="태그 입력 후 Enter"
                   aria-label="새 태그 입력"
                   maxLength={50}
+                  className="text-text-primary"
                   style={{
-                    flex: 1, fontSize: 13, color: 'var(--color-text-primary)',
+                    flex: 1, fontSize: 13,
                     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
                     borderRadius: 8, padding: '6px 10px', outline: 'none',
                   }}
@@ -421,7 +428,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
           {/* 진행률 */}
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>진행률</p>
+              <p className="text-text-muted text-[11px] font-semibold uppercase m-0" style={{ letterSpacing: '0.05em' }}>진행률</p>
               <span style={{ fontSize: 15, fontWeight: 700, color: progressColor }}>{progress}%</span>
             </div>
             {onUpdate ? (
@@ -460,13 +467,14 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
           {/* 설명 */}
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: 0, textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>설명</p>
+              <p className="text-text-muted text-[11px] font-semibold uppercase m-0" style={{ letterSpacing: '0.06em' }}>설명</p>
               {onUpdate && !editDesc && (
                 <button
                   onClick={() => setEditDesc(true)}
                   aria-label="설명 편집"
+                  className="text-text-muted"
                   style={{
-                    fontSize: 11, color: 'var(--color-text-muted)', cursor: 'pointer',
+                    fontSize: 11, cursor: 'pointer',
                     padding: '2px 7px', borderRadius: 4, background: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border)', fontWeight: 500,
                     transition: 'color var(--duration-fast), border-color var(--duration-fast)',
@@ -484,8 +492,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
                   onChange={(e) => setDescVal(e.target.value)}
                   rows={4}
                   aria-label="카드 설명 편집"
+                  className="text-text-secondary"
                   style={{
-                    fontSize: 14, lineHeight: 1.65, color: 'var(--color-text-secondary)',
+                    fontSize: 14, lineHeight: 1.65,
                     background: 'var(--color-bg-elevated)', border: '1px solid var(--color-point)',
                     borderRadius: 10, padding: '12px 14px', resize: 'vertical', outline: 'none',
                   }}
@@ -511,9 +520,9 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
               </div>
             ) : (
               <div
+                className={descVal ? 'text-text-secondary' : 'text-text-muted'}
                 style={{
                   fontSize: 14, lineHeight: 1.65,
-                  color: descVal ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
                   fontStyle: descVal ? 'normal' : 'italic',
                   background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)',
                   borderRadius: 10, padding: '12px 14px',
@@ -527,20 +536,20 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
 
           {/* 활동 로그 */}
           <div>
-            <p style={{ fontSize: 11, color: 'var(--color-text-muted)', margin: '0 0 12px', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 600 }}>활동</p>
+            <p className="text-text-muted text-[11px] font-semibold uppercase" style={{ margin: '0 0 12px', letterSpacing: '0.06em' }}>활동</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 200, overflowY: 'auto' }}>
               {activities.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--color-text-muted)', fontStyle: 'italic', padding: '12px 0', margin: 0 }}>아직 활동 기록이 없습니다.</p>
+                <p className="text-text-muted italic" style={{ fontSize: 13, padding: '12px 0', margin: 0 }}>아직 활동 기록이 없습니다.</p>
               ) : (
                 activities.map((act) => (
                   <div key={act.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '10px 12px' }}>
                     <AgentAvatar name={act.agent} size={28} />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'baseline', flexWrap: 'wrap', marginBottom: 3 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{act.agent}</span>
-                        <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{formatDate(act.created_at)}</span>
+                        <span className="text-text-primary" style={{ fontSize: 13, fontWeight: 600 }}>{act.agent}</span>
+                        <span className="text-text-muted text-[11px]">{formatDate(act.created_at)}</span>
                       </div>
-                      <p style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-secondary)', margin: 0 }}>{getActivityIcon(act.action)} {act.detail}</p>
+                      <p className="text-text-secondary" style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>{getActivityIcon(act.action)} {act.detail}</p>
                     </div>
                   </div>
                 ))
@@ -552,7 +561,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
         {/* ── 푸터 ── */}
         <div className="modal-footer modal-footer--split" style={{ background: 'var(--color-bg-elevated)' }}>
           {/* 저장 중 표시 */}
-          <span style={{ fontSize: 'var(--text-caption)', color: 'var(--color-text-muted)', opacity: saving ? 1 : 0, transition: 'opacity 200ms' }}>저장 중…</span>
+          <span className="text-text-muted text-[length:var(--text-caption)]" style={{ opacity: saving ? 1 : 0, transition: 'opacity 200ms' }}>저장 중…</span>
           <Button variant="outline" size="medium" onClick={onClose}>
             닫기
           </Button>
@@ -560,17 +569,18 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
 
         {/* 토스트 */}
         {toast && (
-          <div style={{
-            position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)',
-            background: 'var(--color-bg-elevated)',
-            border: '1px solid var(--color-border)',
-            color: 'var(--color-text-primary)',
-            fontSize: 13, fontWeight: 500,
-            padding: '8px 18px', borderRadius: 10,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border)',
-            pointerEvents: 'none', whiteSpace: 'nowrap',
-            animation: 'toastIn 200ms cubic-bezier(0.16,1,0.3,1)',
-          }}>
+          <div
+            className="text-text-primary"
+            style={{
+              position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)',
+              background: 'var(--color-bg-elevated)',
+              border: '1px solid var(--color-border)',
+              fontSize: 13, fontWeight: 500,
+              padding: '8px 18px', borderRadius: 10,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px var(--color-border)',
+              pointerEvents: 'none', whiteSpace: 'nowrap',
+              animation: 'toastIn 200ms cubic-bezier(0.16,1,0.3,1)',
+            }}>
             {toast}
           </div>
         )}

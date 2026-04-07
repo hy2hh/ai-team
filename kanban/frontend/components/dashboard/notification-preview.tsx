@@ -46,10 +46,8 @@ export default function NotificationPreview({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {unreadCount > 0 && (
             <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: 'var(--color-point)',
+              className="text-[color:var(--color-point)] text-[11px] font-semibold"
+            style={{
                 background: 'var(--color-point-subtle)',
                 border: '1px solid var(--color-point-border)',
                 borderRadius: 6,
@@ -62,9 +60,9 @@ export default function NotificationPreview({
           {unreadCount > 0 && onMarkAllRead && (
             <button
               onClick={onMarkAllRead}
+              className="text-text-secondary"
               style={{
                 fontSize: 12,
-                color: 'var(--color-text-secondary)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -95,17 +93,13 @@ export default function NotificationPreview({
           ))}
         </div>
       ) : error ? (
-        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', padding: '12px 0' }}>
+        <p className="text-text-muted text-center text-[13px]" style={{ padding: '12px 0' }}>
           알림을 불러올 수 없습니다
         </p>
       ) : notifications.length === 0 ? (
         <p
-          style={{
-            fontSize: 13,
-            color: 'var(--color-col-done)',
-            textAlign: 'center',
-            padding: '12px 0',
-          }}
+          className="text-col-done text-center text-[13px]"
+          style={{ padding: '12px 0' }}
         >
           ✅ 새 알림이 없습니다
         </p>
@@ -167,10 +161,10 @@ export default function NotificationPreview({
 
                 {/* 메시지 */}
                 <p
+                  className={isUnread ? 'text-text-primary' : 'text-text-muted'}
                   style={{
                     flex: 1,
                     fontSize: 13,
-                    color: isUnread ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                     margin: 0,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -180,11 +174,8 @@ export default function NotificationPreview({
                   {notif.message}
                   {notif.actor && (
                     <span
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--color-text-muted)',
-                        marginLeft: 6,
-                      }}
+                      className="text-text-muted text-[11px]"
+                    style={{ marginLeft: 6 }}
                     >
                       — {notif.actor}
                     </span>
@@ -194,12 +185,8 @@ export default function NotificationPreview({
                 {/* 시간 */}
                 <time
                   dateTime={notif.created_at}
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--color-text-muted)',
-                    flexShrink: 0,
-                    whiteSpace: 'nowrap',
-                  }}
+                  className="text-text-muted text-[11px]"
+                  style={{ flexShrink: 0, whiteSpace: 'nowrap' }}
                 >
                   {formatRelativeTime(notif.created_at)}
                 </time>
@@ -209,11 +196,9 @@ export default function NotificationPreview({
 
           <a
             href="/dashboard#notifications"
+            className="text-[color:var(--color-point)] text-center text-[13px]"
             style={{
               display: 'block',
-              textAlign: 'center',
-              fontSize: 13,
-              color: 'var(--color-point)',
               textDecoration: 'none',
               padding: '10px 0 4px',
               borderTop: '1px solid var(--color-border)',

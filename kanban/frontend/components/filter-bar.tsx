@@ -35,14 +35,10 @@ export default function FilterBar({
     >
       {/* 담당자 필터 */}
       <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--color-text-muted)',
-          textTransform: 'uppercase',
+        className="text-text-muted text-[11px] font-semibold uppercase self-center"
+      style={{
           letterSpacing: '0.05em',
           marginRight: 4,
-          alignSelf: 'center',
         }}
       >
         담당자
@@ -58,7 +54,7 @@ export default function FilterBar({
             onClick={() => onToggleAssignee(agent)}
             aria-pressed={active}
             aria-label={`${agent} 담당자 필터 ${active ? '해제' : '적용'}`}
-            className="filter-pill-btn focus-ring"
+            className={`filter-pill-btn focus-ring ${active ? '' : 'text-text-secondary'}`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -71,7 +67,7 @@ export default function FilterBar({
               transition: 'all 150ms',
               border: `1px solid ${active ? color : 'var(--color-border)'}`,
               background: active ? `${color}18` : 'transparent',
-              color: active ? color : 'var(--color-text-secondary)',
+              color: active ? color : undefined,
               minHeight: 32,
               minWidth: 44,
             }}
@@ -107,14 +103,10 @@ export default function FilterBar({
 
       {/* 우선순위 필터 */}
       <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          color: 'var(--color-text-muted)',
-          textTransform: 'uppercase',
+        className="text-text-muted text-[11px] font-semibold uppercase self-center"
+      style={{
           letterSpacing: '0.05em',
           marginRight: 4,
-          alignSelf: 'center',
         }}
       >
         우선순위
@@ -128,7 +120,7 @@ export default function FilterBar({
             onClick={() => onTogglePriority(opt.value)}
             aria-pressed={active}
             aria-label={`${opt.label} 우선순위 필터 ${active ? '해제' : '적용'}`}
-            className="filter-pill-btn focus-ring"
+            className={`filter-pill-btn focus-ring ${active ? '' : 'text-text-secondary'}`}
             style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -141,7 +133,7 @@ export default function FilterBar({
               transition: 'all 150ms',
               border: `1px solid ${active ? opt.border : 'var(--color-border)'}`,
               background: active ? opt.bg : 'transparent',
-              color: active ? opt.color : 'var(--color-text-secondary)',
+              color: active ? opt.color : undefined,
               minHeight: 32,
             }}
           >
@@ -166,7 +158,7 @@ export default function FilterBar({
         onClick={isFiltering ? onReset : undefined}
         disabled={!isFiltering}
         aria-label={isFiltering ? '필터 초기화' : '적용된 필터 없음'}
-        className="filter-pill-btn focus-ring"
+        className={`filter-pill-btn focus-ring ${isFiltering ? '' : 'text-text-muted'}`}
         style={{
           marginLeft: 4,
           padding: '5px 12px',
@@ -175,7 +167,7 @@ export default function FilterBar({
           fontWeight: 500,
           cursor: isFiltering ? 'pointer' : 'default',
           background: isFiltering ? 'var(--color-due-overdue-bg)' : 'transparent',
-          color: isFiltering ? 'var(--color-due-overdue)' : 'var(--color-text-muted)',
+          color: isFiltering ? 'var(--color-due-overdue)' : undefined,
           border: `1px solid ${isFiltering ? 'var(--color-due-overdue-border)' : 'var(--color-border)'}`,
           transition: 'all var(--duration-fast)',
           minHeight: 32,
@@ -191,11 +183,10 @@ export default function FilterBar({
         role="status"
         aria-live="polite"
         aria-atomic="true"
+        className={isFiltering ? 'text-text-secondary font-medium' : 'text-text-muted font-normal'}
         style={{
           marginLeft: 'auto',
           fontSize: 12,
-          color: isFiltering ? 'var(--color-text-secondary)' : 'var(--color-text-muted)',
-          fontWeight: isFiltering ? 500 : 400,
         }}
       >
         {isFiltering

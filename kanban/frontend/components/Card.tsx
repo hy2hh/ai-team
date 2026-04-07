@@ -142,10 +142,8 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
             }}
           />
           <p
+            className="text-text-primary text-[13px] font-medium"
             style={{
-              color: 'var(--color-text-primary)',
-              fontSize: 13,
-              fontWeight: 500,
               lineHeight: 1.45,
               flex: 1,
               margin: 0,
@@ -156,7 +154,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
             aria-label={`${card.title} 카드 삭제`}
-            className="delete-btn"
+            className="delete-btn text-text-muted text-[11px]"
             data-testid="card-delete-btn"
             style={{
               width: 20,
@@ -165,11 +163,9 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              color: 'var(--color-text-muted)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 11,
               opacity: 0,
               transition: 'opacity var(--duration-fast), color var(--duration-fast), background var(--duration-fast)',
               flexShrink: 0,
@@ -182,9 +178,8 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
         {/* 설명 — 점 너비(7px) + 간격(8px) = 15px 들여쓰기로 제목 텍스트와 정렬 */}
         {card.description && (
           <p
+            className="text-text-secondary text-xs"
             style={{
-              color: 'var(--color-text-secondary)',
-              fontSize: 12,
               lineHeight: 1.5,
               margin: '6px 0 0 15px',
               display: '-webkit-box',
@@ -200,8 +195,8 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
         {/* 진행률 바 */}
         <div style={{ marginTop: 10, paddingLeft: 15 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-            <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>진행률</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: progress === 0 ? 'var(--color-text-muted)' : progressColor }}>
+            <span className="text-text-muted text-[11px]">진행률</span>
+            <span className="text-[11px] font-semibold" style={{ color: progress === 0 ? 'var(--color-text-muted)' : progressColor }}>
               {progress === 0 ? '시작 전' : `${progress}%`}
             </span>
           </div>
@@ -236,7 +231,8 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
             {tags.length > 3 && (
               <span
                 title={tags.slice(3).join(', ')}
-                style={{ fontSize: 10, color: 'var(--color-text-muted)', padding: '1px 4px', cursor: 'default' }}
+                className="text-text-muted"
+                style={{ fontSize: 10, padding: '1px 4px', cursor: 'default' }}
               >
                 +{tags.length - 3}
               </span>
@@ -319,7 +315,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
               <AgentAvatar name={card.assignee} />
               <span
-                style={{ fontSize: 11, color: 'var(--color-text-muted)' }}
+                className="text-text-muted text-[11px]"
                 aria-label={`담당자: ${card.assignee}`}
               >
                 {card.assignee}

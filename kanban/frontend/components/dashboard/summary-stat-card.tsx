@@ -65,10 +65,10 @@ export default function SummaryStatCard({
           <div
             aria-live="polite"
             aria-atomic="true"
+            className={error ? 'text-[color:var(--color-priority-high)]' : 'text-text-primary'}
             style={{
               fontSize: 28,
               fontWeight: 700,
-              color: error ? 'var(--color-priority-high)' : 'var(--color-text-primary)',
               lineHeight: 1,
               minHeight: 32,
               display: 'flex',
@@ -87,12 +87,7 @@ export default function SummaryStatCard({
 
         {/* 레이블 */}
         <p
-          style={{
-            fontSize: 12,
-            fontWeight: 500,
-            color: 'var(--color-text-secondary)',
-            margin: 0,
-          }}
+          className="text-text-secondary text-xs font-medium m-0"
         >
           {label}
         </p>
@@ -100,11 +95,8 @@ export default function SummaryStatCard({
         {/* 트렌드 */}
         {trend && !loading && !error && (
           <p
-            style={{
-              fontSize: 11,
-              color: 'var(--color-text-muted)',
-              margin: '4px 0 0',
-            }}
+            className="text-text-muted text-[11px]"
+          style={{ margin: '4px 0 0' }}
           >
             {trend}
           </p>
@@ -112,11 +104,8 @@ export default function SummaryStatCard({
 
         {error && (
           <p
-            style={{
-              fontSize: 11,
-              color: 'var(--color-priority-high)',
-              margin: '4px 0 0',
-            }}
+            className="text-[11px] text-[color:var(--color-priority-high)]"
+          style={{ margin: '4px 0 0' }}
           >
             데이터 로드 실패
           </p>

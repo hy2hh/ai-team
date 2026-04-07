@@ -144,15 +144,9 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
               }}
             />
             <h3
+              className="text-text-primary text-[13px] font-semibold m-0 overflow-hidden text-ellipsis whitespace-nowrap"
               style={{
-                color: 'var(--color-text-primary)',
-                fontSize: 13,
-                fontWeight: 600,
-                margin: 0,
                 letterSpacing: '-0.01em',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
               }}
             >
               {column.name}
@@ -210,12 +204,12 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
             style={{
               margin: '8px 12px 0',
               fontSize: 12,
-              color: 'var(--color-priority-high)',
               background: 'var(--color-priority-high-bg)',
               border: '1px solid var(--color-priority-high-border)',
               borderRadius: 8,
               padding: '6px 10px',
             }}
+            className="text-[color:var(--color-priority-high)]"
           >
             {colError}
           </div>
@@ -269,11 +263,10 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
             onClick={() => setShowAddModal(true)}
             disabled={isWipExceeded}
             aria-label={`${column.name} 컬럼에 카드 추가${isWipExceeded ? ' (WIP 한도 도달)' : ''}`}
-            className="add-card-btn"
+            className={`add-card-btn ${isWipExceeded ? 'text-text-muted' : 'text-text-secondary'}`}
             data-testid="card-create-btn"
             style={{
               width: '100%',
-              color: isWipExceeded ? 'var(--color-text-muted)' : 'var(--color-text-secondary)',
               background: 'transparent',
               border: `1px dashed ${isWipExceeded ? 'var(--color-border)' : 'var(--color-border-strong)'}`,
               borderRadius: 8,
