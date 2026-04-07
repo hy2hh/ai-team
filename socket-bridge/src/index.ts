@@ -1358,7 +1358,7 @@ const executeSingle = async (
         lastResultPerAgent.set(agentResult.agent, agentResult);
       }
       for (const agentResult of lastResultPerAgent.values()) {
-        if (shouldVerify(agentResult.agent)) {
+        if (shouldVerify(agentResult.agent) && agentResult.changedFiles.length > 0) {
           console.log(
             `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
           );
@@ -2009,6 +2009,8 @@ const flushDebounceBuffer = async (
 
   // 실행
   const executeTask = async () => {
+    // 🧠 라우팅 완료 → 실행 시작 시 항상 제거 (non-PM/위임없음/병렬 등 모든 경로 커버)
+    try { await apps[0].client.reactions.remove({ channel: slackEvent.channel, timestamp: slackEvent.ts, name: 'brain' }); } catch { /* 없으면 무시 */ }
     // QA 명령어 — specPath 없으면 사용법 안내
     if (routing.isQACommand && !routing.specPath) {
       await apps[0].client.chat.postMessage({
