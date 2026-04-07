@@ -2104,6 +2104,11 @@ export const handleMessage = async (
       );
     } else {
       // 비PM 에이전트: 범위 초과 시 PM에게 에스컬레이션 신호 도구
+      // 단, 'mention' 라우팅은 사용자가 에이전트를 명시적으로 선택한 것 → 에스컬레이션 차단
+      const baseMethod = routingMethod.replace(':parallel', '');
+      if (baseMethod === 'mention') {
+        console.log(`[escalation] ${agentName}: mention 라우팅 → escalate_to_pm 비활성화`);
+      } else {
       const escalationServer = createSdkMcpServer({
         name: 'escalation',
         tools: [
@@ -2139,6 +2144,7 @@ export const handleMessage = async (
       });
       baseMcpServers.escalation = escalationServer;
       baseTools.push('mcp__escalation__escalate_to_pm');
+      } // end if (baseMethod !== 'mention')
     }
 
     // 모든 에이전트: sid에게 Block Kit 버튼으로 권한 승인 요청
