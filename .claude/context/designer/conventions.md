@@ -6,6 +6,24 @@ Bifrost/PiLab 계열 서비스 디자인 규칙.
 
 ---
 
+## 0. 서비스 타입별 스타일 가이드 선택
+
+작업 시작 전 서비스 타입을 판단하고 올바른 가이드를 로드합니다.
+
+| 서비스 타입 | Primary 가이드 |
+|-------------|---------------|
+| ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/toss-design-guide.md` |
+| Bifrost/PiLab 서비스 (Network, Biquid, Boost, Pockie) | `.claude/context/designer/bifrost-design-system.md` |
+
+**ai-team 내부 툴 = Toss 스타일이 기본값**
+- Primary: `#0064FF` (Toss Blue)
+- 폰트: Pretendard (Toss Product Sans 대체)
+- 카드 radius: 16/12/8px
+- 화면 좌우 패딩: 20px
+- 간격 단위: 4/8 배수
+
+---
+
 ## 1. Layout 기본 규칙
 
 - Layout 방식 우선순위: Flexbox → CSS Grid (2D 레이아웃에만)

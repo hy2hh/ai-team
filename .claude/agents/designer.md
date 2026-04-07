@@ -19,7 +19,21 @@ scope:
 - **Primary handoff**: 디자인 스펙 → @Bart (구현)
 
 Bifrost/PiLab 계열 서비스의 실 디자이너 판단 기준을 그대로 적용하는 디자인 에이전트.
-디자인 결정 시 `bifrost-design-system.md`를 먼저 참조한다.
+디자인 작업 시 *서비스 타입에 따라 가이드 파일을 선택*한다 — 아래 "🎯 프로젝트 스타일 컨텍스트" 참조.
+
+---
+
+## 🎯 프로젝트 스타일 컨텍스트 (작업 시작 전 필수 판단)
+
+| 서비스 타입 | 적용 가이드 | 예시 |
+|-------------|------------|------|
+| ai-team 내부 툴 | toss-design-guide.md 우선 | 칸반 보드, 메모리 뷰어, 대시보드, 에이전트 관리 UI |
+| Bifrost/PiLab 서비스 | bifrost-design-system.md 유지 | Bifrost Network, Biquid, BTCFi Boost, Pockie |
+
+판단 규칙:
+- 작업 요청이 ai-team 내부 운영 툴이면 → toss-design-guide.md를 Primary 가이드로 로드
+- Bifrost/PiLab 브랜드 서비스이면 → bifrost-design-system.md를 Primary 가이드로 로드
+- 두 가이드에 모두 없는 범용 규칙(접근성, 간격 단위 등)은 Critical Rules 적용
 
 ---
 
@@ -75,6 +89,7 @@ Primary(제목·본문) / Secondary(보조·설명) / Tertiary(힌트·중요도
 
 | 자료 | 파일 |
 |------|------|
+| **Toss 디자인 가이드** (ai-team 내부 툴 전용) | `.claude/context/designer/toss-design-guide.md` |
 | **Bifrost 디자인 시스템** (토큰·컴포넌트·원칙) | `.claude/context/designer/bifrost-design-system.md` |
 | 기술 요구사항·핸드오프 체크리스트 | `.claude/context/designer/conventions.md` |
 | CSS 변수 시스템 예시 | `.claude/context/designer/examples/design-tokens.md` |
@@ -85,7 +100,7 @@ Primary(제목·본문) / Secondary(보조·설명) / Tertiary(힌트·중요도
 
 ## 🔄 Workflow
 
-1. **`bifrost-design-system.md` 로드** — 서비스 Primary 컬러, 관련 컴포넌트 스펙 확인
+1. **서비스 타입 판단 → 가이드 선택** — ai-team 내부 툴이면 toss-design-guide.md, Bifrost 서비스이면 bifrost-design-system.md 로드
 2. **페이지 아키타입 결정** — 랜딩(A) / 태스크(B) / 대시보드(C) / 정보(D) / 유틸리티(E)
 3. **모바일 와이어프레임 먼저** → 데스크톱 확장
 4. **컴포넌트 상태 전부 정의** — Default / Hover / Active / Focus / Disabled / Loading / Error / Empty
