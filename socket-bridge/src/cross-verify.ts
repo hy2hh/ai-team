@@ -13,9 +13,6 @@ import type { App } from '@slack/bolt';
 import { getDb } from './db.js';
 import { handleMessage } from './agent-runtime.js';
 import type { SlackEvent } from './types.js';
-import { rateLimited } from './rate-limiter.js';
-import { agentDisplayName } from './queue-processor.js';
-import { buildMessageBlocks } from './slack-table.js';
 
 /** 프로젝트 루트 (socket-bridge의 부모) */
 const PROJECT_ROOT = resolve(import.meta.dirname, '..', '..');
@@ -342,47 +339,7 @@ export const runCrossVerification = async (
   const verifyResults = await Promise.all(verifyPromises);
   results.push(...verifyResults);
 
-  // 결과 요약 Slack 포스팅
   const hasFail = results.some((r) => r.result === 'FAIL');
-  const hasWarn = results.some((r) => r.result === 'WARN');
-
-  const summary = results
-    .map((r) => {
-      const emoji =
-        r.result === 'PASS'
-          ? '✅'
-          : r.result === 'FAIL'
-            ? '❌'
-            : '⚠️';
-      const resultText =
-        r.result === 'PASS'
-          ? '이상 없음'
-          : r.result === 'FAIL'
-            ? '문제 발견'
-            : '주의 필요';
-      return `${emoji} *${agentDisplayName(r.verifier)}:* ${resultText}`;
-    })
-    .join('\n');
-
-  const overallEmoji = hasFail ? '❌' : hasWarn ? '⚠️' : '✅';
-  const overallStatus = hasFail ? '문제 발견' : hasWarn ? '주의 필요' : '이상 없음';
-
-  try {
-    await rateLimited(() =>
-      (() => {
-        const fullText = `${overallEmoji} *${agentDisplayName(producerAgent)} 작업 동료 검토 — ${overallStatus}*\n${summary}`;
-        const verifyBlocks = buildMessageBlocks(fullText);
-        return slackApp.client.chat.postMessage({
-          channel: event.channel,
-          thread_ts: event.thread_ts ?? event.ts,
-          text: fullText,
-          ...(verifyBlocks ? { blocks: verifyBlocks } : {}),
-        });
-      })(),
-    );
-  } catch {
-    // 포스팅 실패 무시
-  }
 
   if (hasFail) {
     console.log(

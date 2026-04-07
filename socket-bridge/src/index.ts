@@ -25,6 +25,7 @@ import {
   cleanupStaleAgents,
   cleanupExpiredSessions,
   resolveResearchMode,
+  cancelResearchMode,
 } from './agent-runtime.js';
 import {
   getClaudeSdkQueryAuthOptions,
@@ -951,7 +952,24 @@ const executeSingle = async (
         }
       }
 
-      // ✅ PM 위임 메시지에 완료 리액션 (step 완료, 실패 시 제외)
+      // ✅ 각 에이전트 완료 메시지에 체크 리액션 (step 완료 시)
+      for (let i = 0; i < step.agents.length; i++) {
+        const r = stepResults[i];
+        if (r.status === 'fulfilled' && r.value.postedTs) {
+          try {
+            await pmApp.client.reactions.add({
+              channel: event.channel,
+              timestamp: r.value.postedTs,
+              name: 'white_check_mark',
+            });
+            console.log(`[reaction] ✅ step ${si + 1} 에이전트 [${step.agents[i]}] 완료 메시지 리액션: ${r.value.postedTs}`);
+          } catch {
+            // 리액션 실패 무시 (이미 달린 경우 포함)
+          }
+        }
+      }
+
+      // ✅ PM 위임 메시지 ⚒️ → ✅ 교체 (step 완료, 실패 시 제외)
       if (seqPmTs && !stepHasFailure) {
         const firstTargetApp = findAgentApp(step.agents[0], apps);
         await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'hammer_and_pick', 'white_check_mark');
@@ -994,18 +1012,6 @@ const executeSingle = async (
         }
       }
 
-      // 중간 step 완료 Slack 알림
-      if (si < result.delegationSteps.length - 1) {
-        try {
-          await pmApp.client.chat.postMessage({
-            channel: event.channel,
-            thread_ts: event.thread_ts ?? event.ts,
-            text: `✅ *Step ${si + 1} 완료* — [${step.agents.join(', ')}]\n작업: ${step.task}\n다음: Step ${si + 2} [${result.delegationSteps[si + 1].agents.join(', ')}] — ${result.delegationSteps[si + 1].task}`,
-          });
-        } catch {
-          // 포스팅 실패 무시
-        }
-      }
     }
 
     // 전체 순차 위임 완료 → PM 리뷰
@@ -1031,45 +1037,44 @@ const executeSingle = async (
     for (const agentResult of seqResults) {
       lastSeqResultPerAgent.set(agentResult.agent, agentResult);
     }
-    for (const agentResult of lastSeqResultPerAgent.values()) {
-      if (shouldVerify(agentResult.agent)) {
-        console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
-        try {
-          const verifyResults = await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
-          const hasFail = verifyResults.some((r) => r.result === 'FAIL');
-          if (hasFail) {
-            console.warn(`[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`);
-            const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
-            const agentApp = findAgentApp(agentResult.agent, apps);
+    const seqVerifyAgents = [...lastSeqResultPerAgent.values()].filter((r) => shouldVerify(r.agent));
+    for (const agentResult of seqVerifyAgents) {
+      console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
+      try {
+        const verifyResults = await runCrossVerification(agentResult.agent, agentResult.text, agentResult.changedFiles, event, pmApp);
+        const hasFail = verifyResults.some((r) => r.result === 'FAIL');
+        if (hasFail) {
+          console.warn(`[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`);
+          const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
+          const agentApp = findAgentApp(agentResult.agent, apps);
+          try {
+            const loopResult = await runRalphLoop(
+              agentResult.agent,
+              event.text,
+              failedVerifier?.details ?? 'Cross-verify FAIL',
+              event,
+              agentApp,
+              pmApp,
+            );
+            console.log(`[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`);
+          } catch (loopErr) {
+            console.error(`[qa-loop] Ralph Loop 실패: ${agentResult.agent}`, loopErr);
+          }
+        } else {
+          // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
+          const specPath = extractSpecPath(event.text);
+          if (specPath) {
+            console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
             try {
-              const loopResult = await runRalphLoop(
-                agentResult.agent,
-                event.text,
-                failedVerifier?.details ?? 'Cross-verify FAIL',
-                event,
-                agentApp,
-                pmApp,
-              );
-              console.log(`[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`);
-            } catch (loopErr) {
-              console.error(`[qa-loop] Ralph Loop 실패: ${agentResult.agent}`, loopErr);
-            }
-          } else {
-            // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
-            const specPath = extractSpecPath(event.text);
-            if (specPath) {
-              console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-              try {
-                const qaApp = findAgentApp('qa', apps);
-                await runDirectQA(specPath, event, qaApp);
-              } catch (qaErr) {
-                console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
-              }
+              const qaApp = findAgentApp('qa', apps);
+              await runDirectQA(specPath, event, qaApp);
+            } catch (qaErr) {
+              console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
             }
           }
-        } catch (err) {
-          console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
         }
+      } catch (err) {
+        console.error(`[cross-verify] ${agentResult.agent} 검증 실패:`, err);
       }
     }
 
@@ -1374,66 +1379,64 @@ const executeSingle = async (
       for (const agentResult of accumulatedResults) {
         lastResultPerAgent.set(agentResult.agent, agentResult);
       }
-      for (const agentResult of lastResultPerAgent.values()) {
-        if (shouldVerify(agentResult.agent) && agentResult.changedFiles.length > 0) {
-          console.log(
-            `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
+      const hubVerifyAgents = [...lastResultPerAgent.values()].filter((r) => shouldVerify(r.agent) && r.changedFiles.length > 0);
+      for (const agentResult of hubVerifyAgents) {
+        console.log(
+          `[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`,
+        );
+        try {
+          const verifyResults = await runCrossVerification(
+            agentResult.agent,
+            agentResult.text,
+            agentResult.changedFiles,
+            event,
+            pmApp,
           );
-          try {
-            const verifyResults = await runCrossVerification(
-              agentResult.agent,
-              agentResult.text,
-              agentResult.changedFiles,
-              event,
-              pmApp,
+          const hasFail = verifyResults.some(
+            (r) => r.result === 'FAIL',
+          );
+          if (hasFail) {
+            console.warn(
+              `[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`,
             );
-            const hasFail = verifyResults.some(
-              (r) => r.result === 'FAIL',
-            );
-            if (hasFail) {
-              console.warn(
-                `[cross-verify] ${agentResult.agent}: FAIL 감지 — Ralph Loop 시작`,
+            const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
+            const agentApp = findAgentApp(agentResult.agent, apps);
+            try {
+              const loopResult = await runRalphLoop(
+                agentResult.agent,
+                event.text,
+                failedVerifier?.details ?? 'Cross-verify FAIL',
+                event,
+                agentApp,
+                pmApp,
               );
-              // Ralph Loop: 자동 재작업 → 재검증 루프
-              const failedVerifier = verifyResults.find((r) => r.result === 'FAIL');
-              const agentApp = findAgentApp(agentResult.agent, apps);
+              console.log(
+                `[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`,
+              );
+            } catch (loopErr) {
+              console.error(
+                `[qa-loop] Ralph Loop 실패: ${agentResult.agent}`,
+                loopErr,
+              );
+            }
+          } else {
+            // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
+            const specPath = extractSpecPath(event.text);
+            if (specPath) {
+              console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
               try {
-                const loopResult = await runRalphLoop(
-                  agentResult.agent,
-                  event.text, // 원래 작업
-                  failedVerifier?.details ?? 'Cross-verify FAIL',
-                  event,
-                  agentApp,
-                  pmApp,
-                );
-                console.log(
-                  `[qa-loop] Ralph Loop 완료: ${agentResult.agent} → ${loopResult.finalResult} (${loopResult.iterations}회)`,
-                );
-              } catch (loopErr) {
-                console.error(
-                  `[qa-loop] Ralph Loop 실패: ${agentResult.agent}`,
-                  loopErr,
-                );
-              }
-            } else {
-              // QA 자동 트리거: specPath가 있으면 Chalmers QA 실행
-              const specPath = extractSpecPath(event.text);
-              if (specPath) {
-                console.log(`[qa-loop] cross-verify PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-                try {
-                  const qaApp = findAgentApp('qa', apps);
-                  await runDirectQA(specPath, event, qaApp);
-                } catch (qaErr) {
-                  console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
-                }
+                const qaApp = findAgentApp('qa', apps);
+                await runDirectQA(specPath, event, qaApp);
+              } catch (qaErr) {
+                console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
               }
             }
-          } catch (err) {
-            console.error(
-              `[cross-verify] ${agentResult.agent} 검증 실패:`,
-              err,
-            );
           }
+        } catch (err) {
+          console.error(
+            `[cross-verify] ${agentResult.agent} 검증 실패:`,
+            err,
+          );
         }
       }
 
@@ -2393,6 +2396,45 @@ const main = async () => {
         },
       );
     }
+
+    // ─── Lisa 리서치 취소 버튼 핸들러 ────────────────────────────
+    app.action(
+      'research_mode_cancel',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const threadTs = (action as { value?: string }).value ?? '';
+          const b = body as {
+            channel?: { id?: string };
+            message?: { ts?: string };
+            container?: { message_ts?: string; channel_id?: string };
+          };
+          const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+          const messageTs = b.message?.ts ?? b.container?.message_ts ?? '';
+
+          await rateLimited(() =>
+            app.client.chat.update({
+              channel,
+              ts: messageTs,
+              text: '리서치가 취소되었습니다.',
+              blocks: [
+                {
+                  type: 'section',
+                  text: { type: 'mrkdwn', text: '리서치가 취소되었습니다.' },
+                },
+              ],
+            }),
+          );
+
+          const resolved = cancelResearchMode(threadTs);
+          if (!resolved) {
+            console.warn(`[research-mode] 취소 대상 없음: ${threadTs}`);
+          }
+        } catch (err) {
+          console.error('[research-mode] cancel 핸들러 오류:', err);
+        }
+      },
+    );
 
     // ─── 에이전트 제어 버튼 핸들러 (취소/재실행) ────────────────
     app.action(
