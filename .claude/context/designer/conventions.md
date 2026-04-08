@@ -12,7 +12,9 @@
 
 | 서비스 타입 | Primary 가이드 |
 |-------------|---------------|
-| ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/apple-design-system.md` |
+| ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/component-guide.md` |
+
+> **파일 우선순위**: `component-guide.md` > `apple-design-system.md`. 값 충돌 시 `component-guide.md` 기준 사용. `apple-design-system.md`는 iOS/macOS HIG 원전 참조용.
 
 **ai-team 내부 툴 = Apple 스타일이 기본값**
 - Primary: `#0071e3` (Apple Blue)

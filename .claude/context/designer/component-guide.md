@@ -25,7 +25,7 @@
 ### 보조 색상
 | 역할 | 값 | 용도 |
 |------|----|------|
-| Secondary Text | `rgba(0,0,0,0.8)` | 보조 설명 |
+| Secondary Text | `rgba(0,0,0,0.80)` | 보조 설명 |
 | Tertiary/Disabled | `rgba(0,0,0,0.48)` | 비활성 |
 | Card Shadow | `rgba(0,0,0,0.22) 3px 5px 30px 0px` | Elevated card |
 | Dark Surface | `#272729`–`#242426` | 다크 모드 레이어 |
@@ -70,7 +70,7 @@
 | 레벨 | 처리 방식 | 용도 |
 |------|----------|------|
 | Flat | No shadow | 기본 섹션 |
-| Navigation Glass | `backdrop-filter: saturate(180%) blur(20px)` + `rgba(0,0,0,0.8)` | Sticky nav |
+| Navigation Glass | `backdrop-filter: saturate(180%) blur(20px)` + `rgba(0,0,0,0.80)` | Sticky nav |
 | Subtle Lift | `rgba(0,0,0,0.22) 3px 5px 30px 0px` | Elevated card |
 | Focus | `2px solid #0071e3` | 키보드 포커스 |
 
@@ -89,7 +89,7 @@ Shadow는 극히 드물게 — 대부분 요소는 shadow 없음.
 - Tailwind arbitrary 값 금지 — `p-[16px]` → `p-4`, `mx-[8px]` → `mx-2`
 - 섹션 수직 패딩 최소 80px — 유틸리티 앱도 apple.com 여백 기준 적용
 
-Navigation: Sticky 48px, `rgba(0,0,0,0.8)` + `backdrop-filter: saturate(180%) blur(20px)`. Glass effect 필수 — 불투명 nav 금지. Links: 12px SF Pro Text, white.
+Navigation: Sticky 48px, `rgba(0,0,0,0.80)` + `backdrop-filter: saturate(180%) blur(20px)`. Glass effect 필수 — 불투명 nav 금지. Links: 12px SF Pro Text, white.
 
 카드: Border 없음, 5–8px radius, Shadow: `rgba(0,0,0,0.22) 3px 5px 30px 0px` (elevated만).
 
@@ -128,7 +128,7 @@ Navigation: Sticky 48px, `rgba(0,0,0,0.8)` + `backdrop-filter: saturate(180%) bl
 | Dark 섹션 배경 | `#000000` | Apple semantic |
 | Primary 텍스트 (light) | `#1d1d1f` | Near-black |
 | Primary 텍스트 (dark) | `#ffffff` | White |
-| Secondary 텍스트 | `rgba(0,0,0,0.8)` | 80% black |
+| Secondary 텍스트 | `rgba(0,0,0,0.80)` | 80% black |
 | Tertiary/Disabled | `rgba(0,0,0,0.48)` | 48% black |
 | Brand/CTA | `#0071e3` | Apple Blue |
 | Link (light) | `#0066cc` | Link Blue |

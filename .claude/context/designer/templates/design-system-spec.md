@@ -1,74 +1,149 @@
-<!-- Extracted from .claude/agents/designer.md -->
-
-# Design System Specification Template
-
-# [Project Name] UI Design System
+# [Project Name] UI Design System — Apple 스타일
 
 ## Design Foundations
 
 ### Color System
-**Primary Colors**: [Brand color palette with hex values]
-**Secondary Colors**: [Supporting color variations]
-**Semantic Colors**: [Success, warning, error, info colors]
-**Neutral Palette**: [Grayscale system for text and backgrounds]
-**Accessibility**: [WCAG AA compliant color combinations]
+**Accent (단일)**: `#0071e3` (light) / `#2997ff` (dark section)
+**Link**: `#0066cc` (light bg) / `#2997ff` (dark bg)
+**Background**: `#ffffff` (카드·오버레이) / `#f5f5f7` (light 섹션) / `#000000` (dark 섹션)
+**Dark Surface**: `#272729` / `#242426`
+**Text Primary**: `#1d1d1f` (light bg) / `#ffffff` (dark bg)
+**Text Secondary**: `rgba(0,0,0,0.80)` / **Tertiary**: `rgba(0,0,0,0.48)`
+**Shadow (elevated)**: `rgba(0,0,0,0.22) 3px 5px 30px 0px`
+
+> 강조색은 `#0071e3` 단 하나. 커스텀 유채색 금지.
 
 ### Typography System
-**Primary Font**: [Main brand font for headlines and UI]
-**Secondary Font**: [Body text and supporting content font]
-**Font Scale**: [12px → 14px → 16px → 18px → 24px → 30px → 36px]
-**Font Weights**: [400, 500, 600, 700]
-**Line Heights**: [Optimal line heights for readability]
+**Font**: `"Helvetica Neue", Helvetica, Arial, sans-serif`
+**SF Pro Display** (20px+) / **SF Pro Text** (19px 이하) — 혼용 금지
+
+| 역할 | Size | Weight | Line Height | Letter Spacing |
+|------|------|--------|-------------|----------------|
+| Display Hero | 56px | 600 | 1.07 | -0.28px |
+| Section Heading | 40px | 600 | 1.10 | normal |
+| Tile Heading | 28px | 400 | 1.14 | 0.196px |
+| Card Title | 21px | 700 | 1.19 | 0.231px |
+| Body | 17px | 400 | 1.47 | -0.374px |
+| Body Emphasis | 17px | 600 | 1.24 | -0.374px |
+| Caption / Link | 14px | 400 | 1.29 | -0.224px |
+| Nav / Micro | 12px | 400 | normal | -0.12px |
+
+> weight 800/900 절대 금지. 음수 letter-spacing 필수 (Display 헤딩 제외).
 
 ### Spacing System
-**Base Unit**: 4px
-**Scale**: [4px, 8px, 12px, 16px, 24px, 32px, 48px, 64px]
-**Usage**: [Consistent spacing for margins, padding, and component gaps]
+**Base Unit**: 8px
+
+| Token | Value |
+|-------|-------|
+| `--space-1` | 8px |
+| `--space-2` | 16px |
+| `--space-3` | 24px |
+| `--space-4` | 32px |
+| `--space-5` | 40px |
+| `--space-6` | 48px |
+| `--space-8` | 64px |
+
+섹션 수직 패딩 최소 80px.
+
+### Border Radius
+| Token | Value | 용도 |
+|-------|-------|------|
+| `--radius-micro` | 5px | 최소 요소 |
+| `--radius-md` | 8px | 버튼·카드 |
+| `--radius-input` | 11px | 인풋 필드 |
+| `--radius-panel` | 12px | 패널·시트 |
+| `--radius-pill` | 980px | CTA Pill |
+| `--radius-circle` | 50% | 미디어 컨트롤 |
+
+---
 
 ## Component Library
 
-### Base Components
-**Buttons**: [Primary, secondary, tertiary variants with sizes]
-**Form Elements**: [Inputs, selects, checkboxes, radio buttons]
-**Navigation**: [Menu systems, breadcrumbs, pagination]
-**Feedback**: [Alerts, toasts, modals, tooltips]
-**Data Display**: [Cards, tables, lists, badges]
+### Navigation Bar
+- Height: 48px, Sticky
+- `background: rgba(0,0,0,0.80); backdrop-filter: saturate(180%) blur(20px);`
+- Links: 12px SF Pro Text, `#ffffff`
+
+### Buttons
+| 유형 | Background | Text | Radius |
+|------|-----------|------|--------|
+| Primary CTA | `#0071e3` | `#ffffff` | `980px` (pill) |
+| Primary Standard | `#0071e3` | `#ffffff` | `8px` |
+| Secondary | `transparent` | `#0066cc` | `980px` |
+| Destructive | `#ff3b30` | `#ffffff` | `8px` |
+
+### Cards
+- Border 없음, `background: #ffffff`
+- Shadow (elevated만): `rgba(0,0,0,0.22) 3px 5px 30px 0px`
+- Radius: `8px`
 
 ### Component States
-**Interactive States**: [Default, hover, active, focus, disabled]
-**Loading States**: [Skeleton screens, spinners, progress bars]
-**Error States**: [Validation feedback and error messaging]
-**Empty States**: [No data messaging and guidance]
+모든 컴포넌트에 8개 상태 정의 필수:
+**Default / Hover / Active / Focus / Disabled / Loading / Error / Empty**
+
+- Focus ring: `2px solid #0071e3`
+- Loading: Skeleton (Spinner 금지)
+- Empty: 텍스트만 (일러스트·CTA 없음)
+
+---
 
 ## Responsive Design
 
-### Breakpoint Strategy
-**Mobile**: 320px - 639px (base design)
-**Tablet**: 640px - 1023px (layout adjustments)
-**Desktop**: 1024px - 1279px (full feature set)
-**Large Desktop**: 1280px+ (optimized for large screens)
+| Breakpoint | Width | Layout |
+|-----------|-------|--------|
+| Mobile | 360–639px | 단일 컬럼, 패딩 16px |
+| Tablet | 640–1023px | 2-col 그리드 |
+| Desktop | 1024px+ | 최대 너비 980px, 중앙 정렬 |
 
-### Layout Patterns
-**Grid System**: [12-column flexible grid with responsive breakpoints]
-**Container Widths**: [Centered containers with max-widths]
-**Component Behavior**: [How components adapt across screen sizes]
-
-## Accessibility Standards
-
-### WCAG AA Compliance
-**Color Contrast**: 4.5:1 ratio for normal text, 3:1 for large text
-**Keyboard Navigation**: Full functionality without mouse
-**Screen Reader Support**: Semantic HTML and ARIA labels
-**Focus Management**: Clear focus indicators and logical tab order
-
-### Inclusive Design
-**Touch Targets**: 44px minimum size for interactive elements
-**Motion Sensitivity**: Respects user preferences for reduced motion
-**Text Scaling**: Design works with browser text scaling up to 200%
-**Error Prevention**: Clear labels, instructions, and validation
+- Hero 헤드라인: 56px → 40px → 28px (모바일)
+- 그리드: 3-col → 2-col → 단일 컬럼
+- 섹션 구분: `#000000` / `#f5f5f7` 교차 (거터 없음)
 
 ---
-**UI Designer**: [Your name]
-**Design System Date**: [Date]
-**Implementation**: Ready for developer handoff
-**QA Process**: Design review and validation protocols established
+
+## Accessibility (WCAG AA)
+- 일반 텍스트 대비: **4.5:1** 이상
+- 대형 텍스트 (18px+ bold / 24px+): **3:1** 이상
+- 터치 타겟 최소 **44×44px**
+- 텍스트 입력 최소 **16px** (iOS Safari 자동 줌 방지)
+- `reduced-motion` 미디어 쿼리 대응
+- 비장식 이미지 alt 텍스트 필수
+
+---
+
+## CSS Token File (핸드오프 필수 제공)
+
+```css
+:root {
+  --color-apple-blue:   #0071e3;
+  --color-link-light:   #0066cc;
+  --color-link-dark:    #2997ff;
+
+  --color-bg-light:     #f5f5f7;
+  --color-bg-white:     #ffffff;
+  --color-bg-dark:      #000000;
+  --color-bg-dark-1:    #272729;
+
+  --color-text-primary:   #1d1d1f;
+  --color-text-secondary: rgba(0,0,0,0.80);
+  --color-text-tertiary:  rgba(0,0,0,0.48);
+  --color-text-on-dark:   #ffffff;
+
+  --shadow-card: rgba(0,0,0,0.22) 3px 5px 30px 0px;
+
+  --radius-micro:  5px;
+  --radius-md:     8px;
+  --radius-input:  11px;
+  --radius-panel:  12px;
+  --radius-pill:   980px;
+  --radius-circle: 50%;
+
+  --space-1: 8px;  --space-2: 16px; --space-3: 24px;
+  --space-4: 32px; --space-5: 40px; --space-6: 48px;
+  --space-8: 64px;
+}
+```
+
+---
+**Designer**: Krusty
+**Handoff to**: @Bart

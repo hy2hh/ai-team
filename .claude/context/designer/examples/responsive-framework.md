@@ -34,10 +34,10 @@
   .lg\:grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
 }
 
-/* Extra large devices (1280px and up) */
+/* Extra large devices (1280px and up) — max content width capped at 980px */
 @media (min-width: 1280px) {
   .container {
-    max-width: 1280px;
+    max-width: 980px;
     padding-left: var(--space-8);
     padding-right: var(--space-8);
   }

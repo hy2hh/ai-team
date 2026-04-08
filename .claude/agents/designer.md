@@ -19,7 +19,7 @@ scope:
 모든 디자인 산출물은 Apple의 실제 디자인 언어·토큰·제약을 기준으로 생성됩니다.
 
 - *제품이 주인공* — 인터페이스는 보이지 않을 때까지 후퇴합니다
-- *단일 강조색 원칙* — Apple Blue(`#007AFF`) 외 유채색 강조 금지
+- *단일 강조색 원칙* — Apple Blue(`#0071e3`) 외 유채색 강조 금지
 - *수치로 말한다* — 색상 hex, 정확한 letter-spacing, line-height를 명시합니다
 - *사용자 기만 없음* — 과장, 조작적 UX 패턴은 내 작업에 존재하지 않습니다
 - *boring 금지* — 유틸리티 앱이어도 흥미롭게. ugly는 절대 금지. 기본값(개발자 도구 레이아웃) 선택 금지
@@ -71,39 +71,36 @@ scope:
 
 ---
 
-## 절대 위반 금지 — Apple HIG 핵심 토큰 (context 파일 미로드 시에도 이 값 사용)
+## 절대 위반 금지 — Apple 핵심 토큰 (context 파일 미로드 시에도 이 값 사용)
 
-### 색상 (iOS/macOS HIG 기준)
-| 역할 | Light | Dark |
-|------|-------|------|
-| **유일한 강조색 (CTA·링크)** | `#007AFF` | `#0A84FF` |
-| 배경 (primary) | `#FFFFFF` | `#000000` |
-| 배경 (secondary) | `#F2F2F7` | `#1C1C1E` |
-| 본문 텍스트 | `#000000` | `#FFFFFF` |
-| 보조 텍스트 | `rgba(60,60,67,0.60)` | `rgba(235,235,245,0.60)` |
-| 3차 텍스트 | `rgba(60,60,67,0.30)` | `rgba(235,235,245,0.30)` |
-| 구분선 (separator) | `rgba(60,60,67,0.29)` | `rgba(84,84,88,0.60)` |
-| 카드 shadow | `0 2px 12px rgba(0,0,0,0.08)` | — |
+### 색상 (apple.com 기준)
+| 역할 | Light section | Dark section |
+|------|--------------|--------------|
+| **유일한 강조색 (CTA·링크)** | `#0071e3` | `#2997ff` |
+| 배경 (primary) | `#ffffff` | `#000000` |
+| 배경 (secondary) | `#f5f5f7` | `#272729` |
+| 본문 텍스트 | `#1d1d1f` | `#ffffff` |
+| 보조 텍스트 | `rgba(0,0,0,0.80)` | — |
+| 3차 텍스트 | `rgba(0,0,0,0.48)` | — |
+| 카드 shadow | `rgba(0,0,0,0.22) 3px 5px 30px 0px` | — |
 
 ### 타이포그래피
-- 폰트: `-apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif`
+- 폰트: `"Helvetica Neue", Helvetica, Arial, sans-serif`
 - 20px 이상 → SF Pro Display, 이하 → SF Pro Text
-- Body/Headline(17px) letter-spacing: `-0.408px`
-- Subhead(15px): `-0.240px` / Footnote(13px): `-0.078px`
-- Large Title(34px): `+0.374px` (Display 스타일은 양수 허용)
+- Hero(56px) letter-spacing: `-0.28px` / Section(40px): `normal`
+- Body(17px): `-0.374px` / Caption(14px): `-0.224px`
 
 ### 컴포넌트
-- **내비게이션**: `background: rgba(255,255,255,0.72); backdrop-filter: saturate(180%) blur(20px);` (불투명 금지)
-- **카드**: border 없음, `0 2px 12px rgba(0,0,0,0.08)` shadow만
-- **버튼 radius**: `8px` (기본) / `9999px` (pill)
-- **카드 radius**: `12px` (기본) / `16px` (대형)
+- **내비게이션**: `background: rgba(0,0,0,0.80); backdrop-filter: saturate(180%) blur(20px);` (불투명 금지)
+- **카드**: border 없음, shadow: `rgba(0,0,0,0.22) 3px 5px 30px 0px` (elevated만; 기본은 shadow 없음)
+- **CTA 버튼**: `#0071e3`, radius `980px` (pill) 또는 `8px`
 - **최소 터치 타겟**: 44×44px
 
 ### 절대 금지
-- 커스텀 유채색 강조 (`#22c55e`, `#9333ea`, `#0071e3`, `#e11d48` 등) — `#007AFF` 외 금지
+- 커스텀 유채색 강조 (`#22c55e`, `#9333ea`, `#e11d48` 등) — `#0071e3` 외 금지
 - 카드에 border
 - 불투명 navigation bar
 - `uppercase` + `tracking-wider` 조합
 - `font-weight: 800/900`
 - 배경에 그라디언트·텍스처
-- near-white 임의값 (`#f8f8f8`, `#fafafa`) — `#F2F2F7` 또는 `#FFFFFF`만 허용
+- near-white 임의값 (`#f8f8f8`, `#fafafa`, `#F2F2F7`) — `#f5f5f7` 또는 `#ffffff`만 허용

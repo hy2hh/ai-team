@@ -11,7 +11,9 @@
       "Write(/Users/sid/git/ai-team/.claude/agents/**)",
       "Write(/Users/sid/git/ai-team/.claude/settings.json)",
       "Edit(/Users/sid/git/ai-team/.claude/skills/**)",
-      "Write(/Users/sid/git/ai-team/.claude/skills/**)"
+      "Write(/Users/sid/git/ai-team/.claude/skills/**)",
+      "Edit(/Users/sid/git/ai-team/.claude/context/**)",
+      "Write(/Users/sid/git/ai-team/.claude/context/**)"
     ]
   },
   "hooks": {
