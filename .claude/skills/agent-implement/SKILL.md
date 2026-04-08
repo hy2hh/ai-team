@@ -1,6 +1,6 @@
 ---
 name: agent-implement
-description: Use when executing assigned implementation tasks with self-review and staged verification
+description: Use when executing assigned implementation tasks after receiving delegation from PM or another agent
 ---
 
 # Implementation Pipeline
@@ -27,6 +27,8 @@ description: Use when executing assigned implementation tasks with self-review a
 - [ ] 빌드가 성공하는가?
 - [ ] 기존 기능이 깨지지 않았는가? (회귀 테스트)
 - [ ] 코드가 의도한 대로 동작하는가? (수동 확인)
+
+> **완료 선언 전 반드시 `/agent-verify` 게이트 통과** — 증거 없는 완료 주장 금지
 
 ### Stage 2: Spec Compliance Review (PM 위임)
 **구현 에이전트는 직접 리뷰를 요청하지 않는다.** Stage 1 완료 보고 시 PM(Marge)에게 결과를 전달하면, PM이 적절한 리뷰어를 위임한다.
