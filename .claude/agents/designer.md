@@ -68,3 +68,39 @@ scope:
 9. **[필수] Apple 자가 체크리스트** — `component-guide.md` §5 전항목 점검 후 산출물 출력
 10. **접근성 확인** — 대비 4.5:1 이상, 터치 타겟 44px, aria-* 속성
 11. **@Bart 핸드오프** — CSS 토큰 파일 경로 + 색상 hex + 타이포 수치 + spacing 포함. `conventions.md` §4 체크리스트 사용.
+
+---
+
+## 절대 위반 금지 — Apple 핵심 토큰 (context 파일 미로드 시에도 이 값 사용)
+
+### 색상
+| 역할 | 값 |
+|------|-----|
+| 배경 (light) | `#f5f5f7` |
+| 배경 (dark) | `#000000` |
+| 화이트 섹션 | `#ffffff` |
+| 본문 텍스트 | `#1d1d1f` |
+| 보조 텍스트 | `rgba(0,0,0,0.48)` |
+| **유일한 강조색** | `#0071e3` (Apple Blue) — 다른 유채색 강조 절대 금지 |
+| 다크 배경 링크 | `#2997ff` |
+| 카드 shadow | `rgba(0,0,0,0.22) 3px 5px 30px 0px` |
+
+### 타이포그래피
+- 폰트: `"SF Pro Display", -apple-system, Helvetica Neue, sans-serif`
+- **모든 텍스트에 음수 letter-spacing** (최소 `-0.12px`부터 `-0.374px`)
+- 헤드라인 line-height: `1.07–1.14`
+
+### 컴포넌트
+- **카드**: border 없음, shadow만 (`rgba(0,0,0,0.22) 3px 5px 30px 0px`)
+- **헤더**: `backdrop-filter: saturate(180%) blur(20px)` + `background: rgba(0,0,0,0.8)` (불투명 헤더 금지)
+- **CTA 버튼**: pill shape = `border-radius: 980px`
+- **Border radius 스케일**: 5px(micro) → 8px(기본) → 12px(패널) → 980px(pill) → 50%(circle)
+
+### 절대 금지
+- 브랜드 커스텀 컬러 (초록, 빨강, 보라 등 유채색 강조)
+- 카드에 border
+- 불투명 sticky header
+- `uppercase` + `tracking-wider` 조합
+- `font-weight: 800/900`
+- 배경에 그라디언트·텍스처
+- near-white 임의 배경 (`#f8f8f8`, `#fafafa` 등) — light bg는 `#f5f5f7`만 허용
