@@ -10,48 +10,41 @@ import { useAppStore } from '@/stores/app-store';
 import { fetcher, apiPaths, saveFile } from '@/lib/api';
 import type { FileContent } from '@/lib/types';
 
+/* Empty State — Apple minimal */
 function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-3">
-      <div className="text-sm font-medium text-[var(--color-text-secondary)]">
-        파일을 선택하세요
+    <div className="empty-state">
+      <div className="empty-state-title">파일을 선택하세요</div>
+      <div className="empty-state-desc">
+        사이드바에서 파일을 선택하거나 ⌘K로 검색
       </div>
-      <div className="text-xs text-[var(--color-text-muted)]">
-        왼쪽 파일 트리에서 파일을 선택하거나 ⌘K로 검색
-      </div>
-      <div className="flex gap-3 mt-2">
-        <Shortcut keys="⌘K" label="검색" />
-        <Shortcut keys="⌘B" label="사이드바" />
-        <Shortcut keys="⌘/" label="백링크" />
+      <div className="flex items-center gap-4 mt-4">
+        <KBD keys="⌘K" />
+        <KBD keys="⌘B" />
+        <KBD keys="⌘/" />
       </div>
     </div>
   );
 }
 
-function Shortcut({ keys, label }: { keys: string; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5 min-h-[44px] text-xs text-[var(--color-text-muted)]">
-      <kbd className="font-mono bg-[var(--color-bg-card)] border border-[var(--color-border)] rounded-[var(--radius-sm)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
-        {keys}
-      </kbd>
-      <span>{label}</span>
-    </div>
-  );
+function KBD({ keys }: { keys: string }) {
+  return <span className="kbd">{keys}</span>;
 }
 
-/* 스켈레톤 — Toss: Spinner 금지, Skeleton 사용 */
+/* Skeleton Loader */
 function SkeletonLoader() {
   return (
-    <div className="flex-1 overflow-y-auto px-8 py-6">
-      <div className="max-w-[720px] mx-auto space-y-3">
-        <div className="skeleton h-7 w-3/5 mb-6" />
-        <div className="skeleton h-4 w-full" />
-        <div className="skeleton h-4 w-11/12" />
-        <div className="skeleton h-4 w-4/5" />
-        <div className="skeleton h-4 w-full mt-4" />
-        <div className="skeleton h-4 w-3/4" />
-        <div className="skeleton h-4 w-full" />
-        <div className="skeleton h-4 w-5/6" />
+    <div className="flex-1 overflow-y-auto content-area">
+      <div className="content-container">
+        <div className="space-y-3">
+          <div className="skeleton skeleton-title" />
+          <div className="skeleton skeleton-line" />
+          <div className="skeleton skeleton-line skeleton-line-medium" />
+          <div className="skeleton skeleton-line skeleton-line-short" />
+          <div className="skeleton skeleton-line mt-5" />
+          <div className="skeleton skeleton-line skeleton-line-shorter" />
+          <div className="skeleton skeleton-line skeleton-line-long" />
+        </div>
       </div>
     </div>
   );
@@ -118,7 +111,7 @@ export default function MarkdownViewer() {
     }
   }, [selectedFile, draftContent, mutate, setStoreIsEditing, setEditingFile]);
 
-  // Ctrl/Cmd+S 단축키로 저장
+  // ⌘S 저장 단축키
   useEffect(() => {
     if (!isEditing) return;
     const handler = (e: KeyboardEvent) => {
@@ -139,11 +132,10 @@ export default function MarkdownViewer() {
   if (isLoading) {
     return (
       <div className="h-full flex flex-col">
-        {/* 스켈레톤 헤더 */}
-        <div className="flex items-center justify-between flex-shrink-0 h-12 px-6 border-b border-[var(--color-border)] bg-[var(--color-bg-base)]">
+        <div className="content-header">
           <div className="space-y-1.5">
-            <div className="skeleton h-3.5 w-36" />
-            <div className="skeleton h-2.5 w-52" />
+            <div className="skeleton skeleton-header-title" />
+            <div className="skeleton skeleton-header-meta" />
           </div>
         </div>
         <SkeletonLoader />
@@ -154,7 +146,7 @@ export default function MarkdownViewer() {
   if (error || !data) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-[13px] text-[var(--color-negative)]">파일 로드 실패</div>
+        <span className="file-error">파일 로드 실패</span>
       </div>
     );
   }
@@ -163,35 +155,36 @@ export default function MarkdownViewer() {
   const canEdit = !isJsonl;
 
   return (
-    <div className="h-full flex flex-col">
-      {/* 파일 헤더 — 48px */}
-      <div className="flex items-center justify-between flex-shrink-0 h-12 px-6 border-b border-[var(--color-border)] bg-[var(--color-bg-base)]">
-        <div>
-          <div className="text-sm font-semibold text-[var(--color-text-primary)]">
+    <div className="h-full flex flex-col animate-content-enter">
+      {/* Content Header */}
+      <div className="content-header">
+        <div className="min-w-0">
+          <div className="truncate content-header-title">
             {selectedFile.split('/').pop()}
           </div>
-          <div className="text-xs text-[var(--color-text-muted)]">
+          <div className="truncate content-header-path">
             {selectedFile}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* 파일 메타 정보 */}
+
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* File meta */}
           {!isEditing && (
-            <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+            <div className="flex items-center gap-4 content-meta">
               <span>{(data.size / 1024).toFixed(1)} KB</span>
               <span>{formatDate(data.modifiedAt)}</span>
             </div>
           )}
 
-          {/* 편집 에러 */}
+          {/* Save error */}
           {isEditing && saveError && (
-            <div className="flex items-center gap-1 text-xs text-[var(--color-negative)]">
+            <div className="flex items-center gap-1 save-error">
               <AlertCircle size={12} />
               <span>{saveError}</span>
             </div>
           )}
 
-          {/* 버튼 그룹 */}
+          {/* Action buttons */}
           {canEdit && (
             <div className="flex items-center gap-2">
               {isEditing ? (
@@ -200,27 +193,23 @@ export default function MarkdownViewer() {
                     onClick={handleSave}
                     disabled={isSaving}
                     className="btn-save"
-                    title="저장 (⌘S)"
+                    aria-label="저장 (⌘S)"
                   >
-                    <Check size={14} />
+                    <Check size={13} strokeWidth={2} />
                     저장
                   </button>
                   <button
                     onClick={handleCancel}
                     disabled={isSaving}
                     className="btn-secondary"
-                    title="취소 (Esc)"
+                    aria-label="취소 (Esc)"
                   >
-                    <X size={14} />
                     취소
                   </button>
                 </>
               ) : (
-                <button
-                  onClick={handleEdit}
-                  className="btn-secondary"
-                >
-                  <Pencil size={14} />
+                <button onClick={handleEdit} className="btn-secondary">
+                  <Pencil size={12} strokeWidth={1.5} />
                   편집
                 </button>
               )}
@@ -229,19 +218,19 @@ export default function MarkdownViewer() {
         </div>
       </div>
 
-      {/* 콘텐츠 */}
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-[720px] mx-auto h-full">
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto scrollbar-auto content-area">
+        <div className="content-container h-full">
           {isEditing ? (
             <textarea
               value={draftContent}
               onChange={(e) => setDraftContent(e.target.value)}
-              className="textarea-editor h-full min-h-[400px] p-4"
+              className="textarea-editor h-full"
               autoFocus
               spellCheck={false}
             />
           ) : isJsonl ? (
-            <pre className="font-mono whitespace-pre-wrap text-xs text-[var(--color-text-secondary)]">
+            <pre className="jsonl-viewer">
               {data.content}
             </pre>
           ) : (

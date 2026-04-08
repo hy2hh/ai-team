@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '@bifrost-platform/ui-kit-front';
+import { Button } from '@/components/ui/Button';
 import { AGENTS, AGENT_COLORS, PRIORITY_OPTIONS, getProgressColor } from '@/lib/constants';
 
 interface Props {

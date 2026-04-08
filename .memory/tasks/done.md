@@ -14,7 +14,6 @@
 - [x] API 엔드포인트 7개 구현 | 2026-04-04
 
 ### 칸반 UI
-- [x] Bifrost 디자인 시스템 적용 | 2026-04-02
 - [x] UI 접근성 개선 7건 (aria-label, role, focus, contrast 등) | 2026-04-03
 - [x] 화면 구현 4개 (Board, Card Detail, Analytics, Settings) | 2026-04-03
 

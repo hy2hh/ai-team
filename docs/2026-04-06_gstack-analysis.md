@@ -638,7 +638,7 @@ files_modified:
 |----------|------|------|-----------|
 | **Triage** | 메시지 라우팅 | Read, Write, Edit | 5초 분류, SQLite 클레임, 복합 작업 체이닝 |
 | **Marge (PM)** | 제품 전략 | WebFetch, WebSearch, Read, Write, Edit | 로드맵, 이해관계자 정렬, 발견→출시 |
-| **Krusty (Designer)** | UI/UX | Read, Write, Edit | Bifrost 디자인 시스템, 접근성 |
+| **Krusty (Designer)** | UI/UX | Read, Write, Edit | 접근성 |
 | **Bart (Frontend)** | React/TS | Read, Write, Edit, Bash, Glob, Grep | Core Web Vitals, 컴포넌트 아키텍처 |
 | **Homer (Backend)** | 시스템 아키텍처 | Read, Write, Edit, Bash, Glob, Grep | DB 설계, API 계약, 마이크로서비스 |
 | **Lisa (Researcher)** | 시장 조사 | WebFetch, WebSearch, Read, Write, Edit | 트렌드 분석, 경쟁 분석 |
@@ -973,7 +973,7 @@ Chalmers의 리뷰를 도메인별로 전문화:
 │   ├── security-review.md          # 보안 (인젝션, 인증, CSRF, 암호화)
 │   ├── performance-review.md       # 성능 (N+1, 메모리 릭, 번들 크기)
 │   ├── accessibility-review.md     # 접근성 (WCAG 2.1 AA)
-│   ├── design-compliance-review.md # 디자인 시스템 준수 (Bifrost)
+│   ├── design-compliance-review.md # 디자인 시스템 준수
 │   └── data-safety-review.md       # 데이터 안전 (마이그레이션, 스키마)
 ```
 
@@ -1020,7 +1020,7 @@ Chalmers의 리뷰를 도메인별로 전문화:
 
 ## 디자인 준수 검증
 - Krusty 디자인 스펙 대비 구현 비교
-- Bifrost 디자인 토큰 사용 여부 확인
+- 디자인 토큰 사용 여부 확인
 ```
 
 ### 7.3 Wiggum (SecOps)

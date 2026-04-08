@@ -11,7 +11,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Button } from '@bifrost-platform/ui-kit-front';
+import { Button } from '@/components/ui/Button';
 import { Card as CardType } from '@/lib/types';
 import { api } from '@/lib/api';
 import { PRIORITY_CONFIG, AGENT_COLORS } from '@/lib/constants';

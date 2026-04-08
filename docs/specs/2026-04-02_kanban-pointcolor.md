@@ -18,15 +18,15 @@
 
 ### AC-1. 포인트컬러 선택
 - [x] Designer(Krusty)가 포인트컬러를 선택하고 이유를 스펙에 문서화
-  - **선택: Bifrost brand-point 계열** — 다크 `#7C7AE8` (밝기 +15% 조정), 라이트 `#5F5BE2` (원색)
-  - 이유: Bifrost 디자인 시스템 표준 준수, 팀 칸반이 ai-team 내부 인프라 도구이므로 Bifrost brand 적용 자연스러움
+  - **선택: 퍼플 계열** — 다크 `#7C7AE8` (밝기 +15% 조정), 라이트 `#5F5BE2` (원색)
+  - 이유: 팀 칸반 ai-team 내부 인프라 도구로 퍼플 포인트컬러 적용
 - [x] 선택된 포인트컬러는 `--color-point` 토큰으로 globals.css에 정의
 - [x] 포인트컬러 hover/active 변형 (`--color-point-hover`, `--color-point-glow`) 정의
 
 ### AC-2. 포인트컬러 일관 적용
 - [x] 주요 버튼(Add Card, 저장 등)에 포인트컬러 적용
   - `.btn-primary` → `var(--color-point)`, hover → `var(--color-point-hover)`
-  - UI kit `<Button variant="primary">` — `.bg-brand-point` 오버라이드로 `var(--color-point)` 적용
+  - UI kit `<Button variant="primary">` — `.bg-point` 오버라이드로 `var(--color-point)` 적용
 - [x] 포커스 링, 드래그오버 상태에 포인트컬러 적용
   - `--color-focus-ring: var(--color-point)` + 전역 `button:focus-visible`, `a:focus-visible` 규칙 추가
   - 드래그오버: Column이 `accentColor`(COLUMN_ACCENTS[0] = point color) 사용
@@ -39,7 +39,7 @@
 ### AC-3. 기존 컬럼 accent 유지
 - [x] 컬럼별 accent(todo/inprogress/review/done) 색상은 그대로 유지
   - `COLUMN_ACCENTS = ['#7C7AE8', '#fbbf24', '#c084fc', '#4ade80', '#fb923c', '#f472b6']`
-  - col-1(brand-point) ~ col-6까지 6색 순환 유지
+  - col-1(포인트컬러) ~ col-6까지 6색 순환 유지
 - [x] 포인트컬러와 컬럼 accent가 시각적으로 충돌하지 않음
 
 ### AC-4. 빌드/런타임 안정성

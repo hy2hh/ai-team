@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { DisclaimerBanner } from '@/components/legal/disclaimer-banner';
@@ -27,7 +27,7 @@ function getConfidenceLevel(confidence: number): 'high' | 'mid' | 'low' {
   return 'low';
 }
 
-export default function AnalysisPage() {
+function AnalysisContent() {
   const searchParams = useSearchParams();
   const caseId = searchParams.get('caseId');
 
@@ -718,5 +718,13 @@ function PrecedentCard({
         <span style={{ fontSize: 12, color: '#60A5FA' }}>원문 보기 →</span>
       </div>
     </div>
+  );
+}
+
+export default function AnalysisPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#f5f5f7' }}>로딩 중...</div>}>
+      <AnalysisContent />
+    </Suspense>
   );
 }

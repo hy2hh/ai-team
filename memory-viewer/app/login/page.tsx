@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Database, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -41,63 +41,30 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      className="flex items-center justify-center min-h-[100dvh]"
-      style={{ background: 'var(--color-bg-base)' }}
-    >
-      <div
-        className="w-[calc(100%-40px)] max-w-[360px] rounded-[var(--radius-lg)] p-8"
-        style={{
-          background: 'var(--color-bg-surface)',
-          border: '1px solid var(--color-border)',
-        }}
-      >
-        {/* 헤더 */}
-        <div className="mb-8">
-          <div
-            className="w-10 h-10 rounded-[var(--radius-md)] flex items-center justify-center mb-4"
-            style={{ background: 'var(--color-point-subtle)' }}
-          >
-            <Database size={18} style={{ color: 'var(--color-point-light)' }} />
+    <div className="login-page flex items-center justify-center min-h-dvh">
+      <div className="login-card w-full animate-scale-in">
+        {/* Header */}
+        <div className="mb-8 text-center">
+          <div className="login-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"
+                fill="var(--blue)"
+                opacity="0.2"
+              />
+              <circle cx="12" cy="12" r="3" fill="var(--blue)" />
+            </svg>
           </div>
-          <h1
-            style={{
-              fontSize: '20px',
-              fontWeight: 'var(--font-weight-bold)',
-              color: 'var(--color-text-primary)',
-              lineHeight: 'var(--line-height-tight)',
-            }}
-          >
-            Memory Viewer
-          </h1>
-          <p
-            className="mt-1.5"
-            style={{
-              fontSize: 'var(--text-body-sm)',
-              color: 'var(--color-text-secondary)',
-              lineHeight: 'var(--line-height-normal)',
-            }}
-          >
-            관리자 전용 액세스
-          </p>
+          <h1 className="login-heading text-balance">Memory Viewer</h1>
+          <p className="login-subtitle">관리자 전용 액세스</p>
         </div>
 
-        {/* 폼 */}
+        {/* Form */}
         <form onSubmit={handleSubmit}>
-          {/* 비밀번호 레이블 */}
-          <label
-            htmlFor="password"
-            className="block mb-2"
-            style={{
-              fontSize: 'var(--text-body-sm)',
-              fontWeight: 'var(--font-weight-medium)',
-              color: 'var(--color-text-secondary)',
-            }}
-          >
+          <label htmlFor="password" className="login-label">
             비밀번호
           </label>
 
-          {/* 비밀번호 인풋 */}
           <div className="relative">
             <input
               id="password"
@@ -109,8 +76,7 @@ export default function LoginPage() {
               }}
               placeholder="비밀번호 입력"
               autoFocus
-              className={`input-base w-full h-12 pr-11 pl-4${error ? ' input-error' : ''}`}
-              style={{ fontSize: '16px' /* 모바일 zoom 방지 */ }}
+              className={`input-base input-password-pad w-full${error ? ' input-error' : ''}`}
             />
             <button
               type="button"
@@ -123,27 +89,19 @@ export default function LoginPage() {
             </button>
           </div>
 
-          {/* 에러 메시지 */}
+          {/* Error */}
           {error && (
-            <div
-              className="flex items-center gap-1.5 mt-3 px-3 py-2 rounded-[var(--radius-sm)]"
-              style={{
-                background: 'rgba(236, 45, 48, 0.10)',
-                border: '1px solid rgba(236, 45, 48, 0.25)',
-                fontSize: 'var(--text-body-sm)',
-                color: 'var(--color-negative)',
-              }}
-            >
+            <div className="error-banner flex items-center gap-2 mt-3 px-3 py-2 animate-content-enter">
               <AlertCircle size={14} className="shrink-0" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* 로그인 버튼 — Toss CTA: 56px, radius 12px */}
+          {/* Submit */}
           <button
             type="submit"
             disabled={isLoading || !password}
-            className="btn-primary mt-5"
+            className="btn-primary login-submit"
           >
             {isLoading && <Loader2 size={16} className="animate-spin" />}
             {isLoading ? '로그인 중...' : '로그인'}

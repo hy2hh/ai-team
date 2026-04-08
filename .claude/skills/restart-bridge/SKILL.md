@@ -8,10 +8,10 @@ description: Socket bridge + AI 에이전트 전체를 안전하게 재시작. S
 ## 실행
 
 ```bash
-# 기본 (API 키 모드)
+# 기본 (.env의 Claude OAuth token 사용 — BRIDGE_ANTHROPIC_AUTH_MODE=claude_oauth)
 bash .claude/skills/restart-bridge/scripts/restart.sh
 
-# 로컬 claude 로그인 계정 요금제 사용
+# 로컬 claude login 키체인 계정 사용 (로컬로 실행하라는 지시가 있을 때만)
 bash .claude/skills/restart-bridge/scripts/restart.sh local
 ```
 

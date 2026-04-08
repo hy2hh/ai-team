@@ -1,112 +1,131 @@
 @import "tailwindcss";
 
 /* =============================================
-   다크 테마 (기본)
+   Apple 디자인 시스템 — 다크 테마 (기본)
    ============================================= */
 :root,
 [data-theme="dark"] {
-  /* 타이포그래피 토큰 — Bifrost 디자인 시스템 기반 */
-  --text-h3: 20px;
-  --text-h4: 17px;
-  --text-body: 14px;
-  --text-body-sm: 13px;
+  /* 타이포그래피 토큰 — Apple SF Pro 스케일 */
+  --text-h3: 21px;     /* Card Title: 21px / weight 700 */
+  --text-h4: 17px;     /* Body: 17px / weight 400 */
+  --text-body: 17px;
+  --text-body-sm: 14px;
   --text-caption: 12px;
   --text-label: 11px;
 
-  --line-height-tight: 1.3;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.65;
+  /* Apple 확장 타이포그래피 */
+  --text-display-hero:    56px;   /* weight 600, lh 1.07, ls -0.28px */
+  --text-section-heading: 40px;   /* weight 600, lh 1.10 */
+  --text-tile-heading:    28px;   /* weight 400, lh 1.14, ls 0.196px */
+  --text-card-title:      21px;   /* weight 700, lh 1.19, ls 0.231px */
+  --text-micro:           12px;   /* weight 400, lh 1.33, ls -0.12px */
+  --text-nav:             12px;
+
+  --line-height-tight: 1.14;    /* Apple headline */
+  --line-height-normal: 1.47;   /* Apple body */
+  --line-height-relaxed: 1.29;  /* Apple caption */
 
   --font-weight-normal: 400;
-  --font-weight-medium: 500;
+  --font-weight-medium: 400;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
-  /* Border Radius 토큰 */
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 16px;
-  --radius-pill: 20px;
+  /* Border Radius 토큰 — Apple 스케일 */
+  --radius-sm: 5px;    /* micro: 최소 요소 */
+  --radius-md: 8px;    /* standard: 버튼, 카드 */
+  --radius-lg: 12px;   /* panel: 패널, 시트 */
+  --radius-xl: 16px;   /* large panel */
+  --radius-pill: 980px; /* Pill CTA */
   --radius-full: 50%;
 
-  /* 배경 레이어 — 깊은 네이비 다크 팔레트 */
-  --color-bg-base:        #080d17;
-  --color-bg-surface:     #0d1526;
-  --color-bg-elevated:    #111d33;
-  --color-bg-card:        #172039;
-  --color-bg-input:       #111d33;
-  --color-bg-overlay:     rgba(0, 0, 0, 0.7);
+  /* 배경 레이어 — Apple 다크 팔레트 */
+  --color-bg-base:        #000000;  /* Apple pure black */
+  --color-bg-surface:     #1c1c1e;  /* Apple dark surface */
+  --color-bg-elevated:    #2c2c2e;  /* Apple dark elevated */
+  --color-bg-card:        #272729;  /* Apple dark card */
+  --color-bg-input:       #1c1c1e;
+  --color-bg-overlay:     rgba(0, 0, 0, 0.72);
 
-  /* 테두리 */
-  --color-border:         #1e2d47;
-  --color-border-strong:  #253550;
+  /* Apple 시스템 배경 alias */
+  --color-bg-dark:        #000000;
+  --color-bg-light:       #f5f5f7;
 
-  /* 텍스트 */
-  --color-text-primary:   #e2e8f5;
-  --color-text-secondary: #7a90b8;
-  --color-text-muted:     #3d506e;
-  --color-text-inverse:   #ffffff;
+  /* 테두리 — 화이트 반투명 */
+  --color-border:         rgba(255, 255, 255, 0.12);
+  --color-border-strong:  rgba(255, 255, 255, 0.20);
 
-  /* 액션 — Bifrost brand-point 계열 */
-  --color-action-primary:         #7C7AE8;
-  --color-action-primary-hover:   #9B99EF;
-  --color-action-secondary:       #172039;
-  --color-action-secondary-hover: #1e2d47;
+  /* 텍스트 — Apple 다크 팔레트 */
+  --color-text-primary:   #f5f5f7;              /* Apple near-white */
+  --color-text-secondary: rgba(255,255,255,0.72);
+  --color-text-muted:     rgba(255,255,255,0.40);
+  --color-text-inverse:   #1d1d1f;
+  --color-text-on-dark:   #ffffff;
 
-  /* 포인트컬러 토큰 — Bifrost brand-point #5F5BE2 (다크 모드 밝기 조정) */
-  --color-point:        #7C7AE8;
-  --color-point-hover:  #9B99EF;
-  --color-point-subtle: rgba(95, 91, 226, 0.12);
-  --color-point-border: rgba(95, 91, 226, 0.30);
-  --color-point-glow:   rgba(95, 91, 226, 0.20);
+  /* 액션 — Apple Blue */
+  --color-action-primary:         #0071e3;  /* Apple Blue */
+  --color-action-primary-hover:   #2997ff;  /* Bright Blue (dark bg) */
+  --color-action-secondary:       #1c1c1e;
+  --color-action-secondary-hover: #2c2c2e;
 
-  /* 포커스 */
-  --color-focus-ring: #7C7AE8;
+  /* Apple 포인트컬러 — dark bg용 Bright Blue */
+  --color-apple-blue:   #0071e3;
+  --color-link-light:   #0066cc;
+  --color-link-dark:    #2997ff;
 
-  /* 드래그/드롭 */
-  --color-drag-over: #7C7AE8;
+  --color-point:        #2997ff;              /* Bright Blue (dark bg) */
+  --color-point-hover:  #57b9ff;
+  --color-point-subtle: rgba(41, 151, 255, 0.12);
+  --color-point-border: rgba(41, 151, 255, 0.28);
+  --color-point-glow:   rgba(41, 151, 255, 0.20);
 
-  /* 상태 색상 */
-  --color-priority-high:          #f87171;
-  --color-priority-medium:        #fbbf24;
-  --color-priority-low:           #4ade80;
-  --color-priority-high-bg:       rgba(248, 113, 113, 0.12);
-  --color-priority-high-border:   rgba(248, 113, 113, 0.25);
-  --color-priority-medium-bg:     rgba(251, 191, 36, 0.12);
-  --color-priority-medium-border: rgba(251, 191, 36, 0.25);
-  --color-priority-low-bg:        rgba(74, 222, 128, 0.12);
-  --color-priority-low-border:    rgba(74, 222, 128, 0.25);
-  --color-progress-high:          #4ade80;
-  --color-progress-medium:        #fbbf24;
-  --color-progress-low:           #f87171;
+  /* 포커스 / 드래그 */
+  --color-focus-ring: #0071e3;
+  --color-drag-over:  #2997ff;
 
-  /* 에이전트 아바타 */
-  --color-agent-homer:    #4f7ef0;
-  --color-agent-bart:     #22d3ee;
-  --color-agent-marge:    #c084fc;
-  --color-agent-lisa:     #4ade80;
-  --color-agent-krusty:   #fb923c;
-  --color-agent-sid:      #f472b6;
-  --color-agent-chalmers: #f59e0b;
-  --color-agent-wiggum:   #94a3b8;
+  /* 그림자 — Apple 스케일 */
+  --shadow-card:   rgba(0,0,0,0.22) 3px 5px 30px 0px;
+  --shadow-none:   none;
 
-  /* 컬럼 accent — 6개 컬럼 순환용 (Column.tsx COLUMN_ACCENTS와 동기화) */
-  --color-col-1:          var(--color-point);       /* Todo: brand-point */
-  --color-col-2:          #fbbf24;                  /* In Progress: amber */
-  --color-col-3:          #c084fc;                  /* Review: purple */
-  --color-col-4:          #4ade80;                  /* Done: green */
-  --color-col-5:          #fb923c;                  /* 추가 컬럼: orange */
-  --color-col-6:          #f472b6;                  /* 추가 컬럼: pink */
-  --color-col-default:    #7a90b8;
+  /* 상태 색상 — Apple System Colors (dark) */
+  --color-priority-high:          #ff453a;  /* Apple Red */
+  --color-priority-medium:        #ff9f0a;  /* Apple Yellow */
+  --color-priority-low:           #30d158;  /* Apple Green */
+  --color-priority-high-bg:       rgba(255, 69, 58, 0.12);
+  --color-priority-high-border:   rgba(255, 69, 58, 0.25);
+  --color-priority-medium-bg:     rgba(255, 159, 10, 0.12);
+  --color-priority-medium-border: rgba(255, 159, 10, 0.25);
+  --color-priority-low-bg:        rgba(48, 209, 88, 0.12);
+  --color-priority-low-border:    rgba(48, 209, 88, 0.25);
+  --color-progress-high:          #30d158;
+  --color-progress-medium:        #ff9f0a;
+  --color-progress-low:           #ff453a;
+
+  /* 에이전트 아바타 — Apple System Colors */
+  --color-agent-homer:    #2997ff;  /* Apple Bright Blue */
+  --color-agent-bart:     #5ac8fa;  /* Apple Teal */
+  --color-agent-marge:    #bf5af2;  /* Apple Purple */
+  --color-agent-lisa:     #30d158;  /* Apple Green */
+  --color-agent-krusty:   #ff9f0a;  /* Apple Yellow */
+  --color-agent-sid:      #ff375f;  /* Apple Pink */
+  --color-agent-chalmers: #ffd60a;  /* Apple Yellow (bright) */
+  --color-agent-wiggum:   #8e8e93;  /* Apple Gray */
+
+  /* 컬럼 accent — Apple System Colors (dark variant) */
+  --color-col-1:          var(--color-point);   /* Todo: Apple Bright Blue */
+  --color-col-2:          #ff9f0a;              /* In Progress: Apple Yellow */
+  --color-col-3:          #bf5af2;              /* Review: Apple Purple */
+  --color-col-4:          #30d158;              /* Done: Apple Green */
+  --color-col-5:          #ff453a;              /* 추가: Apple Red */
+  --color-col-6:          #ff375f;              /* 추가: Apple Pink */
+  --color-col-default:    rgba(255,255,255,0.40);
 
   /* 컬럼 accent 배경 (8% 투명도) */
-  --color-col-1-bg:       rgba(95, 91, 226, 0.08);
-  --color-col-2-bg:       rgba(251, 191, 36, 0.08);
-  --color-col-3-bg:       rgba(192, 132, 252, 0.08);
-  --color-col-4-bg:       rgba(74, 222, 128, 0.08);
-  --color-col-5-bg:       rgba(251, 146, 60, 0.08);
-  --color-col-6-bg:       rgba(244, 114, 182, 0.08);
+  --color-col-1-bg:       rgba(41, 151, 255, 0.08);
+  --color-col-2-bg:       rgba(255, 159, 10, 0.08);
+  --color-col-3-bg:       rgba(191, 90, 242, 0.08);
+  --color-col-4-bg:       rgba(48, 209, 88, 0.08);
+  --color-col-5-bg:       rgba(255, 69, 58, 0.08);
+  --color-col-6-bg:       rgba(255, 55, 95, 0.08);
 
   /* 레거시 alias — 기존 코드 호환 */
   --color-col-todo:       var(--color-col-1);
@@ -114,16 +133,16 @@
   --color-col-review:     var(--color-col-3);
   --color-col-done:       var(--color-col-4);
 
-  /* 마감일 상태 */
-  --color-due-warning:         #fb923c;
-  --color-due-warning-bg:     rgba(251, 146, 60, 0.12);
-  --color-due-warning-border: rgba(251, 146, 60, 0.30);
-  --color-due-overdue:        #f87171;
-  --color-due-overdue-bg:     rgba(248, 113, 113, 0.12);
-  --color-due-overdue-border: rgba(248, 113, 113, 0.30);
-  --color-due-normal:         #4ade80;
-  --color-due-normal-bg:      rgba(74, 222, 128, 0.10);
-  --color-due-normal-border:  rgba(74, 222, 128, 0.25);
+  /* 마감일 상태 — Apple System Colors (dark) */
+  --color-due-warning:         #ff9f0a;               /* Apple Yellow */
+  --color-due-warning-bg:     rgba(255, 159, 10, 0.12);
+  --color-due-warning-border: rgba(255, 159, 10, 0.28);
+  --color-due-overdue:        #ff453a;               /* Apple Red */
+  --color-due-overdue-bg:     rgba(255, 69, 58, 0.12);
+  --color-due-overdue-border: rgba(255, 69, 58, 0.28);
+  --color-due-normal:         #30d158;               /* Apple Green */
+  --color-due-normal-bg:      rgba(48, 209, 88, 0.10);
+  --color-due-normal-border:  rgba(48, 209, 88, 0.25);
 
   /* 태그 */
   --color-tag-bg:     var(--color-point-subtle);
@@ -134,8 +153,8 @@
   --color-accent: var(--color-action-primary);
 
   /* WIP 초과 강조 */
-  --color-wip-exceeded-border: rgba(248, 113, 113, 0.45);
-  --color-wip-exceeded-shadow: rgba(248, 113, 113, 0.25);
+  --color-wip-exceeded-border: rgba(255, 69, 58, 0.45);  /* Apple Red */
+  --color-wip-exceeded-shadow: rgba(255, 69, 58, 0.25);
 
   /* 애니메이션 duration 통일 */
   --duration-fast:   150ms;
@@ -153,86 +172,86 @@
 }
 
 /* =============================================
-   라이트 테마
+   Apple 디자인 시스템 — 라이트 테마
    ============================================= */
 [data-theme="light"] {
-  /* 배경 레이어 — 클린 화이트/그레이 팔레트 */
-  --color-bg-base:        #f0f4f8;
-  --color-bg-surface:     #ffffff;
-  --color-bg-elevated:    #f8fafc;
+  /* 배경 레이어 — Apple light 팔레트 (#f5f5f7 / #ffffff 이진 리듬) */
+  --color-bg-base:        #f5f5f7;  /* Apple light gray */
+  --color-bg-surface:     #ffffff;  /* Apple white */
+  --color-bg-elevated:    #ffffff;
   --color-bg-card:        #ffffff;
-  --color-bg-input:       #f1f5f9;
-  --color-bg-overlay:     rgba(15, 23, 42, 0.5);
+  --color-bg-input:       #fafafa;  /* filter/search 인풋 */
+  --color-bg-overlay:     rgba(0, 0, 0, 0.50);
 
-  /* 테두리 */
-  --color-border:         #e2e8f0;
-  --color-border-strong:  #cbd5e1;
+  /* 테두리 — 블랙 반투명 */
+  --color-border:         rgba(0, 0, 0, 0.10);
+  --color-border-strong:  rgba(0, 0, 0, 0.18);
 
-  /* 텍스트 */
-  --color-text-primary:   #1e293b;
-  --color-text-secondary: #475569;
-  --color-text-muted:     #94a3b8;
-  --color-text-inverse:   #0f172a;
+  /* 텍스트 — Apple light 팔레트 */
+  --color-text-primary:   #1d1d1f;              /* Apple Near Black */
+  --color-text-secondary: rgba(0,0,0,0.80);
+  --color-text-muted:     rgba(0,0,0,0.48);
+  --color-text-inverse:   #ffffff;
 
-  /* 액션 — Bifrost brand-point #5F5BE2 */
-  --color-action-primary:         #5F5BE2;
-  --color-action-primary-hover:   #4D49C5;
-  --color-action-secondary:       #f1f5f9;
-  --color-action-secondary-hover: #e2e8f0;
+  /* 액션 — Apple Blue */
+  --color-action-primary:         #0071e3;  /* Apple Blue */
+  --color-action-primary-hover:   #0066cc;  /* Link Blue */
+  --color-action-secondary:       #f5f5f7;
+  --color-action-secondary-hover: rgba(0,0,0,0.06);
 
-  /* 포인트컬러 토큰 — Bifrost brand-point #5F5BE2 */
-  --color-point:        #5F5BE2;
-  --color-point-hover:  #4D49C5;
-  --color-point-subtle: rgba(95, 91, 226, 0.10);
-  --color-point-border: rgba(95, 91, 226, 0.25);
-  --color-point-glow:   rgba(95, 91, 226, 0.15);
+  /* 포인트컬러 토큰 — Apple Blue */
+  --color-point:        #0071e3;
+  --color-point-hover:  #0066cc;
+  --color-point-subtle: rgba(0, 113, 227, 0.08);
+  --color-point-border: rgba(0, 113, 227, 0.20);
+  --color-point-glow:   rgba(0, 113, 227, 0.12);
 
   /* 포커스 */
-  --color-focus-ring: #5F5BE2;
+  --color-focus-ring: #0071e3;
 
   /* 드래그/드롭 */
-  --color-drag-over: #5F5BE2;
+  --color-drag-over: #0071e3;
 
-  /* 상태 색상 — 라이트 배경에 맞게 진하게 조정 */
-  --color-priority-high:          #dc2626;
-  --color-priority-medium:        #d97706;
-  --color-priority-low:           #16a34a;
-  --color-priority-high-bg:       rgba(220, 38, 38, 0.10);
-  --color-priority-high-border:   rgba(220, 38, 38, 0.25);
-  --color-priority-medium-bg:     rgba(217, 119, 6, 0.10);
-  --color-priority-medium-border: rgba(217, 119, 6, 0.25);
-  --color-priority-low-bg:        rgba(22, 163, 74, 0.10);
-  --color-priority-low-border:    rgba(22, 163, 74, 0.25);
-  --color-progress-high:          #16a34a;
-  --color-progress-medium:        #d97706;
-  --color-progress-low:           #dc2626;
+  /* 상태 색상 — Apple System Colors (light) */
+  --color-priority-high:          #ff3b30;  /* Apple Red */
+  --color-priority-medium:        #ff9500;  /* Apple Orange */
+  --color-priority-low:           #34c759;  /* Apple Green */
+  --color-priority-high-bg:       rgba(255, 59, 48, 0.08);
+  --color-priority-high-border:   rgba(255, 59, 48, 0.20);
+  --color-priority-medium-bg:     rgba(255, 149, 0, 0.08);
+  --color-priority-medium-border: rgba(255, 149, 0, 0.20);
+  --color-priority-low-bg:        rgba(52, 199, 89, 0.08);
+  --color-priority-low-border:    rgba(52, 199, 89, 0.20);
+  --color-progress-high:          #34c759;
+  --color-progress-medium:        #ff9500;
+  --color-progress-low:           #ff3b30;
 
-  /* 에이전트 아바타 — 다크과 동일 (충분한 채도) */
-  --color-agent-homer:    #4f7ef0;
-  --color-agent-bart:     #22d3ee;
-  --color-agent-marge:    #c084fc;
-  --color-agent-lisa:     #4ade80;
-  --color-agent-krusty:   #fb923c;
-  --color-agent-sid:      #f472b6;
-  --color-agent-chalmers: #f59e0b;
-  --color-agent-wiggum:   #94a3b8;
+  /* 에이전트 아바타 — Apple System Colors (light) */
+  --color-agent-homer:    #007aff;  /* Apple Blue */
+  --color-agent-bart:     #5ac8fa;  /* Apple Teal */
+  --color-agent-marge:    #af52de;  /* Apple Purple */
+  --color-agent-lisa:     #34c759;  /* Apple Green */
+  --color-agent-krusty:   #ff9500;  /* Apple Orange */
+  --color-agent-sid:      #ff2d55;  /* Apple Pink */
+  --color-agent-chalmers: #ffcc00;  /* Apple Yellow */
+  --color-agent-wiggum:   #8e8e93;  /* Apple Gray */
 
-  /* 컬럼 accent — 라이트 배경용 (채도 높은 버전) */
-  --color-col-1:          var(--color-point);       /* Todo: brand-point */
-  --color-col-2:          #d97706;                  /* In Progress: amber-600 */
-  --color-col-3:          #9333ea;                  /* Review: purple-600 */
-  --color-col-4:          #16a34a;                  /* Done: green-600 */
-  --color-col-5:          #ea580c;                  /* 추가 컬럼: orange-600 */
-  --color-col-6:          #db2777;                  /* 추가 컬럼: pink-600 */
-  --color-col-default:    #64748b;
+  /* 컬럼 accent — Apple System Colors (light) */
+  --color-col-1:          var(--color-point);   /* Todo: Apple Blue */
+  --color-col-2:          #ff9500;              /* In Progress: Apple Orange */
+  --color-col-3:          #af52de;              /* Review: Apple Purple */
+  --color-col-4:          #34c759;              /* Done: Apple Green */
+  --color-col-5:          #ff3b30;              /* 추가: Apple Red */
+  --color-col-6:          #ff2d55;              /* 추가: Apple Pink */
+  --color-col-default:    rgba(0,0,0,0.48);
 
-  /* 컬럼 accent 배경 (6% 투명도 — 라이트 배경 대비) */
-  --color-col-1-bg:       rgba(95, 91, 226, 0.06);
-  --color-col-2-bg:       rgba(217, 119, 6, 0.06);
-  --color-col-3-bg:       rgba(147, 51, 234, 0.06);
-  --color-col-4-bg:       rgba(22, 163, 74, 0.06);
-  --color-col-5-bg:       rgba(234, 88, 12, 0.06);
-  --color-col-6-bg:       rgba(219, 39, 119, 0.06);
+  /* 컬럼 accent 배경 (6% 투명도 — Apple light 배경 대비) */
+  --color-col-1-bg:       rgba(0, 113, 227, 0.06);
+  --color-col-2-bg:       rgba(255, 149, 0, 0.06);
+  --color-col-3-bg:       rgba(175, 82, 222, 0.06);
+  --color-col-4-bg:       rgba(52, 199, 89, 0.06);
+  --color-col-5-bg:       rgba(255, 59, 48, 0.06);
+  --color-col-6-bg:       rgba(255, 45, 85, 0.06);
 
   /* 레거시 alias */
   --color-col-todo:       var(--color-col-1);
@@ -240,16 +259,16 @@
   --color-col-review:     var(--color-col-3);
   --color-col-done:       var(--color-col-4);
 
-  /* 마감일 상태 */
-  --color-due-warning:         #d97706;
-  --color-due-warning-bg:     rgba(217, 119, 6, 0.10);
-  --color-due-warning-border: rgba(217, 119, 6, 0.25);
-  --color-due-overdue:        #dc2626;
-  --color-due-overdue-bg:     rgba(220, 38, 38, 0.10);
-  --color-due-overdue-border: rgba(220, 38, 38, 0.30);
-  --color-due-normal:         #16a34a;
-  --color-due-normal-bg:      rgba(22, 163, 74, 0.10);
-  --color-due-normal-border:  rgba(22, 163, 74, 0.25);
+  /* 마감일 상태 — Apple System Colors (light) */
+  --color-due-warning:         #ff9500;               /* Apple Orange */
+  --color-due-warning-bg:     rgba(255, 149, 0, 0.08);
+  --color-due-warning-border: rgba(255, 149, 0, 0.22);
+  --color-due-overdue:        #ff3b30;               /* Apple Red */
+  --color-due-overdue-bg:     rgba(255, 59, 48, 0.08);
+  --color-due-overdue-border: rgba(255, 59, 48, 0.22);
+  --color-due-normal:         #34c759;               /* Apple Green */
+  --color-due-normal-bg:      rgba(52, 199, 89, 0.08);
+  --color-due-normal-border:  rgba(52, 199, 89, 0.22);
 
   /* 태그 */
   --color-tag-bg:     var(--color-point-subtle);
@@ -259,9 +278,9 @@
   /* accent alias */
   --color-accent: var(--color-action-primary);
 
-  /* WIP 초과 강조 — 라이트 배경 대비 */
-  --color-wip-exceeded-border: rgba(220, 38, 38, 0.4);
-  --color-wip-exceeded-shadow: rgba(220, 38, 38, 0.2);
+  /* WIP 초과 강조 — Apple Red (light) */
+  --color-wip-exceeded-border: rgba(255, 59, 48, 0.40);
+  --color-wip-exceeded-shadow: rgba(255, 59, 48, 0.20);
 }
 
 @theme inline {
@@ -380,9 +399,11 @@ html[data-theme="light"] {
 body {
   background: var(--color-bg-base);
   color: var(--color-text-primary);
-  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+  /* SF Pro Display/Text → -apple-system fallback (macOS/iOS에서 SF Pro 자동 적용) */
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.374px; /* Apple body letter-spacing */
 }
 
 /* 커스텀 스크롤바 */
@@ -438,23 +459,23 @@ select option {
   padding: 0 16px;
 }
 
-/* 모달 박스 */
+/* 모달 박스 — Apple panel radius */
 .modal-box {
   background: var(--color-bg-surface);
   border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: var(--radius-xl); /* 16px */
   width: 100%;
   max-width: 440px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
   animation: modalFadeIn 180ms ease-out;
 }
 
-/* 카드 베이스 */
+/* 카드 베이스 — Apple: border 없음, shadow 사용 */
 .card-base {
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md); /* 8px Apple standard */
   padding: 14px 16px;
   position: relative;
   overflow: hidden;
@@ -940,17 +961,15 @@ select:focus-visible {
 }
 
 /* =============================================
-   UI Kit 오버라이드 — brand-point → var(--color-point)
-   @bifrost-platform/ui-kit-front index.css의 brand-point는 #5F5BE2 하드코딩.
-   다크 테마에서 --color-point(#7C7AE8)와 불일치하므로 CSS 변수로 오버라이드.
+   포인트컬러 유틸리티
    ============================================= */
-.bg-brand-point {
+.bg-point {
   background-color: var(--color-point) !important;
 }
-.border-brand-point {
+.border-point {
   border-color: var(--color-point) !important;
 }
-.text-brand-point {
+.text-point {
   color: var(--color-point) !important;
 }
 .hover\:bg-brand-300:hover {

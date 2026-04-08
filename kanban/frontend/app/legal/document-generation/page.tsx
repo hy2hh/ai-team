@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DisclaimerBanner } from '@/components/legal/disclaimer-banner';
 import { legalApi } from '@/lib/legal-api';
@@ -45,7 +45,7 @@ const INITIAL_FORM: FormState = {
   claimReason: '',
 };
 
-export default function DocumentGenerationPage() {
+function DocumentGenerationContent() {
   const searchParams = useSearchParams();
   const caseId = searchParams.get('caseId');
 
@@ -161,7 +161,6 @@ export default function DocumentGenerationPage() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 45%) minmax(0, 55%)',
-          gap: 0,
           maxWidth: 1400,
           margin: '0 auto',
           padding: '32px 24px',
@@ -650,5 +649,13 @@ function FormFields({
         </label>
       ))}
     </div>
+  );
+}
+
+export default function DocumentGenerationPage() {
+  return (
+    <Suspense fallback={<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: '#f5f5f7' }}>로딩 중...</div>}>
+      <DocumentGenerationContent />
+    </Suspense>
   );
 }

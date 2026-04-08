@@ -122,7 +122,7 @@ const VERIFY_MATRIX: Record<
   frontend: [
     {
       verifier: 'designer',
-      checkItems: '디자인 일치: 컴포넌트가 디자인 스펙(색상, 간격, 타이포그래피, 반응형)과 일치하는지 확인',
+      checkItems: '디자인 토큰 준수: CSS 변수(--color-*, --radius-*, --shadow-*, --font-*) 사용 여부 확인. Apple 하드코딩 값(#0071e3, #f5f5f7, #1d1d1f 등) 직접 사용 금지 — 변수 미사용 시 FAIL. 컴포넌트가 디자인 스펙(색상, 간격, 타이포그래피, 반응형)과 일치하는지 확인',
     },
     {
       verifier: 'backend',
@@ -211,6 +211,59 @@ const recordVerification = (
 };
 
 /**
+ * Apple 디자인 토큰 하드코딩 검사 (grep 기반 자동 lint)
+ *
+ * CSS/TSX 파일에서 CSS 변수 대신 직접 Apple 색상값 사용 여부를 검출한다.
+ * globals.css / design-tokens.css (정의 파일)는 제외한다.
+ *
+ * @param changedFiles - 변경된 파일 경로 배열
+ * @returns 위반 항목 목록 (빈 배열 = 위반 없음)
+ */
+export const checkAppleTokenLint = (changedFiles: string[]): string[] => {
+  const APPLE_PATTERNS: Array<{ pattern: RegExp; name: string }> = [
+    { pattern: /#0071e3/gi, name: 'Apple Blue (#0071e3)' },
+    { pattern: /#0066cc/gi, name: 'Link Blue (#0066cc)' },
+    { pattern: /#2997ff/gi, name: 'Dark Link Blue (#2997ff)' },
+    { pattern: /#f5f5f7/gi, name: 'Apple Light Gray (#f5f5f7)' },
+    { pattern: /#1d1d1f/gi, name: 'Apple Dark Text (#1d1d1f)' },
+    { pattern: /#272729|#242426/gi, name: 'Apple Dark Surface' },
+    { pattern: /rgba\(0,\s*0,\s*0,\s*0\.22\)/gi, name: 'Card Shadow rgba(0,0,0,0.22)' },
+    { pattern: /rgba\(0,\s*0,\s*0,\s*0\.8\)/gi, name: 'Secondary Text rgba(0,0,0,0.8)' },
+    { pattern: /rgba\(0,\s*0,\s*0,\s*0\.48\)/gi, name: 'Tertiary Text rgba(0,0,0,0.48)' },
+  ];
+
+  // 정의 파일(globals.css, design-tokens.css)은 제외 — 변수 선언 자체는 허용
+  const targetFiles = changedFiles.filter((f) => {
+    const ext = f.slice(f.lastIndexOf('.'));
+    const isDefinitionFile =
+      f.endsWith('globals.css') ||
+      f.endsWith('design-tokens.css') ||
+      f.endsWith('design-tokens.md') ||
+      f.endsWith('ui-kit.css');
+    return (ext === '.tsx' || ext === '.ts' || ext === '.css') && !isDefinitionFile;
+  });
+
+  const violations: string[] = [];
+
+  for (const filePath of targetFiles) {
+    try {
+      const absPath = resolve(PROJECT_ROOT, filePath);
+      const content = readFileSync(absPath, 'utf-8');
+      for (const { pattern, name } of APPLE_PATTERNS) {
+        pattern.lastIndex = 0; // g 플래그 정규식 상태 리셋
+        if (pattern.test(content)) {
+          violations.push(`\`${filePath}\`: ${name} 하드코딩 감지 → CSS 변수 사용 필요`);
+        }
+      }
+    } catch {
+      // 파일 읽기 실패는 무시
+    }
+  }
+
+  return violations;
+};
+
+/**
  * 크로스 검증 실행
  *
  * 생산자의 작업 결과를 검증자에게 전달하고,
@@ -247,11 +300,30 @@ export const runCrossVerification = async (
     ? producerResult.slice(0, MAX_RESULT_LENGTH) + '\n\n... (결과 잘림)'
     : producerResult;
 
+  // ── Apple 토큰 lint (frontend/designer 산출물에만 적용) ──
+  let tokenLintSection = '';
+  if (producerAgent === 'frontend' || producerAgent === 'designer') {
+    const violations = checkAppleTokenLint(changedFiles);
+    if (violations.length > 0) {
+      tokenLintSection = [
+        '',
+        '⚠️ *[자동 토큰 Lint 결과]* Apple 디자인 토큰 하드코딩 감지:',
+        ...violations.map((v) => `• ${v}`),
+        '→ CSS 변수(var(--color-*) 등)로 교체 필요. designer 검증 시 FAIL 기준 적용.',
+      ].join('\n');
+    } else if (changedFiles.some((f) => f.endsWith('.css') || f.endsWith('.tsx'))) {
+      tokenLintSection = '\n✅ *[자동 토큰 Lint]* Apple 하드코딩 값 미감지';
+    }
+  }
+
   // ── 코드가 직접 읽은 변경 파일 내용 (구조적 강제) ──
   const fileContents = readChangedFileContents(changedFiles);
-  const fileSection = fileContents
-    ? `\n\n*변경된 파일 내용 (${changedFiles.length}개, 코드가 직접 읽음):*\n${fileContents}`
-    : '\n\n*(변경된 파일 없음)*';
+  const fileSection = [
+    fileContents
+      ? `\n\n*변경된 파일 내용 (${changedFiles.length}개, 코드가 직접 읽음):*\n${fileContents}`
+      : '\n\n*(변경된 파일 없음)*',
+    tokenLintSection,
+  ].join('');
 
   // 검증자 병렬 실행
   const verifyPromises = verifiers.map(async ({ verifier, checkItems }) => {

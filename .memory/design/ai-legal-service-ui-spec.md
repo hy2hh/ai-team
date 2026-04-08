@@ -2,7 +2,7 @@
 > 작성일: 2026-04-05
 > 작성자: Krusty (Designer)
 > 핸드오프 대상: Bart (Frontend)
-> 기반: Bifrost Design System + ai-legal-service Feature Spec
+> 기반: ai-legal-service Feature Spec
 
 ---
 
@@ -15,7 +15,7 @@
 | `--primary-hover` | `#1D4FD8` | 버튼 hover 상태 |
 | `--primary-subtle` | `#EFF6FF` | 배경 강조 (라이트) / `#1C2A4A` (다크) |
 
-> 근거: 법률 서비스는 "신뢰(Trust)"가 핵심. Navy-Blue 계열이 권위·안정감을 전달. Bifrost 기존 서비스와 충돌 없는 신규 토큰으로 정의.
+> 근거: 법률 서비스는 "신뢰(Trust)"가 핵심. Navy-Blue 계열이 권위·안정감을 전달. 신규 토큰으로 정의.
 
 ### 다크 모드 배경 (Blue 계열 → 네이비 틴트)
 | 레이어 | 토큰 | Hex | 용도 |
@@ -32,7 +32,7 @@
 | `--text-secondary` | `#9AAAC4` | 보조·설명 |
 | `--text-tertiary` | `#5C6E8A` | 힌트·비중 낮음 |
 | `--text-disabled` | `#3A4A60` | 비활성 UI |
-| `--text-brand` | `#60A5FA` | 강조 (brand-point 라이트 버전) |
+| `--text-brand` | `#60A5FA` | 강조 (포인트컬러 라이트 버전) |
 | `--text-danger` | `#EC2D30` | 에러·삭제 |
 | `--text-success` | `#0C9D61` | 성공·확인 |
 | `--text-warning` | `#FE9B0E` | 경고 |
@@ -117,7 +117,7 @@ Hover        --bg-input       1px --primary        --text-primary
 Selected     --primary-subtle 1px --primary        --primary (bold)
 ```
 - 크기: min-height 64px (mobile: 56px), border-radius 12px
-- 아이콘: 24px, 좌측 배치 (Bifrost Icon 컴포넌트)
+- 아이콘: 24px, 좌측 배치
 - 텍스트: Body 16px Medium
 
 #### CTA Button (다음 단계)
@@ -149,7 +149,7 @@ Selected     --primary-subtle 1px --primary        --primary (bold)
 ```
 
 #### Input 컴포넌트
-- `<Input>` from `@bifrost-platform/ui-kit-front`
+- `<Input>` 컴포넌트
 - Focus: border `--primary`, 1px solid
 - Error: border `--text-danger`, 하단 에러 메시지 12px
 
@@ -269,7 +269,7 @@ AI 메시지:
   텍스트: --text-primary
 
 스트리밍 중:
-  Skeleton 컴포넌트 (Bifrost ui-kit-front `<Skeleton>`) 3행
+  Skeleton 컴포넌트 3행
 ```
 
 #### 입력창 (채팅)
@@ -455,7 +455,7 @@ Hover: GrayAlpha.50 4% 오버레이 (cursor: pointer)
 
 **카테고리 Badge**
 ```
-<Badge> 컴포넌트 (Bifrost ui-kit-front)
+<Badge> 컴포넌트
 노동·임금: bg --primary-subtle, text --primary
 임대차:    bg #1A3A2A, text #0C9D61
 계약·거래: bg #2A1E40, text #A78BFA
@@ -473,7 +473,7 @@ Hover: GrayAlpha.50 4% 오버레이 (cursor: pointer)
 #### 빈 상태 (케이스 없음)
 ```
 Body Sm --text-tertiary "아직 케이스가 없습니다."
-(일러스트, CTA 없음 — Bifrost 빈 상태 원칙)
+(일러스트, CTA 없음)
 ```
 
 #### 사이드바 네비게이션
@@ -528,7 +528,7 @@ padding: 12px 16px
   - 온보딩 Step 3: 요금제 선택 아래
 ```
 
-### Toast / Snackbar (Bifrost `<Toast>`)
+### Toast / Snackbar
 ```
 성공: "케이스가 생성되었습니다" → --text-success
 에러: "분석에 실패했습니다. 다시 시도해주세요" → --text-danger
@@ -551,7 +551,6 @@ duration: 3000ms
 
 ## 7. Bart 핸드오프 체크리스트
 
-- [ ] `@bifrost-platform/ui-kit-front` 설치 및 CSS import 확인
 - [ ] CSS 변수 (`--primary`, `--bg-base` 등) `globals.css`에 정의
 - [ ] Pretendard 폰트 로드 (`next/font` 또는 CDN)
 - [ ] 다크 모드 기본 설정 (법률 서비스 특성상 다크 우선)

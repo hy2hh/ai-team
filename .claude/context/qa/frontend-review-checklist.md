@@ -5,6 +5,41 @@ v0 (Vercel) 디자인/코딩 가이드라인 기반. 위반 발견 시 심각도
 
 ---
 
+## 0. Apple 디자인 토큰 준수 (ai-team 내부 툴 전용) — **CRITICAL**
+
+> 모든 ai-team 내부 툴(칸반, 메모리 뷰어 등)은 Apple 디자인 시스템을 따른다.
+> 컴포넌트 파일에서 Apple 값을 하드코딩하면 **즉시 FAIL**.
+
+### 검증 절차 (먼저 실행)
+
+```bash
+# 1. design-tokens.css 또는 globals.css에 CSS 변수 정의 존재 여부 확인
+grep -c '\-\-color-\|\-\-radius-\|\-\-shadow-\|\-\-font-' \
+  {project}/app/globals.css {project}/app/design-tokens.css 2>/dev/null
+
+# 2. 컴포넌트 파일에서 Apple 값 하드코딩 검출 (위반 = FAIL)
+grep -rn '#0071e3\|#0066cc\|#2997ff\|#f5f5f7\|#1d1d1f\|#272729\|#242426' \
+  --include='*.tsx' --include='*.ts' {project}/
+
+# 3. rgba 하드코딩 검출
+grep -rn 'rgba(0,\s*0,\s*0,\s*0\.\(22\|8\|48\))' \
+  --include='*.tsx' --include='*.css' {project}/ | grep -v 'globals.css' | grep -v 'design-tokens'
+
+# 4. CSS 변수 참조 확인 (var(--) 없이 직접 값 사용 여부)
+grep -rn 'color:\s*#\|background:\s*#\|background-color:\s*#' \
+  --include='*.css' {project}/ | grep -v 'globals.css' | grep -v 'design-tokens'
+```
+
+### 판정 기준
+
+| 상황 | 판정 |
+|------|------|
+| CSS 변수 정의 없음 (globals.css에 `--color-*` 없음) | **FAIL** |
+| 컴포넌트 TSX/CSS에 Apple hex 하드코딩 | **FAIL** |
+| globals.css만 정의하고 컴포넌트는 변수 사용 | PASS |
+
+---
+
 ## 1. Color & Design Token Violations
 
 ### Critical

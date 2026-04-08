@@ -172,7 +172,7 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
           </span>
         </div>
 
-        {/* WIP 진행 바 — brand-point 단일 색상 */}
+        {/* WIP 진행 바 — 포인트컬러 단일 색상 */}
         {column.wip_limit != null && (
           <div
             role="progressbar"
@@ -257,7 +257,7 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
           )}
         </div>
 
-        {/* 카드 추가 버튼 — brand-point hover */}
+        {/* 카드 추가 버튼 — 포인트컬러 hover */}
         <div style={{ padding: '0 12px 12px' }}>
           <button
             onClick={() => setShowAddModal(true)}
@@ -278,7 +278,7 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
               transition: 'all var(--duration-fast)',
               opacity: isWipExceeded ? 0.4 : 1,
               minHeight: 44,
-              // brand-point hover (globals.css .add-card-btn:not(:disabled):hover)
+              // 포인트컬러 hover (globals.css .add-card-btn:not(:disabled):hover)
               '--col-accent': 'var(--color-point)',
               '--col-accent-bg': 'var(--color-point-subtle)',
             } as React.CSSProperties}

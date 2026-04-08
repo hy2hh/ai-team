@@ -10,9 +10,9 @@ import type { SearchResult } from '@/lib/types';
 export default function SearchBar() {
   const [query, setQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
-  const [focused, setFocused] = useState(false);
   const { selectFile, expandFolder } = useAppStore();
   const inputRef = useRef<HTMLInputElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
@@ -35,6 +35,7 @@ export default function SearchBar() {
     setQuery('');
   }, [selectFile, expandFolder]);
 
+  // ⌘K 글로벌 단축키
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -51,34 +52,41 @@ export default function SearchBar() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
   return (
-    <div className="relative">
-      <div
-        className={`flex items-center gap-2 transition-colors h-9 px-3 bg-[var(--color-bg-input)] border rounded-[var(--radius-md)] ${focused ? 'border-[var(--color-point-border)]' : 'border-[var(--color-border)]'}`}
-        onFocus={() => setFocused(true)}
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget)) {
-            setFocused(false);
-          }
-        }}
-      >
-        <Search size={14} className="text-[var(--color-text-muted)] shrink-0" />
+    <div className="relative" ref={wrapRef}>
+      {/* Search Input — Apple command palette style */}
+      <div className="search-input-wrap">
+        <Search size={14} className="shrink-0 tree-icon-color" />
         <input
           ref={inputRef}
           type="text"
-          placeholder="검색... (⌘K)"
+          placeholder="검색"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setShowResults(true);
           }}
           onFocus={() => setShowResults(true)}
-          className="flex-1 bg-transparent outline-none text-[13px] text-[var(--color-text-primary)]"
+          className="search-input"
         />
+        {!query && (
+          <span className="kbd">⌘K</span>
+        )}
         {query && (
           <button
             onClick={() => { setQuery(''); setShowResults(false); }}
-            className="flex items-center justify-center min-w-[44px] min-h-[44px] text-[var(--color-text-muted)] bg-transparent -mx-3"
+            className="icon-btn icon-btn-sm"
             aria-label="검색 지우기"
           >
             <X size={12} />
@@ -86,23 +94,21 @@ export default function SearchBar() {
         )}
       </div>
 
+      {/* Search Results Dropdown */}
       {showResults && results && results.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 overflow-hidden z-50 overflow-y-auto bg-[var(--color-bg-elevated)] border border-[var(--color-border-strong)] rounded-[var(--radius-lg)] max-h-[320px]">
+        <div className="search-dropdown">
           {results.map((result) => (
             <button
               key={result.path}
               onClick={() => handleSelect(result.path)}
-              className="search-result-row w-full text-left transition-colors duration-150 px-3 py-2 min-h-[44px] border-b border-[var(--color-border)] bg-transparent"
+              className="search-result-row w-full text-left px-4 py-3 bg-transparent cursor-pointer border-none"
             >
-              <div className="text-[13px] font-medium text-[var(--color-text-primary)]">
-                {result.name}
-              </div>
-              <div className="text-xs mt-0.5 text-[var(--color-text-muted)]">
-                {result.path}
-              </div>
+              <div className="search-result-name">{result.name}</div>
+              <div className="search-result-path">{result.path}</div>
               {result.matches.slice(0, 2).map((m, i) => (
-                <div key={i} className="truncate text-xs mt-1 text-[var(--color-text-secondary)]">
-                  <span className="text-[var(--color-text-muted)]">L{m.lineNumber}:</span> {m.line}
+                <div key={i} className="truncate mt-1 search-result-match">
+                  <span className="search-result-line-num">L{m.lineNumber}:</span>{' '}
+                  {m.line}
                 </div>
               ))}
             </button>

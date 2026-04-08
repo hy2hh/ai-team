@@ -73,7 +73,6 @@ ui-kit-front 참조 경로: `/Users/hangheejo/git/ui-kit-front`
 
 ## 스코프 제외
 
-- `@bifrost-platform/ui-kit-front` 패키지 설치 — 마이그레이션 비용 리스크로 보류
 - Pretendard 폰트 — 번들 사이즈 측정 후 재논의
 - 카드 순서 변경 (drag reorder) — Backend order 필드 필요
 - 터치 드래그앤드롭 — 별도 태스크

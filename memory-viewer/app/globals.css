@@ -1,139 +1,192 @@
 @import "tailwindcss";
 
 /* =============================================
-   Toss Design System — Web 적용
-   폰트: Pretendard (Toss Product Sans 대체, CDN 미제공)
-   타입 스케일: TDS Mobile T1~T7 실측값 (Lisa 리서치 2026-04-07)
+   Apple Design System — Memory Viewer
+   Redesigned: apple.com editorial quality
+
+   Philosophy:
+   - 제품이 주인공, 인터페이스는 후퇴
+   - 단일 강조색: Apple Blue (#0071e3)
+   - 이진 배경 리듬: #ffffff ↔ #f5f5f7
+   - SF Pro 기반 타이포그래피 (Pretendard 대체)
+   - 넉넉한 여백, 정제된 디테일
    ============================================= */
 
-/* ─── Pretendard Variable 로드 지원 ─── */
+/* --- Pretendard Variable (SF Pro Korean fallback) --- */
 @font-face {
   font-family: 'Pretendard Variable';
   font-display: swap;
 }
 
 :root {
-  /* ─── 폰트 패밀리 (TDS Mobile 스택 + Pretendard 대체) ─── */
-  --font-family: 'Pretendard Variable', 'Pretendard',
-    'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont,
-    'Noto Sans KR', Roboto, sans-serif;
+  /* ═══════════════════════════════════════════
+     1. FONT SYSTEM
+     ═══════════════════════════════════════════ */
+  --font-display: 'Pretendard Variable', 'Pretendard',
+    -apple-system, BlinkMacSystemFont, system-ui, 'Helvetica Neue',
+    'Apple SD Gothic Neo', Helvetica, Arial, sans-serif;
+  --font-text: var(--font-display);
+  --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code',
+    'Cascadia Code', 'Menlo', 'Monaco', 'Courier New', monospace;
 
-  /* ─── 타이포그래피 토큰 (TDS Mobile T스케일 실측값) ─── */
-  /* T1: 최대 헤딩 */
-  --text-t1-size:   30px;
-  --text-t1-lh:     40px;
-  /* T2: 대형 헤딩 */
-  --text-t2-size:   26px;
-  --text-t2-lh:     35px;
-  /* T3: 일반 헤딩 */
-  --text-t3-size:   22px;
-  --text-t3-lh:     31px;
-  /* T4: 소형 헤딩 */
-  --text-t4-size:   20px;
-  --text-t4-lh:     29px;
-  /* T5: 본문 Regular */
-  --text-t5-size:   17px;
-  --text-t5-lh:     25.5px;
-  /* T6: 본문 Small */
-  --text-t6-size:   15px;
-  --text-t6-lh:     22.5px;
-  /* T7: Caption */
-  --text-t7-size:   13px;
-  --text-t7-lh:     19.5px;
+  /* --- Typography Scale (Apple HIG exact) --- */
+  --text-hero:      56px;
+  --text-section:   40px;
+  --text-tile:      28px;
+  --text-card:      21px;
+  --text-body-lg:   17px;
+  --text-body:      15px;
+  --text-caption:   14px;
+  --text-footnote:  12px;
+  --text-nano:      11px;
 
-  /* ─── 편의 별칭 (컴포넌트에서 사용) ─── */
-  --text-h1:       var(--text-t3-size);   /* 22px — 페이지 헤딩 */
-  --text-h2:       var(--text-t4-size);   /* 20px */
-  --text-body:     var(--text-t6-size);   /* 15px — 기본 본문 */
-  --text-body-sm:  var(--text-t7-size);   /* 13px */
-  --text-caption:  11px;                  /* TDS ST 최소값 */
-  --text-label:    var(--text-t7-size);   /* 13px */
+  /* --- Line Heights --- */
+  --lh-hero:    1.07;
+  --lh-section: 1.10;
+  --lh-tile:    1.14;
+  --lh-card:    1.19;
+  --lh-body:    1.47;
+  --lh-caption: 1.43;
+  --lh-micro:   1.33;
 
-  --lh-t5:         var(--text-t5-lh);    /* 25.5px */
-  --lh-t6:         var(--text-t6-lh);    /* 22.5px */
-  --lh-t7:         var(--text-t7-lh);    /* 19.5px */
-  --line-height-tight:   1.3;
-  --line-height-normal:  1.5;
-  --line-height-relaxed: 1.7;
+  /* --- Font Weights --- */
+  --fw-light:     300;
+  --fw-regular:   400;
+  --fw-medium:    500;
+  --fw-semibold:  600;
+  --fw-bold:      700;
 
-  /* ─── 폰트 웨이트 (TDS: Light / Regular 400 / Bold 700) ─── */
-  --font-weight-normal:   400;
-  --font-weight-medium:   500;   /* TDS 미정의, UI 보조용 */
-  --font-weight-semibold: 600;   /* TDS 미정의, UI 보조용 */
-  --font-weight-bold:     700;
+  /* --- Letter Spacing --- */
+  --ls-hero:     -0.28px;
+  --ls-section:   0px;
+  --ls-tile:      0.196px;
+  --ls-card:      0.231px;
+  --ls-body:     -0.374px;
+  --ls-caption:  -0.224px;
+  --ls-micro:    -0.12px;
+  --ls-nano:     -0.08px;
 
-  /* ─── 스페이싱 스케일 (4px 기준) ─── */
-  --space-1:   4px;
-  --space-2:   8px;
-  --space-3:  12px;
-  --space-4:  16px;
-  --space-5:  20px;
-  --space-6:  24px;
-  --space-8:  32px;
-  --space-10: 40px;
-  --space-12: 48px;
-  --space-14: 56px;
+  /* ═══════════════════════════════════════════
+     2. COLOR SYSTEM
+     ═══════════════════════════════════════════ */
 
-  /* ─── Border Radius ─── */
-  --radius-xs:  4px;   /* 기본 UI 요소 */
-  --radius-sm:  8px;   /* 카드 내부 */
-  --radius-md: 12px;   /* CTA 버튼, 인풋 */
-  --radius-lg: 16px;   /* 카드 */
-  --radius-xl: 24px;   /* 대형 카드 */
+  /* --- Backgrounds --- */
+  --bg-primary:    #ffffff;
+  --bg-secondary:  #f5f5f7;
+  --bg-elevated:   rgba(0, 0, 0, 0.03);
+  --bg-hover:      rgba(0, 0, 0, 0.04);
+  --bg-active:     rgba(0, 0, 0, 0.06);
+  --bg-glass:      rgba(255, 255, 255, 0.72);
+  --bg-glass-nav:  rgba(251, 251, 253, 0.8);
+  --bg-overlay:    rgba(0, 0, 0, 0.4);
+  --bg-input:      #f5f5f7;
 
-  /* ─── 배경 레이어 (Toss 라이트) ─── */
-  --color-bg-base:     #FFFFFF;   /* 메인 콘텐츠 영역 */
-  --color-bg-surface:  #F9FAFB;   /* 사이드바 / 보조 배경 */
-  --color-bg-elevated: #F2F4F6;   /* hover / 인라인 코드 배경 (TDS grey100) */
-  --color-bg-card:     #F9FAFB;   /* 카드 배경 */
-  --color-bg-input:    #FFFFFF;   /* 인풋 배경 */
-  --color-bg-overlay:  rgba(0, 0, 0, 0.4);
+  /* --- Text Colors --- */
+  --text-primary:    #1d1d1f;
+  --text-secondary:  rgba(0, 0, 0, 0.56);
+  --text-tertiary:   rgba(0, 0, 0, 0.40);
+  --text-quaternary: rgba(0, 0, 0, 0.28);
+  --text-disabled:   rgba(0, 0, 0, 0.18);
+  --text-inverse:    #ffffff;
 
-  /* ─── 테두리 (1px solid, 무채색) ─── */
-  --color-border:        #E5E8EB;
-  --color-border-strong: #D1D6DB;
+  /* --- Apple Blue --- */
+  --blue:          #0071e3;
+  --blue-hover:    #0077ed;
+  --blue-active:   #006edb;
+  --blue-subtle:   rgba(0, 113, 227, 0.08);
+  --blue-focus:    rgba(0, 113, 227, 0.28);
+  --link:          #0066cc;
+  --link-dark:     #2997ff;
 
-  /* ─── 텍스트 6단계 ─── */
-  --color-text-primary:   #191F28;   /* 제목·본문 */
-  --color-text-secondary: #8B95A1;   /* 보조·설명 */
-  --color-text-tertiary:  #B0B8C1;   /* 힌트·중요도 낮음 */
-  --color-text-muted:     #B0B8C1;   /* 내부 호환 */
-  --color-text-disabled:  #D1D6DB;   /* 비활성 */
-  --color-text-inverse:   #FFFFFF;
+  /* --- Semantic Status --- */
+  --red:     #ff3b30;
+  --green:   #30d158;
+  --orange:  #ff9f0a;
 
-  /* ─── 브랜드 블루 (TDS 실측 토큰) ─── */
-  --color-blue-50:   #E8F3FF;   /* TDS blue50 */
-  --color-blue-100:  #C9E2FF;   /* TDS blue100 */
-  --color-blue-300:  #64A8FF;   /* TDS blue300 */
-  --color-blue-400:  #4593FC;   /* TDS blue400 */
-  --color-blue-500:  #3182F6;   /* Toss 대표 블루 */
+  /* --- Grey Scale --- */
+  --grey-50:  #f5f5f7;
+  --grey-100: #e8e8ed;
+  --grey-200: #d2d2d7;
+  --grey-300: #b0b0b8;
+  --grey-400: #86868b;
+  --grey-500: #6e6e73;
+  --grey-600: #515154;
+  --grey-700: #3a3a3c;
+  --grey-800: #2c2c2e;
+  --grey-900: #1d1d1f;
 
-  --color-point:        #3182F6;   /* Primary CTA */
-  --color-point-light:  #4593FC;   /* TDS blue400 */
-  --color-point-hover:  #1B64DA;
-  --color-point-subtle: #E8F3FF;   /* TDS blue50 */
-  --color-point-border: #3182F6;
+  /* --- Folder Colors (Apple Accent Palette) --- */
+  --color-folder-facts:     #0071e3;
+  --color-folder-decisions: #bf5af2;
+  --color-folder-tasks:     #30d158;
+  --color-folder-handoff:   #ff9f0a;
+  --color-folder-design:    #ff375f;
+  --color-folder-logs:      var(--grey-400);
+  --color-folder-default:   var(--text-tertiary);
 
-  /* ─── 포커스 ─── */
-  --color-focus-ring: rgba(49, 130, 246, 0.25);
+  /* --- Borders --- */
+  --border:        rgba(0, 0, 0, 0.06);
+  --border-strong: rgba(0, 0, 0, 0.12);
+  --border-focus:  var(--blue);
 
-  /* ─── 시맨틱 ─── */
-  --color-negative: #F04452;   /* 에러·삭제 */
-  --color-warning:  #F5A623;
-  --color-positive: #0BB151;
-  --color-info:     #3182F6;
+  /* ═══════════════════════════════════════════
+     3. SPACING (8px baseline rhythm)
+     ═══════════════════════════════════════════ */
+  --sp-1:   4px;
+  --sp-2:   8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-8:  32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-20: 80px;
 
-  /* ─── 폴더 색상 (무채색 계열) ─── */
-  --color-folder-facts:     #8B95A1;
-  --color-folder-decisions: #8B95A1;
-  --color-folder-tasks:     #8B95A1;
-  --color-folder-handoff:   #8B95A1;
-  --color-folder-design:    #8B95A1;
-  --color-folder-logs:      #B0B8C1;
-  --color-folder-default:   #8B95A1;
+  /* ═══════════════════════════════════════════
+     4. BORDER RADIUS
+     ═══════════════════════════════════════════ */
+  --radius-xs:    5px;
+  --radius-sm:    8px;
+  --radius-md:   12px;
+  --radius-lg:   18px;
+  --radius-xl:   24px;
+  --radius-pill: 980px;
+
+  /* ═══════════════════════════════════════════
+     5. ELEVATION & SHADOW
+     ═══════════════════════════════════════════ */
+  --shadow-sm:     0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-card:   0 2px 12px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-popup:  0 12px 40px rgba(0, 0, 0, 0.12), 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-nav:    0 0.5px 0 rgba(0, 0, 0, 0.06);
+  --shadow-float:  0 8px 30px rgba(0, 0, 0, 0.10), 0 2px 8px rgba(0, 0, 0, 0.06);
+
+  /* ═══════════════════════════════════════════
+     6. TRANSITIONS
+     ═══════════════════════════════════════════ */
+  --ease-out:    cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --duration-fast:   120ms;
+  --duration-normal: 200ms;
+  --duration-slow:   320ms;
+
+  /* ═══════════════════════════════════════════
+     7. LAYOUT
+     ═══════════════════════════════════════════ */
+  --content-max:     800px;
+  --sidebar-width:   272px;
+  --sidebar-sm:      248px;
+  --right-panel:     280px;
+  --nav-height:      52px;
+  --header-height:   48px;
+  --touch-target:    44px;
 }
 
-/* ─── 기본 리셋 ─── */
+/* ═══════════════════════════════════════════
+   RESET & FOUNDATION
+   ═══════════════════════════════════════════ */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -142,395 +195,1089 @@
 
 html, body {
   height: 100%;
-  background: var(--color-bg-base);
-  color: var(--color-text-primary);
-  font-family: var(--font-family);
-  font-size: var(--text-body);        /* 15px — TDS T6 */
-  line-height: var(--lh-t6);          /* 22.5px */
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  font-feature-settings: 'kern' 1, 'liga' 1;
 }
 
-/* ─── 키보드 포커스 ─── */
+::selection {
+  background: var(--blue-subtle);
+  color: var(--text-primary);
+}
+
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
 
-/* ─── 스크롤바 ─── */
-::-webkit-scrollbar        { width: 4px; height: 4px; }
+/* --- Scrollbar --- */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: var(--color-border); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-border-strong); }
-
-/* =============================================
-   마크다운 렌더링
-   ============================================= */
-.markdown-body {
-  font-family: var(--font-family);
-  font-size: var(--text-body);       /* 15px TDS T6 */
-  line-height: var(--lh-t6);         /* 22.5px */
-  color: var(--color-text-primary);
+::-webkit-scrollbar-thumb  {
+  background: rgba(0, 0, 0, 0.10);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.18);
 }
 
-/* 헤딩 — TDS T스케일 적용 */
-.markdown-body h1 {
-  font-size: var(--text-t3-size);    /* 22px TDS T3 */
-  line-height: var(--text-t3-lh);    /* 31px */
-  font-weight: var(--font-weight-bold);
-  margin: var(--space-6) 0 var(--space-3);
-  color: var(--color-text-primary);
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: var(--space-3);
+.scrollbar-auto {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
-.markdown-body h2 {
-  font-size: var(--text-t4-size);    /* 20px TDS T4 */
-  line-height: var(--text-t4-lh);    /* 29px */
-  font-weight: var(--font-weight-bold);
-  margin: var(--space-5) 0 var(--space-2);
-  color: var(--color-text-primary);
-}
-.markdown-body h3 {
-  font-size: var(--text-t5-size);    /* 17px TDS T5 */
-  line-height: var(--text-t5-lh);    /* 25.5px */
-  font-weight: var(--font-weight-bold);
-  margin: var(--space-4) 0 var(--space-2);
-  color: var(--color-text-primary);
-}
-.markdown-body h4, .markdown-body h5, .markdown-body h6 {
-  font-size: var(--text-body);       /* 15px TDS T6 */
-  font-weight: var(--font-weight-bold);
-  margin: var(--space-3) 0 var(--space-2);
+.scrollbar-auto:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.10) transparent;
 }
 
-.markdown-body p {
-  margin: var(--space-2) 0;
-  line-height: var(--lh-t6);        /* 22.5px */
-}
-.markdown-body ul, .markdown-body ol {
-  margin: var(--space-2) 0;
-  padding-left: var(--space-5);
-}
-.markdown-body li {
-  margin: var(--space-1) 0;
-  line-height: var(--lh-t6);
-}
-
-/* 인라인 코드 */
-.markdown-body code {
-  background: var(--color-bg-elevated);
-  padding: 2px var(--space-1);
-  border-radius: var(--radius-xs);
-  font-size: 0.875em;
-  color: var(--color-point);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+/* ═══════════════════════════════════════════
+   NAVIGATION — Apple Glass Header
+   ═══════════════════════════════════════════ */
+.nav-glass {
+  height: var(--nav-height);
+  background: var(--bg-glass-nav);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 0.5px solid var(--border);
+  box-shadow: var(--shadow-nav);
 }
 
-/* 코드 블록 */
-.markdown-body pre {
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-4);
-  margin: var(--space-3) 0;
-  overflow-x: auto;
-}
-.markdown-body pre code {
-  background: transparent;
-  padding: 0;
-  color: var(--color-text-primary);
-  font-size: var(--text-t7-size);    /* 13px TDS T7 */
-  line-height: var(--lh-t7);        /* 19.5px */
-}
-
-/* 인용 */
-.markdown-body blockquote {
-  border-left: 2px solid var(--color-point);
-  padding-left: var(--space-4);
-  margin: var(--space-3) 0;
-  color: var(--color-text-secondary);
-}
-
-/* 표 */
-.markdown-body table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: var(--space-3) 0;
-  font-size: var(--text-body-sm);    /* 13px TDS T7 */
-}
-.markdown-body th, .markdown-body td {
-  border: 1px solid var(--color-border);
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-}
-.markdown-body th {
-  background: var(--color-bg-surface);
-  font-weight: var(--font-weight-bold);
+.nav-title {
   font-size: var(--text-caption);
-  color: var(--color-text-secondary);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-caption);
+  color: var(--text-primary);
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR — Apple Finder Style
+   ═══════════════════════════════════════════ */
+.sidebar {
+  background: var(--bg-secondary);
+  border-right: 0.5px solid var(--border);
+  width: var(--sidebar-width);
+}
+
+.sidebar-label {
+  font-size: var(--text-nano);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  color: var(--text-quaternary);
 }
 
-/* 링크 */
-.markdown-body a {
-  color: var(--color-point);
-  text-decoration: none;
-}
-.markdown-body a:hover {
-  color: var(--color-point-hover);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-/* 구분선 */
-.markdown-body hr {
-  border: none;
-  border-top: 1px solid var(--color-border);
-  margin: var(--space-6) 0;
-}
-
-/* 체크박스 */
-.markdown-body input[type="checkbox"] {
-  margin-right: var(--space-2);
-  accent-color: var(--color-point);
-}
-
-/* 강조 */
-.markdown-body strong {
-  color: var(--color-text-primary);
-  font-weight: var(--font-weight-bold);
-}
-
-/* =============================================
-   파일트리 (List Item)
-   TDS 기준: 터치 타겟 44px, padding 수평 12px
-   ============================================= */
+/* ═══════════════════════════════════════════
+   FILE TREE — Apple List Items
+   ═══════════════════════════════════════════ */
 .tree-node {
-  min-height: 36px;
-  padding: 0 var(--space-3);         /* 0 12px — 4배수 */
+  min-height: 32px;
+  padding: 6px var(--sp-3);
+  padding-left: calc(var(--tree-depth, 0) * 14px + 12px);
   display: flex;
   align-items: center;
-  border-radius: var(--radius-xs);   /* 4px */
-  font-size: var(--text-t7-size);    /* 13px TDS T7 */
-  line-height: var(--lh-t7);        /* 19.5px */
-  color: var(--color-text-primary);
+  gap: 6px;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-footnote);
+  letter-spacing: var(--ls-micro);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: background 100ms ease;
+  transition: all var(--duration-fast) var(--ease-out);
+  margin: 1px var(--sp-2);
 }
+
 .tree-node:hover:not(.tree-node-selected) {
-  background: var(--color-bg-elevated);   /* #F2F4F6 TDS grey100 */
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
+
 .tree-node-selected {
-  background: var(--color-point-subtle);  /* #E8F3FF TDS blue50 */
-  color: var(--color-point);
+  background: var(--blue-subtle);
+  color: var(--blue);
 }
 
-/* ─── 검색 결과 행 hover ─── */
-.search-result-row:hover {
-  background: var(--color-bg-elevated);
+.tree-node-selected .tree-icon {
+  color: var(--blue);
 }
 
-/* ─── 백링크 행 hover ─── */
-.backlink-row:hover {
-  background: var(--color-bg-elevated);
+.tree-chevron {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-quaternary);
+  transition: transform var(--duration-fast) var(--ease-out);
 }
 
-/* ─── 헤더 아이콘 버튼 hover ─── */
+.tree-chevron-open {
+  transform: rotate(90deg);
+}
+
+.tree-name {
+  font-size: var(--text-footnote);
+  letter-spacing: var(--ls-micro);
+  color: var(--text-secondary);
+}
+
+.tree-name-selected {
+  color: var(--blue);
+}
+
+.tree-name-folder {
+  color: var(--folder-color, var(--text-secondary));
+}
+
+.tree-size {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: var(--text-nano);
+  color: var(--text-quaternary);
+}
+
+.tree-icon-color {
+  color: var(--text-quaternary);
+}
+
+/* ═══════════════════════════════════════════
+   ICON BUTTON — 44px touch target, ghost style
+   ═══════════════════════════════════════════ */
 .icon-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-xs);   /* 4px */
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border-radius: var(--radius-sm);
   border: none;
   background: transparent;
-  color: var(--color-text-secondary);
+  color: var(--text-tertiary);
   cursor: pointer;
-  transition: background 100ms ease, color 100ms ease;
+  transition: all var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
 }
+
 .icon-btn:hover {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-primary);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
-/* ─── 모바일 드로어 오버레이 ─── */
-.drawer-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--color-bg-overlay);
-  z-index: 40;
+.icon-btn:active {
+  background: var(--bg-active);
+  transform: scale(0.95);
 }
 
-/* ─── 사이드바 드로어 트랜지션 ─── */
-.sidebar-drawer {
-  transition: transform 250ms ease;
+.icon-btn-active {
+  color: var(--blue);
 }
 
-/* =============================================
-   컴포넌트 유틸리티 클래스
-   TDS 기준 수치 적용
-   ============================================= */
+.icon-btn-active:hover {
+  background: var(--blue-subtle);
+}
 
-/* ─── CTA 버튼 (TDS 기준: height 56px, radius 12px, full-width) ─── */
+.icon-btn-sm {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+}
+
+.icon-btn-xs {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+}
+
+.icon-btn-green {
+  color: var(--green);
+}
+
+/* ═══════════════════════════════════════════
+   BUTTONS — Apple HIG
+   ═══════════════════════════════════════════ */
 .btn-primary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);               /* 8px */
-  height: var(--space-14);           /* 56px */
+  gap: var(--sp-2);
+  height: 50px;
   width: 100%;
-  border-radius: var(--radius-md);   /* 12px */
-  background: var(--color-point);
-  color: var(--color-text-inverse);
-  font-size: var(--text-body);       /* 15px TDS T6 */
-  font-weight: var(--font-weight-bold);
+  padding: 0 var(--sp-8);
+  border-radius: var(--radius-md);
+  background: var(--blue);
+  color: var(--text-inverse);
+  font-size: var(--text-body-lg);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-body);
   border: none;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: all var(--duration-normal) var(--ease-out);
 }
+
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-point-hover);
+  background: var(--blue-hover);
+  transform: scale(1.01);
 }
+
 .btn-primary:active:not(:disabled) {
+  background: var(--blue-active);
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled {
+  background: var(--grey-200);
+  color: var(--text-disabled);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  height: 30px;
+  padding: 0 var(--sp-3);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-micro);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--grey-300);
+  color: var(--text-primary);
+}
+
+.btn-secondary:active:not(:disabled) {
   transform: scale(0.97);
 }
-.btn-primary:disabled {
-  background: var(--color-bg-elevated);
-  color: var(--color-text-disabled);
-  cursor: not-allowed;
-}
 
-/* ─── 보조 버튼 (인라인 액션용) ─── */
-.btn-secondary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-1);               /* 4px */
-  height: 28px;
-  padding: 0 var(--space-3);         /* 0 12px */
-  border-radius: var(--radius-xs);   /* 4px */
-  background: var(--color-bg-base);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-  font-size: var(--text-t7-size);    /* 13px TDS T7 */
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease;
-}
-.btn-secondary:hover:not(:disabled) {
-  background: var(--color-bg-elevated);
-  border-color: var(--color-border-strong);
-}
 .btn-secondary:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.4;
 }
 
-/* ─── 저장 버튼 (brand fill, 인라인 크기) ─── */
 .btn-save {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-1);               /* 4px */
-  height: 28px;
-  padding: 0 var(--space-3);         /* 0 12px */
-  border-radius: var(--radius-xs);   /* 4px */
-  background: var(--color-point);
-  color: var(--color-text-inverse);
-  font-size: var(--text-t7-size);    /* 13px TDS T7 */
-  font-weight: var(--font-weight-medium);
+  gap: var(--sp-1);
+  height: 30px;
+  padding: 0 var(--sp-4);
+  border-radius: var(--radius-pill);
+  background: var(--blue);
+  color: var(--text-inverse);
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-micro);
   border: none;
   cursor: pointer;
-  transition: background 150ms ease;
+  transition: all var(--duration-fast) var(--ease-out);
 }
+
 .btn-save:hover:not(:disabled) {
-  background: var(--color-point-hover);
+  background: var(--blue-hover);
 }
+
+.btn-save:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
 .btn-save:disabled {
-  opacity: 0.8;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* ─── 인풋 (TDS 기준: height 52px, radius 12px) ─── */
-.input-base {
-  height: 52px;
-  width: 100%;
-  padding: 0 var(--space-4);         /* 0 16px */
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);   /* 12px */
-  color: var(--color-text-primary);
-  font-family: var(--font-family);
-  font-size: var(--text-body);       /* 15px TDS T6 */
-  line-height: var(--lh-t6);
-  outline: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
-}
-.input-base::placeholder {
-  color: var(--color-text-tertiary);
-}
-.input-base:focus {
-  border-color: var(--color-point);
-  box-shadow: 0 0 0 3px var(--color-focus-ring);
-}
-.input-base.input-error {
-  border-color: var(--color-negative);
-}
-.input-base.input-error:focus {
-  border-color: var(--color-negative);
-  box-shadow: 0 0 0 3px rgba(240, 68, 82, 0.15);
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--blue);
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-micro);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
-/* ─── 편집 텍스트에어리어 ─── */
+.btn-ghost:hover {
+  background: var(--blue-subtle);
+}
+
+/* ═══════════════════════════════════════════
+   INPUT — Apple: filled bg, border on focus
+   ═══════════════════════════════════════════ */
+.input-base {
+  height: 48px;
+  width: 100%;
+  padding: 0 var(--sp-4);
+  background: var(--bg-input);
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-text);
+  font-size: 16px;
+  letter-spacing: var(--ls-body);
+  line-height: var(--lh-body);
+  outline: none;
+  transition: all var(--duration-normal) var(--ease-out);
+}
+
+.input-base::placeholder {
+  color: var(--text-quaternary);
+}
+
+.input-base:focus {
+  background: var(--bg-primary);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-focus);
+}
+
+.input-base.input-error {
+  border-color: var(--red);
+}
+
+.input-base.input-error:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.15);
+}
+
+.input-password-pad {
+  padding-right: var(--touch-target);
+}
+
+/* ═══════════════════════════════════════════
+   TEXTAREA — Editor
+   ═══════════════════════════════════════════ */
 .textarea-editor {
   width: 100%;
-  padding: var(--space-4);
-  background: var(--color-bg-input);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);   /* 8px */
-  color: var(--color-text-primary);
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
-  font-size: var(--text-t7-size);    /* 13px TDS T7 */
-  line-height: var(--lh-t7);        /* 19.5px */
+  min-height: 400px;
+  padding: var(--sp-5);
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0px;
   outline: none;
   resize: none;
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition: all var(--duration-normal) var(--ease-out);
 }
+
 .textarea-editor:focus {
-  border-color: var(--color-point);
-  box-shadow: 0 0 0 3px var(--color-focus-ring);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-focus);
 }
 
-/* ─── 스켈레톤 로딩 (TDS: Spinner 금지) ─── */
-@keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.45; }
+/* ═══════════════════════════════════════════
+   SEARCH — Apple Command Palette Style
+   ═══════════════════════════════════════════ */
+.search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  height: 36px;
+  padding: 0 var(--sp-3);
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-normal) var(--ease-out);
 }
-.skeleton {
-  background: var(--color-bg-elevated);
+
+.search-input-wrap:focus-within {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-focus);
+  background: var(--bg-primary);
+}
+
+.search-input {
+  flex: 1;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-footnote);
+  color: var(--text-primary);
+  letter-spacing: var(--ls-micro);
+  border: none;
+}
+
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--bg-primary);
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popup);
+  z-index: 50;
+  animation: dropdown-enter var(--duration-normal) var(--ease-spring);
+}
+
+@keyframes dropdown-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.search-result-row {
+  transition: background var(--duration-fast) var(--ease-out);
+  border-bottom: 0.5px solid var(--border);
+  min-height: var(--touch-target);
+}
+
+.search-result-row:last-child {
+  border-bottom: none;
+}
+
+.search-result-row:hover {
+  background: var(--bg-hover);
+}
+
+.search-result-name {
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  color: var(--text-primary);
+  letter-spacing: var(--ls-micro);
+}
+
+.search-result-path {
+  font-size: var(--text-nano);
+  color: var(--text-quaternary);
+  letter-spacing: var(--ls-nano);
+  margin-top: 2px;
+}
+
+.search-result-match {
+  font-size: var(--text-nano);
+  color: var(--text-tertiary);
+}
+
+.search-result-line-num {
+  color: var(--text-quaternary);
+}
+
+/* ═══════════════════════════════════════════
+   CONTENT HEADER — File info bar
+   ═══════════════════════════════════════════ */
+.content-header {
+  height: var(--header-height);
+  padding: 0 var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg-primary);
+  flex-shrink: 0;
+}
+
+.content-header-title {
+  font-size: var(--text-caption);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-caption);
+  color: var(--text-primary);
+}
+
+.content-header-path {
+  font-size: var(--text-nano);
+  color: var(--text-quaternary);
+  letter-spacing: var(--ls-nano);
+  margin-top: 2px;
+}
+
+.content-meta {
+  font-size: var(--text-nano);
+  color: var(--text-quaternary);
+}
+
+.content-area {
+  padding: var(--sp-10) var(--sp-8);
+}
+
+.content-container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+}
+
+/* ═══════════════════════════════════════════
+   BACKLINKS PANEL — Right sidebar
+   ═══════════════════════════════════════════ */
+.right-panel {
+  width: var(--right-panel);
+  background: var(--bg-primary);
+  border-color: var(--border);
+}
+
+.tab-btn {
+  flex: 1;
+  height: var(--touch-target);
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  letter-spacing: var(--ls-micro);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  color: var(--text-quaternary);
+}
+
+.tab-btn:hover {
+  color: var(--text-secondary);
+}
+
+.tab-btn-active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+.tab-header {
+  border-bottom: 0.5px solid var(--border);
+}
+
+.backlink-row {
+  transition: background var(--duration-fast) var(--ease-out);
+  border-bottom: 0.5px solid var(--border);
+  min-height: var(--touch-target);
+}
+
+.backlink-row:hover {
+  background: var(--bg-hover);
+}
+
+.backlink-source {
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  color: var(--link);
+  letter-spacing: var(--ls-micro);
+}
+
+.backlink-context {
+  font-size: var(--text-nano);
+  margin-top: 3px;
+  color: var(--text-quaternary);
+}
+
+.outline-item {
+  font-size: var(--text-nano);
+  line-height: var(--lh-micro);
+  padding: var(--sp-2) var(--sp-4) var(--sp-2) calc(var(--outline-indent, 0) * 12px + 16px);
+}
+
+.outline-h1 { color: var(--text-primary); font-weight: var(--fw-semibold); }
+.outline-h2 { color: var(--text-primary); font-weight: var(--fw-medium); }
+.outline-h3 { color: var(--text-secondary); font-weight: var(--fw-regular); }
+.outline-h4 { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+
+.panel-empty {
+  padding: var(--sp-5);
+  font-size: var(--text-footnote);
+  color: var(--text-quaternary);
+}
+
+/* ═══════════════════════════════════════════
+   MARKDOWN — Apple Editorial Typography
+   ═══════════════════════════════════════════ */
+.markdown-body {
+  font-family: var(--font-text);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  letter-spacing: var(--ls-body);
+  color: var(--text-primary);
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.markdown-body h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-tile);
+  line-height: var(--lh-tile);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-tile);
+  margin: var(--sp-10) 0 var(--sp-4);
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.markdown-body h1:first-child { margin-top: 0; }
+
+.markdown-body h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-card);
+  line-height: var(--lh-card);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-card);
+  margin: var(--sp-8) 0 var(--sp-3);
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.markdown-body h3 {
+  font-size: var(--text-body-lg);
+  line-height: var(--lh-body);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-body);
+  margin: var(--sp-6) 0 var(--sp-2);
+  color: var(--text-primary);
+}
+
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: var(--text-body);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-body);
+  margin: var(--sp-5) 0 var(--sp-2);
+  color: var(--text-secondary);
+}
+
+.markdown-body p {
+  margin: var(--sp-3) 0;
+  line-height: var(--lh-body);
+}
+
+.markdown-body ul,
+.markdown-body ol {
+  margin: var(--sp-3) 0;
+  padding-left: var(--sp-6);
+}
+
+.markdown-body li {
+  margin: var(--sp-1) 0;
+  line-height: var(--lh-body);
+}
+
+.markdown-body li::marker {
+  color: var(--text-tertiary);
+}
+
+.markdown-body code {
+  background: var(--bg-secondary);
+  padding: 2px 6px;
   border-radius: var(--radius-xs);
-  animation: skeleton-pulse 1.5s ease-in-out infinite;
+  font-size: 0.875em;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  letter-spacing: 0px;
+  font-weight: var(--fw-medium);
 }
 
-/* ─── 비밀번호 토글 버튼 (터치 타겟 44px) ─── */
+.markdown-body pre {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-5);
+  margin: var(--sp-5) 0;
+  overflow-x: auto;
+  border: none;
+}
+
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.7;
+  letter-spacing: 0px;
+  font-weight: var(--fw-regular);
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--blue);
+  padding: var(--sp-3) var(--sp-5);
+  margin: var(--sp-5) 0;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.markdown-body blockquote p { margin: var(--sp-1) 0; }
+
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--sp-5) 0;
+  font-size: 13px;
+}
+
+.markdown-body th,
+.markdown-body td {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+}
+
+.markdown-body th {
+  font-weight: var(--fw-semibold);
+  font-size: var(--text-nano);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.markdown-body tr:last-child td { border-bottom: none; }
+
+.markdown-body a {
+  color: var(--link);
+  text-decoration: none;
+  transition: color var(--duration-fast);
+}
+
+.markdown-body a:hover {
+  color: var(--blue);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.markdown-body hr {
+  border: none;
+  height: 0.5px;
+  background: var(--border-strong);
+  margin: var(--sp-10) 0;
+}
+
+.markdown-body input[type="checkbox"] {
+  margin-right: var(--sp-2);
+  accent-color: var(--blue);
+  width: 15px;
+  height: 15px;
+}
+
+.markdown-body strong {
+  color: var(--text-primary);
+  font-weight: var(--fw-semibold);
+}
+
+.markdown-body img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+  margin: var(--sp-4) 0;
+}
+
+/* ═══════════════════════════════════════════
+   JSONL Viewer
+   ═══════════════════════════════════════════ */
+.jsonl-viewer {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ═══════════════════════════════════════════
+   ERROR BANNER
+   ═══════════════════════════════════════════ */
+.error-banner {
+  background: rgba(255, 59, 48, 0.06);
+  border: 1px solid rgba(255, 59, 48, 0.15);
+  color: var(--red);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-footnote);
+}
+
+.save-error {
+  font-size: var(--text-nano);
+  color: var(--red);
+}
+
+/* ═══════════════════════════════════════════
+   SKELETON LOADING
+   ═══════════════════════════════════════════ */
+@keyframes skeleton-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.08) 50%,
+    rgba(0, 0, 0, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-xs);
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+.skeleton-title {
+  height: 32px;
+  width: 55%;
+  margin-bottom: var(--sp-6);
+}
+
+.skeleton-line {
+  height: 16px;
+  width: 100%;
+}
+
+.skeleton-line-short { width: 78%; }
+.skeleton-line-medium { width: 92%; }
+.skeleton-line-shorter { width: 70%; }
+.skeleton-line-long { width: 88%; }
+
+.skeleton-tree-item {
+  height: 28px;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-header-title { height: 14px; width: 140px; }
+.skeleton-header-meta  { height: 10px; width: 200px; }
+
+/* ═══════════════════════════════════════════
+   PASSWORD TOGGLE
+   ═══════════════════════════════════════════ */
 .btn-eye {
   position: absolute;
   right: 0;
   top: 0;
-  width: 44px;
+  width: var(--touch-target);
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-tertiary);
+  color: var(--text-quaternary);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: color 150ms ease;
+  transition: color var(--duration-fast);
 }
-.btn-eye:hover {
-  color: var(--color-text-secondary);
+
+.btn-eye:hover { color: var(--text-secondary); }
+
+/* ═══════════════════════════════════════════
+   EMPTY STATE — Apple minimal
+   ═══════════════════════════════════════════ */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--sp-2);
+}
+
+.empty-state-title {
+  font-size: var(--text-body-lg);
+  font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
+  letter-spacing: var(--ls-body);
+}
+
+.empty-state-desc {
+  font-size: var(--text-footnote);
+  color: var(--text-quaternary);
+  letter-spacing: var(--ls-micro);
+}
+
+/* ═══════════════════════════════════════════
+   DRAWER & OVERLAY
+   ═══════════════════════════════════════════ */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  z-index: 40;
+  animation: fade-in var(--duration-normal) var(--ease-out);
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.sidebar-drawer {
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+/* ═══════════════════════════════════════════
+   DIVIDERS
+   ═══════════════════════════════════════════ */
+.sidebar-divider {
+  height: 0.5px;
+  background: var(--border);
+  margin: var(--sp-1) var(--sp-3);
+}
+
+/* ═══════════════════════════════════════════
+   KEYBOARD SHORTCUT BADGE
+   ═══════════════════════════════════════════ */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 5px;
+  background: var(--bg-secondary);
+  border: 0.5px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-text);
+  font-size: 11px;
+  font-weight: var(--fw-medium);
+  color: var(--text-tertiary);
+  letter-spacing: 0;
+}
+
+/* ═══════════════════════════════════════════
+   LOGIN PAGE
+   ═══════════════════════════════════════════ */
+.login-page {
+  background: var(--bg-secondary);
+}
+
+.login-card {
+  max-width: 380px;
+  margin: 0 var(--sp-5);
+  padding: var(--sp-10);
+  background: var(--bg-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-popup);
+}
+
+.login-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: var(--blue-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--sp-5);
+}
+
+.login-heading {
+  font-family: var(--font-display);
+  font-size: var(--text-card);
+  font-weight: var(--fw-semibold);
+  color: var(--text-primary);
+  letter-spacing: var(--ls-card);
+  line-height: var(--lh-card);
+}
+
+.login-subtitle {
+  font-size: var(--text-caption);
+  color: var(--text-tertiary);
+  letter-spacing: var(--ls-caption);
+  line-height: var(--lh-caption);
+  margin-top: var(--sp-2);
+}
+
+.login-label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  font-size: var(--text-footnote);
+  font-weight: var(--fw-medium);
+  color: var(--text-secondary);
+  letter-spacing: var(--ls-micro);
+}
+
+.login-submit {
+  margin-top: var(--sp-6);
+}
+
+/* ═══════════════════════════════════════════
+   NEW FILE INPUT (File Tree)
+   ═══════════════════════════════════════════ */
+.new-file-input {
+  flex: 1;
+  height: 28px;
+  padding: 0 var(--sp-2);
+  background: transparent;
+  outline: none;
+  border: 1.5px solid var(--blue);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-footnote);
+  color: var(--text-primary);
+}
+
+.tree-error {
+  font-size: var(--text-nano);
+}
+
+.tree-empty {
+  font-size: var(--text-footnote);
+  color: var(--text-quaternary);
+}
+
+.file-error {
+  font-size: var(--text-footnote);
+  color: var(--red);
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS — Apple smooth transitions
+   ═══════════════════════════════════════════ */
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-enter {
+  animation: content-enter var(--duration-slow) var(--ease-out);
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in var(--duration-normal) var(--ease-spring);
+}
+
+/* ═══════════════════════════════════════════
+   UTILITY
+   ═══════════════════════════════════════════ */
+.text-balance { text-wrap: balance; }
+.text-pretty  { text-wrap: pretty; }
+
+/* Responsive: tablet sidebar */
+@media (max-width: 1024px) {
+  .sidebar {
+    width: var(--sidebar-sm);
+  }
+}
+
+@media (max-width: 768px) {
+  .content-area {
+    padding: var(--sp-6) var(--sp-4);
+  }
 }

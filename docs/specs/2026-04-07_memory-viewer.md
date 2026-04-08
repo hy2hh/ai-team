@@ -16,7 +16,7 @@
 | 포트 | 3002 | 3001 공유 | 칸반(3000)/백엔드(3001)와 독립 운영 |
 | 상태관리 | Zustand | Context API | 칸반보드 패턴 일관성 |
 | 마크다운 렌더링 | react-markdown + remark-gfm + rehype-highlight | MDX | 읽기 전용이므로 경량 선택 |
-| 테마 | Bifrost 다크 테마 | 라이트/다크 토글 | 칸반보드 UI 일관성 |
+| 테마 | 다크 테마 | 라이트/다크 토글 | 칸반보드 UI 일관성 |
 
 ## 인터페이스 계약
 | 엔드포인트 | 메서드 | 요청 | 응답 | 에러 응답 |
@@ -72,7 +72,7 @@
 - `memory-viewer/` — Phase 1 전체 구현
 - `memory-viewer/app/api/backlinks/route.ts` — Graph View에서 재사용할 참조 관계 로직
 - `memory-viewer/lib/types.ts` — 공유 타입 정의
-- `kanban-board/` — UI 일관성 참조 (Bifrost 테마)
+- `kanban-board/` — UI 일관성 참조
 
 ## 성공 기준
 - [ ] Phase 1: `npm run build` 성공 + 런타임 에러 없음

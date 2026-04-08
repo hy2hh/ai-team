@@ -13,7 +13,6 @@ export default function Home() {
   const router = useRouter();
   const { sidebarOpen, rightPanelOpen, toggleSidebar, toggleRightPanel } = useAppStore();
 
-  // 키보드 단축키
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
@@ -36,41 +35,39 @@ export default function Home() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[var(--color-bg-base)]">
-      {/* 타이틀 바 — 48px */}
-      <header className="flex items-center justify-between px-4 flex-shrink-0 h-12 bg-[var(--color-bg-surface)] border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-3">
+    <div className="h-screen flex flex-col bg-[var(--bg-primary)]">
+      {/* Global Navigation — 52px Apple Glass */}
+      <header className="nav-glass flex items-center justify-between px-4 flex-shrink-0 sticky top-0 z-30">
+        <div className="flex items-center gap-1">
           <button
             onClick={toggleSidebar}
-            className="icon-btn flex items-center justify-center transition-colors duration-150 min-w-[44px] min-h-[44px] text-[var(--color-text-secondary)] bg-transparent rounded-[var(--radius-md)]"
-            title="사이드바 토글 (⌘B)"
+            className="icon-btn"
+            aria-label="사이드바 토글 (⌘B)"
           >
-            <Menu size={16} />
+            <Menu size={18} strokeWidth={1.5} />
           </button>
-          <h1 className="text-sm font-semibold text-[var(--color-text-primary)]">
-            .memory/
-          </h1>
+          <span className="nav-title select-none">.memory/</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0">
           <button
             onClick={toggleRightPanel}
-            className={`icon-btn flex items-center justify-center transition-colors duration-150 min-w-[44px] min-h-[44px] bg-transparent rounded-[var(--radius-md)] ${rightPanelOpen ? 'text-[var(--color-point-light)]' : 'text-[var(--color-text-secondary)]'}`}
-            title="백링크 패널 토글 (⌘/)"
+            className={`icon-btn ${rightPanelOpen ? 'icon-btn-active' : ''}`}
+            aria-label="백링크 패널 토글 (⌘/)"
           >
-            <PanelRight size={16} />
+            <PanelRight size={18} strokeWidth={1.5} />
           </button>
           <button
             onClick={handleLogout}
-            className="icon-btn flex items-center justify-center transition-colors duration-150 w-7 h-7 text-[var(--color-text-secondary)] bg-transparent rounded-[var(--radius-xs)]"
-            title="로그아웃"
+            className="icon-btn"
+            aria-label="로그아웃"
           >
-            <LogOut size={16} />
+            <LogOut size={16} strokeWidth={1.5} />
           </button>
         </div>
       </header>
 
-      {/* 메인 레이아웃 */}
+      {/* Main Layout */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* 모바일 드로어 오버레이 */}
         {sidebarOpen && (
@@ -80,44 +77,49 @@ export default function Home() {
           />
         )}
 
-        {/* 좌측 사이드바 */}
+        {/* Left Sidebar — Apple Finder */}
         {sidebarOpen && (
           <aside
-            className="flex flex-col flex-shrink-0 overflow-hidden sidebar-drawer
+            className="sidebar flex flex-col flex-shrink-0 overflow-hidden sidebar-drawer
               fixed md:relative top-0 bottom-0 left-0 md:top-auto md:bottom-auto
-              z-50 md:z-auto w-[280px] md:w-[240px] lg:w-[260px]
-              bg-[var(--color-bg-surface)] border-r border-[var(--color-border)]"
+              z-50 md:z-auto"
           >
-            <div className="p-3">
+            {/* Search */}
+            <div className="px-3 pt-3 pb-2">
               <SearchBar />
             </div>
-            <div className="flex-1 overflow-y-auto">
+
+            <div className="sidebar-divider" />
+
+            {/* File Tree */}
+            <div className="flex-1 overflow-y-auto scrollbar-auto py-1">
               <FileTree />
             </div>
-            <div className="flex-shrink-0 px-3 py-2 text-[11px] text-[var(--color-text-muted)] border-t border-[var(--color-border)]">
-              AI Team Shared Memory
+
+            {/* Footer */}
+            <div className="sidebar-divider" />
+            <div className="flex-shrink-0 px-4 py-3">
+              <span className="sidebar-label">AI Team Memory</span>
             </div>
           </aside>
         )}
 
-        {/* 중앙 — 마크다운 뷰어 */}
-        <main className="flex-1 overflow-hidden bg-[var(--color-bg-base)]">
+        {/* Center: Markdown Viewer */}
+        <main className="flex-1 overflow-hidden bg-[var(--bg-primary)]">
           <MarkdownViewer />
         </main>
 
-        {/* 우측 패널 — 태블릿 이상에서만 고정 패널, 모바일은 오버레이 */}
+        {/* Right Panel: Backlinks & Outline */}
         {rightPanelOpen && (
           <>
-            {/* 태블릿 오버레이 */}
             <div
               className="drawer-overlay hidden sm:block lg:hidden"
               onClick={toggleRightPanel}
             />
             <aside
-              className="flex-shrink-0 overflow-hidden
+              className="right-panel flex-shrink-0 overflow-hidden border-l
                 fixed sm:absolute lg:relative right-0 top-0 bottom-0
-                sm:top-auto sm:bottom-auto z-50 lg:z-auto
-                w-[260px] bg-[var(--color-bg-surface)] border-l border-[var(--color-border)]"
+                sm:top-auto sm:bottom-auto z-50 lg:z-auto"
             >
               <BacklinksPanel />
             </aside>

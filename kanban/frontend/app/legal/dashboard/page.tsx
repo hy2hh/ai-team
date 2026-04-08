@@ -279,7 +279,7 @@ export default function DashboardPage() {
                   }}
                   aria-pressed={statusFilter === s}
                 >
-                  {s === 'all' ? '전체' : statusLabel(s as Case['status'])}
+                  {s === 'all' ? '전체' : statusLabel(s as DisplayStatus)}
                 </button>
               ))}
               <div style={{ flex: 1 }} />

@@ -1,117 +1,142 @@
-# Design Token System — @bifrost-platform/ui-kit-front 사용 예시
+# Design Token System — Apple 스타일 사용 예시
 
-> 토큰 원본: `/Users/hangheejo/git/ui-kit-front/src/theme.ts`
-
----
-
-## 설치 & 설정
-
-```bash
-npm install @bifrost-platform/ui-kit-front
-```
-
-```typescript
-// tailwind.config.ts
-import { createTailwindConfig } from '@bifrost-platform/ui-kit-front/config';
-
-export default createTailwindConfig({
-  content: ['./src/**/*.{ts,tsx}'],
-});
-```
-
-```typescript
-// 프로젝트 entry (main.tsx 또는 _app.tsx)
-import '@bifrost-platform/ui-kit-front/index.css';
-```
+칸반보드 디자인 토큰은 CSS 변수 기반이며 Tailwind 클래스로 노출됩니다.
+Apple 디자인 시스템 기준: `#f5f5f7` (light) / `#000000` (dark) 이진 배경, 단일 강조색 `#0071e3`.
 
 ---
 
-## 색상 토큰 — Tailwind 클래스
+## 색상 토큰 — CSS 변수
+
+### 배경 레이어
+
+```css
+/* Light Section */
+var(--color-bg-light)      /* #f5f5f7 — 정보형 섹션 배경 */
+var(--color-bg-white)      /* #ffffff — 카드, 오버레이 */
+
+/* Dark Section */
+var(--color-bg-dark)       /* #000000 — 몰입형 섹션 배경 */
+var(--color-bg-dark-1)     /* #272729 — 다크 서피스 1 */
+var(--color-bg-dark-2)     /* #242426 — 다크 서피스 2 */
+```
+
+> Light / Dark 섹션을 교차하여 구분. Shadow로 레이어 구분하지 않음 (elevated card 제외).
+
+### Apple Blue (인터랙티브 전용)
+
+```css
+var(--color-apple-blue)          /* #0071e3 — CTA, 버튼, 포커스 링 */
+var(--color-link-light)          /* #0066cc — light bg 링크 */
+var(--color-link-dark)           /* #2997ff — dark bg 링크 */
+```
 
 ```tsx
-// Gray Scale
-<div className="bg-gray-100 text-gray-900" />       // #F7F7F7 / #1A1A1A
-<div className="border border-gray-300" />            // #D9D9D9
-
-// Brand (Pockie/Storybook)
-<span className="text-brand-point" />                // #5F5BE2
-<div className="bg-brand-100" />                     // #F3F3FF
-
-// Semantic
-<span className="text-negative-700" />               // #EC2D30 (에러)
-<span className="text-positive-700" />               // #0C9D61 (성공)
-<span className="text-warning-700" />                // #FE9B0E (경고)
-<span className="text-message-700" />                // #3A70E2 (정보)
+// Apple Blue 유틸리티
+<button className="bg-apple-blue text-white" />    // CTA 버튼
+<a className="text-link-light" />                  // light 섹션 링크
+<a className="text-link-dark" />                   // dark 섹션 링크
 ```
 
-> 서비스별 Primary는 CSS 변수로 주입 — 토큰에 포함되지 않음.
-> Bifrost Network/Biquid: `#FF474C` | BTCFi Boost: `#3467F4` | Pockie: `#5F5BE2 (brand-point)`
+### 텍스트
+
+```css
+/* Light bg */
+var(--color-text-primary)    /* #1d1d1f — 제목·본문 */
+var(--color-text-secondary)  /* rgba(0,0,0,0.8) — 보조 */
+var(--color-text-tertiary)   /* rgba(0,0,0,0.48) — 비활성 */
+
+/* Dark bg */
+var(--color-text-on-dark)    /* #ffffff — 다크 섹션 텍스트 */
+```
+
+### 그림자
+
+```css
+var(--shadow-card)   /* rgba(0,0,0,0.22) 3px 5px 30px 0px — elevated card */
+var(--shadow-none)   /* none — 기본 (대부분 요소) */
+```
 
 ---
 
 ## 타이포그래피 토큰
 
-```tsx
-<h1 className="text-h1 font-bold" />       // 48px, line-height 1.17, weight 700
-<h2 className="text-h2 font-bold" />       // 40px, 1.2
-<h3 className="text-h3 font-medium" />     // 32px, 1.25
-<h4 className="text-h4 font-medium" />     // 24px, 1.33
-<p className="text-subtitle" />            // 20px, 1.4
-<p className="text-body" />                // 16px, 1.5
-<p className="text-bodySm" />              // 14px, 1.43
-<span className="text-caption" />          // 12px, 1.33
+```css
+/* SF Pro Display (20px+) */
+var(--text-display-hero)    /* 56px, weight 600, lh 1.07, ls -0.28px */
+var(--text-section-heading) /* 40px, weight 600, lh 1.10 */
+var(--text-tile-heading)    /* 28px, weight 400, lh 1.14, ls 0.196px */
+var(--text-card-title)      /* 21px, weight 700, lh 1.19, ls 0.231px */
 
-// Font weight
-// font-light (300) / font-regular (400) / font-medium (500) / font-bold (700) / font-black (900)
+/* SF Pro Text (19px 이하) */
+var(--text-body)            /* 17px, weight 400, lh 1.47, ls -0.374px */
+var(--text-body-em)         /* 17px, weight 600, lh 1.24, ls -0.374px */
+var(--text-caption)         /* 14px, weight 400, lh 1.29, ls -0.224px */
+var(--text-micro)           /* 12px, weight 400, lh 1.33, ls -0.12px */
+var(--text-nav)             /* 12px, weight 400, lh normal */
 ```
 
 ---
 
-## TypeScript에서 토큰 직접 접근
-
-```typescript
-import { colors, fontSize, fontWeight } from '@bifrost-platform/ui-kit-front/types';
-
-// 색상값 참조
-const errorColor = colors.negative[700];   // '#EC2D30'
-const grayBorder = colors.gray[300];       // '#D9D9D9'
-
-// 타이포 참조
-const bodySize = fontSize.body[0];         // '16px'
-const bodyLineHeight = fontSize.body[1].lineHeight; // '1.5'
-```
-
----
-
-## 컴포넌트 사용 예시
-
-```tsx
-import { Button, Input, Badge, Spinner } from '@bifrost-platform/ui-kit-front';
-
-// Button — primary는 서비스 컬러 적용
-<Button variant="primary" size="lg">확인</Button>
-
-// Input — focus 시 brand border
-<Input placeholder="금액 입력" />
-
-// 상태 배지
-<Badge variant="positive">활성</Badge>
-<Badge variant="negative">오류</Badge>
-```
-
----
-
-## 다크 모드 배경 레이어 (커스텀 CSS)
+## Border Radius 토큰
 
 ```css
-/* biquid.io 기준 — 토큰에 포함되지 않음, 직접 정의 */
+var(--radius-micro)    /* 5px — 최소 요소 */
+var(--radius-md)       /* 8px — 버튼, 카드 */
+var(--radius-input)    /* 11px — 인풋 필드 */
+var(--radius-panel)    /* 12px — 패널, 시트 */
+var(--radius-pill)     /* 980px — CTA Pill */
+var(--radius-circle)   /* 50% — 미디어 컨트롤 */
+```
+
+---
+
+## Spacing 토큰 (8px 기반)
+
+```css
+var(--space-1)   /* 8px */
+var(--space-2)   /* 16px */
+var(--space-3)   /* 24px */
+var(--space-4)   /* 32px */
+var(--space-5)   /* 40px */
+var(--space-6)   /* 48px */
+var(--space-8)   /* 64px */
+```
+
+---
+
+## CSS 변수 정의 예시
+
+```css
 :root {
-  --bg-0: #000000; /* 페이지 배경 */
-  --bg-1: #080808; /* Header */
-  --bg-2: #1E1E1E; /* 카드 */
-  --bg-3: #303030; /* Input·서브카드 */
-  --bg-4: #3D3D3D; /* 툴팁 */
+  /* Backgrounds */
+  --color-bg-light:     #f5f5f7;
+  --color-bg-white:     #ffffff;
+  --color-bg-dark:      #000000;
+  --color-bg-dark-1:    #272729;
+  --color-bg-dark-2:    #242426;
+
+  /* Apple Blue */
+  --color-apple-blue:   #0071e3;
+  --color-link-light:   #0066cc;
+  --color-link-dark:    #2997ff;
+
+  /* Text */
+  --color-text-primary:   #1d1d1f;
+  --color-text-secondary: rgba(0,0,0,0.8);
+  --color-text-tertiary:  rgba(0,0,0,0.48);
+  --color-text-on-dark:   #ffffff;
+
+  /* Shadow */
+  --shadow-card: rgba(0,0,0,0.22) 3px 5px 30px 0px;
+
+  /* Radius */
+  --radius-micro:  5px;
+  --radius-md:     8px;
+  --radius-input:  11px;
+  --radius-panel:  12px;
+  --radius-pill:   980px;
+  --radius-circle: 50%;
 }
 ```
 
-> Dark 모드 shadow 사용 금지. 배경색 명도 차이로만 레이어 구분.
+> Light / Dark 섹션 전환은 `data-section="dark"` 속성으로 제어.

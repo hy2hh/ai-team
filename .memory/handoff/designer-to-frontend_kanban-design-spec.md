@@ -365,8 +365,8 @@
 
 | 테마 | 값 | CSS 변수 |
 |------|-----|----------|
-| 다크 | `#7C7AE8` (Bifrost brand-point + 밝기 +15%) | `--color-point` |
-| 라이트 | `#5F5BE2` (Bifrost brand-point 원색) | `--color-point` |
+| 다크 | `#7C7AE8` (밝기 +15% 조정) | `--color-point` |
+| 라이트 | `#5F5BE2` (원색) | `--color-point` |
 
 파생 토큰:
 - `--color-point-hover`: 다크 `#9B99EF` / 라이트 `#4D49C5`
@@ -381,7 +381,7 @@
 | `.btn-primary` | 배경색, hover | `var(--color-point)` |
 | `.input-field:focus` | border + glow | `var(--color-point)`, `var(--color-point-subtle)` |
 | `.textarea-field:focus` | border + glow | `var(--color-point)`, `var(--color-point-subtle)` |
-| UI kit `<Button variant="primary">` | `.bg-brand-point` 오버라이드 | globals.css에서 `!important` 오버라이드 |
+| UI kit `<Button variant="primary">` | `.bg-point` 오버라이드 | globals.css에서 `!important` 오버라이드 |
 | 로딩 스피너 | `border-top-color` | `var(--color-point)` |
 | 태그 pill | 배경/border/텍스트 | `--color-tag-{bg,border,text}` (point 기반) |
 | 카드 hover | glow ring | `var(--color-point-glow)` |
@@ -394,7 +394,7 @@
 
 `COLUMN_ACCENTS = ['#7C7AE8', '#fbbf24', '#c084fc', '#4ade80', '#fb923c', '#f472b6']`
 
-• col-1(1번 컬럼): brand-point — point color와 일치 ✅
+• col-1(1번 컬럼): 포인트컬러 — point color와 일치 ✅
 • col-2~6: 컬럼 시맨틱 색상 유지 (amber/purple/green/orange/pink)
 
 ### 6.4 Bart(Frontend) 후속 작업

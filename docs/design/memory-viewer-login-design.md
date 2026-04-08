@@ -9,7 +9,6 @@
 
 ## 디자인 시스템 기반
 
-Memory Viewer는 Bifrost 디자인 시스템의 다크 테마를 사용합니다.
 모든 토큰은 `app/globals.css` CSS 변수를 직접 참조합니다.
 
 ### 컬러 토큰 레퍼런스

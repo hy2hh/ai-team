@@ -12,15 +12,15 @@
 
 | 서비스 타입 | Primary 가이드 |
 |-------------|---------------|
-| ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/toss-design-guide.md` |
-| Bifrost/PiLab 서비스 (Network, Biquid, Boost, Pockie) | `.claude/context/designer/bifrost-design-system.md` |
+| ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/apple-design-system.md` |
 
-**ai-team 내부 툴 = Toss 스타일이 기본값**
-- Primary: `#3182f6` (Toss Blue — 웹 구현값)
-- 폰트: Pretendard (Toss Product Sans 대체)
-- 카드 radius: 16/12/8px
-- 화면 좌우 패딩: 20px
-- 간격 단위: 4/8 배수
+**ai-team 내부 툴 = Apple 스타일이 기본값**
+- Primary: `#0071e3` (Apple Blue)
+- 폰트: SF Pro Display/Text (fallback: Helvetica Neue, Arial)
+- 배경: `#f5f5f7` (light) / `#000000` (dark section)
+- 카드 radius: 8px (standard), no border, subtle shadow
+- 최대 콘텐츠 너비: 980px, 중앙 정렬
+- 간격 단위: 8px 기반
 
 ---
 
@@ -39,7 +39,7 @@
 
 - **emoji를 아이콘 대신 사용 금지**
 - 아이콘 크기: **16px / 20px / 24px** 중 선택 (기본 24px)
-- Bifrost 커스텀 SVG 아이콘 시스템 우선 (`<Icon name="..." />`) → 없으면 lucide-react
+- 아이콘 라이브러리: lucide-react 사용
 - 추상적 도형(gradient circle, blurry blob)을 장식 필러로 사용 금지
 
 ---
@@ -56,10 +56,13 @@
 
 ## 4. Handoff Checklist (→ @Bart)
 
-- [ ] Color palette (시맨틱 토큰 + CSS 변수)
-- [ ] Typography (size, weight, line-height, breakpoint별 size 변화)
+- [ ] **[필수] CSS 토큰 파일 경로 명시** — `{project}/app/globals.css` 또는 `design-tokens.css`에 CSS 변수 블록 작성 완료 확인
+- [ ] Color palette (시맨틱 토큰 + CSS 변수) — `var(--color-*)` 형태로 정의됨
+- [ ] Typography (size, weight, line-height, letter-spacing, breakpoint별 size 변화)
 - [ ] Spacing system
 - [ ] Component specs (Default/Hover/Active/Focus/Disabled/Loading/Error/Empty)
 - [ ] Responsive behavior (breakpoint별 레이아웃 변화)
 - [ ] Accessibility notes (대비 비율, ARIA, 키보드)
 - [ ] Dark/Light 불변/가변 토큰 목록
+
+> ⚠️ CSS 토큰 파일 경로 미제공 시 핸드오프 완료로 인정하지 않음
