@@ -49,7 +49,7 @@ description: Use when delegating tasks to other agents or receiving delegated wo
 ### 응답 프로토콜
 1. **PM 위임 메시지에 이모지 리액션** (필수): 사용자 메시지 리액션과 동일한 시퀀스로 PM의 위임 메시지에 상태 반영
    - 🧠 = 위임 수신 후 분석 중
-   - ⛏️ = 작업 진행 중
+   - ✍️ = 작업 진행 중
    - ✅ = 작업 완료
 2. **위임 맥락 표시** (첫 줄 필수): `_위임자로부터 위임받았습니다 — 위임 이유_`
 3. `.memory/`에서 관련 컨텍스트 확인
