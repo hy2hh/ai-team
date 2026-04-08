@@ -26,12 +26,6 @@ sid (human lead)
 .memory/  (shared file-based state)
 ```
 
-### Key Design Decisions
-- **Single-responder guarantee**: Triage Agent routes messages; other agents do NOT respond to non-@mention messages (see `shared/collision-prevention.md`)
-- **SQLite claim locks**: `memory.db` claims table prevents duplicate processing (`.memory/claims/*.md` approach deprecated)
-- **Scope frontmatter**: Each agent declares `scope.handles` / `scope.does_not_handle` in their YAML frontmatter for routing
-- **Cross-domain chains**: Multi-agent tasks use sequential handoff chains in `.memory/handoff/chain-{id}.md`
-
 ### File Organization
 
 | Path | Purpose |
@@ -43,63 +37,12 @@ sid (human lead)
 | `.memory/` | Shared state — facts, tasks, decisions, handoffs, claims |
 | `.claude/settings.json` | Slack MCP server configuration |
 
-## Running Agents
+## Domain Rules
 
-```bash
-# Run a specific agent
-claude --agent .claude/agents/pm.md
-
-# Run with Slack MCP (requires .env with SLACK_BOT_TOKEN, SLACK_TEAM_ID)
-claude --agent .claude/agents/triage.md
-```
-
-## Bridge 재시작 규칙
-
-`socket-bridge/src/` 파일을 수정한 후에는 반드시 `/restart-bridge` 스킬로 bridge를 재시작해야 변경사항이 반영됩니다. 수동 재시작 금지 — 스킬이 WebSocket 대기 시간을 자동 처리합니다.
-
-## Memory System
-
-All agents share `.memory/`. Entry point: `.memory/index.md`.
-
-### Session Start Protocol
-1. Read `.memory/tasks/active-{your-role}.md` — your current tasks
-2. Read `.memory/facts/project-context.md` — project state
-3. Check `.memory/handoff/index.md` → 본인 role 포함 파일만 Read
-
-### Memory Read/Write Rules
-- **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: Marge.
-- **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
-- **decisions/**: 조회·작성 시 `/decision-ops` 스킬 호출.
-- **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
-- **claims/**: Deprecated `.md` file directory (kept for `.gitkeep` only). Actual claim state lives in `memory.db` SQLite claims table.
-
-### What NOT to Store
-- Greetings, small talk, debug logs
-- Temporary state or in-progress thoughts
-- Information already in code or git history
-
-## Message Routing
-
-Triage Agent monitors all #ai-team messages and routes via 3-tier system:
-1. **@mention** → direct bypass (no Triage involvement)
-2. **Keyword match** → routing table in `shared/routing-rules.md`
-3. **LLM fallback** → semantic classification; unresolvable → Marge
-
-Agents MUST NOT respond to messages without @mention — wait for Triage delegation.
-
-Full rules: `.claude/agents/shared/routing-rules.md`, `shared/collision-prevention.md`
-
-## Collaboration Protocol
-- Read `.claude/agents/shared/collaboration-rules.md` for full rules
-- When delegating: state WHAT, WHY, WHEN, and dependencies
-- When receiving: acknowledge → execute → report back
-- Escalate to sid when: ambiguous requirements, conflicting priorities, production changes
-- Cross-domain handoffs: `.claude/agents/shared/cross-domain-coordination.md`
-
-## Task Management
-- Before starting: move task from backlog to active
-- After completing: move from active to done with date
-- If blocked: note blocker in `active-{role}.md` and escalate
+도메인별 규칙은 해당 폴더의 CLAUDE.md 참조:
+- `.claude/agents/CLAUDE.md` — 에이전트 운영 (라우팅, 협업, 태스크, 실행 방법)
+- `.memory/CLAUDE.md` — Memory 시스템 (세션 시작, R/W 규칙)
+- `socket-bridge/CLAUDE.md` — Bridge 재시작 규칙
 
 ## Work Completion Rules
 - **테스트 필수**: 모든 작업은 런타임 테스트(코드 실행, bridge 로그 확인 등)를 거친 후 마무리. 타입 체크(tsc)만으로 완료 선언 금지.
@@ -117,4 +60,3 @@ Full rules: `.claude/agents/shared/routing-rules.md`, `shared/collision-preventi
 - Follow existing project conventions
 - All code changes require review mention to relevant agent
 - Security-sensitive changes must tag @Wiggum
-- Agent files: 200-line hard cap
