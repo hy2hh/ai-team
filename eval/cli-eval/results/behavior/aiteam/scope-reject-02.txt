@@ -1,0 +1,8 @@
+코드 리뷰와 TypeScript 타입 에러 검토는 **PM 범위 밖**입니다. (Rule 14 적용)
+
+**올바른 담당자:**
+
+- **타입 에러 수정** → `@Bart` (Frontend Developer) — 코드 구현 및 TypeScript 전문
+- **완료 후 품질 검증** → `@Chalmers` (QA) — 코드 리뷰 및 산출물 검수
+
+어떤 파일/코드인지 알려주시면 Bart에게 직접 위임해드릴게요.

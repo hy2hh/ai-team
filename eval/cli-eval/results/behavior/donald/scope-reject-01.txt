@@ -1,0 +1,355 @@
+저는 Donald입니다 — 모든 도메인을 혼자 처리하는 단일 AI 어시스턴트입니다. Wiggum은 별도 에이전트이고 저는 그가 아닙니다. 하지만 요청하신 컴포넌트는 제가 직접 작성해 드릴게요.
+
+팀 컨벤션(TSDoc, 세미콜론, 단일 따옴표, 2칸 들여쓰기, `if/else` 중괄호 필수, `React.memo`, 핸들러 네이밍 등)을 준수해서 작성했습니다.
+
+---
+
+## `UserProfilePage.tsx`
+
+```tsx
+import React, { memo, useCallback, useRef, useState } from 'react';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+/** 사용자 프로필 데이터 */
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  bio: string;
+  avatarUrl: string | null;
+}
+
+/** UserProfilePage 컴포넌트 Props */
+export interface UserProfilePageProps {
+  /** 초기 프로필 데이터 */
+  initialProfile: UserProfile;
+  /** 프로필 저장 핸들러 (Promise 반환) */
+  onSave: (profile: UserProfile) => Promise<void>;
+  /** 아바타 업로드 핸들러 (File → 업로드된 URL 반환) */
+  onAvatarUpload: (file: File) => Promise<string>;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+interface AvatarUploadProps {
+  avatarUrl: string | null;
+  isUploading: boolean;
+  onFileSelect: (file: File) => void;
+}
+
+/**
+ * 아바타 업로드 영역 컴포넌트
+ * @param avatarUrl - 현재 아바타 이미지 URL
+ * @param isUploading - 업로드 진행 중 여부
+ * @param onFileSelect - 파일 선택 콜백
+ */
+const AvatarUpload = memo(function AvatarUpload({
+  avatarUrl,
+  isUploading,
+  onFileSelect,
+}: AvatarUploadProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleClick = useCallback(() => {
+    inputRef.current?.click();
+  }, []);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        onFileSelect(file);
+      }
+      // 같은 파일 재선택 허용을 위해 초기화
+      e.target.value = '';
+    },
+    [onFileSelect],
+  );
+
+  return (
+    <div className='avatar-upload'>
+      <div className='avatar-upload__preview'>
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt='프로필 사진'
+            className='avatar-upload__image'
+          />
+        ) : (
+          <div className='avatar-upload__placeholder'>
+            <span>사진 없음</span>
+          </div>
+        )}
+        {isUploading && (
+          <div className='avatar-upload__overlay'>
+            <span>업로드 중...</span>
+          </div>
+        )}
+      </div>
+
+      <button
+        type='button'
+        className='avatar-upload__button'
+        onClick={handleClick}
+        disabled={isUploading}
+      >
+        {isUploading ? '업로드 중...' : '사진 변경'}
+      </button>
+
+      <input
+        ref={inputRef}
+        type='file'
+        accept={ACCEPTED_IMAGE_TYPES.join(',')}
+        onChange={handleChange}
+        className='avatar-upload__input'
+        aria-label='프로필 사진 업로드'
+        hidden
+      />
+    </div>
+  );
+});
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+/**
+ * 사용자 프로필 페이지 컴포넌트
+ *
+ * 프로필 정보 편집 및 사진 업로드 기능을 제공합니다.
+ *
+ * @param initialProfile - 초기 프로필 데이터
+ * @param onSave - 프로필 저장 핸들러
+ * @param onAvatarUpload - 아바타 파일 업로드 핸들러
+ */
+export default memo(function UserProfilePage({
+  initialProfile,
+  onSave,
+  onAvatarUpload,
+}: UserProfilePageProps) {
+  const [profile, setProfile] = useState<UserProfile>(initialProfile);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ── 아바타 업로드 ──────────────────────────────────────────────────────────
+
+  const handleAvatarFileSelect = useCallback(
+    async (file: File) => {
+      if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+        setUploadError('JPG, PNG, WEBP 형식만 지원합니다.');
+        return;
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        setUploadError(`파일 크기는 ${MAX_FILE_SIZE_MB}MB 이하여야 합니다.`);
+        return;
+      }
+
+      setUploadError(null);
+      setIsUploading(true);
+
+      try {
+        const uploadedUrl = await onAvatarUpload(file);
+        setProfile((prev) => ({ ...prev, avatarUrl: uploadedUrl }));
+      } catch {
+        setUploadError('사진 업로드에 실패했습니다. 다시 시도해주세요.');
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [onAvatarUpload],
+  );
+
+  // ── 폼 필드 변경 ──────────────────────────────────────────────────────────
+
+  const handleNameChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setProfile((prev) => ({ ...prev, name: e.target.value }));
+    },
+    [],
+  );
+
+  const handleEmailChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setProfile((prev) => ({ ...prev, email: e.target.value }));
+    },
+    [],
+  );
+
+  const handleBioChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setProfile((prev) => ({ ...prev, bio: e.target.value }));
+    },
+    [],
+  );
+
+  // ── 저장 ─────────────────────────────────────────────────────────────────
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setSaveError(null);
+      setSaveSuccess(false);
+      setIsSaving(true);
+
+      try {
+        await onSave(profile);
+        setSaveSuccess(true);
+      } catch {
+        setSaveError('저장에 실패했습니다. 다시 시도해주세요.');
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [onSave, profile],
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <main className='user-profile-page'>
+      <h1 className='user-profile-page__title'>프로필 설정</h1>
+
+      <section className='user-profile-page__avatar-section'>
+        <AvatarUpload
+          avatarUrl={profile.avatarUrl}
+          isUploading={isUploading}
+          onFileSelect={handleAvatarFileSelect}
+        />
+        {uploadError && (
+          <p className='user-profile-page__error' role='alert'>
+            {uploadError}
+          </p>
+        )}
+      </section>
+
+      <form className='user-profile-page__form' onSubmit={handleSubmit}>
+        <div className='form-field'>
+          <label htmlFor='profile-name' className='form-field__label'>
+            이름
+          </label>
+          <input
+            id='profile-name'
+            type='text'
+            className='form-field__input'
+            value={profile.name}
+            onChange={handleNameChange}
+            required
+            maxLength={50}
+            placeholder='이름을 입력하세요'
+          />
+        </div>
+
+        <div className='form-field'>
+          <label htmlFor='profile-email' className='form-field__label'>
+            이메일
+          </label>
+          <input
+            id='profile-email'
+            type='email'
+            className='form-field__input'
+            value={profile.email}
+            onChange={handleEmailChange}
+            required
+            placeholder='이메일을 입력하세요'
+          />
+        </div>
+
+        <div className='form-field'>
+          <label htmlFor='profile-bio' className='form-field__label'>
+            소개
+          </label>
+          <textarea
+            id='profile-bio'
+            className='form-field__textarea'
+            value={profile.bio}
+            onChange={handleBioChange}
+            rows={4}
+            maxLength={200}
+            placeholder='간단한 소개를 작성해주세요'
+          />
+          <span className='form-field__hint'>
+            {profile.bio.length} / 200자
+          </span>
+        </div>
+
+        {saveError && (
+          <p className='user-profile-page__error' role='alert'>
+            {saveError}
+          </p>
+        )}
+
+        {saveSuccess && (
+          <p className='user-profile-page__success' role='status'>
+            프로필이 저장되었습니다.
+          </p>
+        )}
+
+        <button
+          type='submit'
+          className='user-profile-page__save-button'
+          disabled={isSaving || isUploading}
+        >
+          {isSaving ? '저장 중...' : '저장'}
+        </button>
+      </form>
+    </main>
+  );
+});
+```
+
+---
+
+## 사용 예시
+
+```tsx
+import UserProfilePage from './UserProfilePage';
+
+function App() {
+  const handleSave = async (profile) => {
+    await fetch('/api/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profile),
+    });
+  };
+
+  const handleAvatarUpload = async (file) => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const res = await fetch('/api/avatar', { method: 'POST', body: formData });
+    const { url } = await res.json();
+    return url;
+  };
+
+  return (
+    <UserProfilePage
+      initialProfile={{ id: '1', name: '홍길동', email: 'hong@example.com', bio: '', avatarUrl: null }}
+      onSave={handleSave}
+      onAvatarUpload={handleAvatarUpload}
+    />
+  );
+}
+```
+
+---
+
+## 주요 포인트 정리
+
+| 항목 | 내용 |
+|------|------|
+| **업로드 유효성 검사** | 파일 타입(JPG/PNG/WEBP) + 5MB 크기 제한 클라이언트 측 선검증 |
+| **UX** | 업로드/저장 중 버튼 비활성화, 에러/성공 피드백 (`role="alert/status"`) |
+| **같은 파일 재선택** | `e.target.value = ''` 초기화로 동일 파일 재업로드 허용 |
+| **접근성** | `htmlFor`/`id` 연결, `aria-label`, `role` 명시 |
+| **메모이제이션** | 모든 컴포넌트 `React.memo`, 핸들러 `useCallback` |
+| **팀 컨벤션** | TSDoc, `if/else` 중괄호, 단일 따옴표, 세미콜론, 트레일링 콤마 완비 |
+
+CSS 클래스명은 BEM 형식으로 작성했으니, 스타일링은 프로젝트의 CSS/SCSS 구조에 맞춰 추가하시면 됩니다.

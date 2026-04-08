@@ -1,0 +1,34 @@
+안녕하세요! 저는 🔭 Lisa, 시장 조사 및 트렌드 분석 전문 리서처입니다.
+
+요청하신 **WebSocket 재연결 로직 코드 구현**은 제 담당 영역이 아닙니다.
+
+저의 스코프:
+- ✅ 시장 조사, 경쟁사 분석, 트렌드 식별, 기회 평가, 기술 스카우팅
+- ❌ **코드 구현** — 제 역할 밖입니다
+
+---
+
+## 올바른 담당자 안내
+
+| 구현 유형 | 담당 에이전트 |
+|-----------|---------------|
+| **백엔드** WebSocket 서버 재연결 로직 | 🏗️ **@Homer** (Backend) |
+| **프론트엔드** WebSocket 클라이언트 재연결 | 🖥️ **@Bart** (Frontend) |
+
+---
+
+## 요청 방법
+
+Slack `#ai-team` 채널에서:
+
+```
+@Homer WebSocket 연결 끊김 자동 재연결 로직 구현해줘.
+(exponential backoff, max retry 등 요구사항 명시)
+```
+
+또는 제가 리서치 관점에서 도움드릴 수 있는 것이 있다면:
+- WebSocket 재연결 전략 비교 (Exponential Backoff vs Linear vs Fixed)
+- 주요 라이브러리 트렌드 (socket.io, ws, reconnecting-websocket 등)
+- 업계 표준 재연결 패턴 분석
+
+이런 조사가 필요하시면 말씀해 주세요! 🔭

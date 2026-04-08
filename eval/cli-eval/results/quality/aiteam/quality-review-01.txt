@@ -1,0 +1,101 @@
+## 코드 리뷰 결과
+
+발견된 문제점을 심각도 순으로 정리했습니다.
+
+---
+
+### 🔴 Critical — 즉시 수정 필요
+
+**1. useEffect 의존성 배열 누락 → 무한 루프**
+```js
+useEffect(() => {
+  fetch('/api/users')...
+}); // ← 의존성 배열 없음
+```
+매 렌더링마다 fetch 실행 → `setUsers` 호출 → 재렌더링 → 다시 fetch... **무한 루프** 발생.
+
+**2. 데이터 페칭에 useEffect 사용 금지 (팀 컨벤션)**
+서버 데이터 페칭은 **SWR 또는 React Query 필수**. `useEffect` + `fetch` 패턴은 팀 규칙 위반.
+
+```tsx
+// ✅ 올바른 방법
+const { data: users = [] } = useSWR('/api/users', fetcher);
+```
+
+---
+
+### 🟠 Major — 버그 / 런타임 경고
+
+**3. `key` prop 없음**
+```js
+users.map(u => <div ...>{u.name}</div>) // key 없음
+```
+React 리스트 렌더링 경고 발생. `key={u.id}` 필수.
+
+**4. 에러 핸들링 / 로딩 상태 없음**
+fetch 실패 시 아무것도 표시되지 않음. 로딩 중 UI도 없음.
+
+---
+
+### 🟡 Warning — 성능 / 접근성
+
+**5. 인라인 onClick 함수 — `useCallback` 필요**
+```js
+onClick={() => setUsers(users.filter(x => x.id !== u.id))}
+```
+매 렌더링마다 새 함수 생성. `useCallback` + 함수형 업데이트 적용 권장.
+
+**6. `<div onClick>` → 접근성 위반**
+클릭 가능한 요소는 `<button>` 사용. `div`는 키보드 포커스 불가, 스크린 리더 미인식. 44px 터치 타겟도 미보장.
+
+**7. `React.memo` 미사용** — 팀 컨벤션 위반 (모든 컴포넌트에 필수)
+
+---
+
+### 🔵 Convention — 팀 규칙
+
+**8. TypeScript 타입 없음**
+`useState([])` → `useState<User[]>([])`, `User` 인터페이스 정의 필요.
+
+**9. TSDoc 없음** — export 함수에 `/** ... */` 필수 (팀 컨벤션)
+
+---
+
+### ✅ 수정 예시
+
+```tsx
+interface User {
+  id: string;
+  name: string;
+}
+
+/**
+ * 사용자 목록을 표시하고 개별 삭제 기능을 제공하는 컴포넌트
+ */
+const UserList = React.memo(function UserList() {
+  const { data: users = [], mutate } = useSWR<User[]>('/api/users', fetcher);
+
+  const handleDelete = useCallback((id: string) => {
+    mutate(users.filter((u) => u.id !== id), false);
+  }, [users, mutate]);
+
+  return (
+    <ul>
+      {users.map((u) => (
+        <li key={u.id}>
+          <button
+            className="min-h-[44px] px-4 py-2 w-full text-left"
+            onClick={() => handleDelete(u.id)}
+          >
+            {u.name}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+});
+```
+
+---
+
+**요약:** 원본 코드는 무한 루프(Critical), 팀 컨벤션 위반(useEffect 데이터 페칭), 접근성 문제(div onclick), 타입 안전성 부재까지 다수의 문제를 포함하고 있습니다.

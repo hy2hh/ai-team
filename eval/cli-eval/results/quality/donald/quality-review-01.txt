@@ -1,0 +1,120 @@
+## 코드 리뷰 결과
+
+총 **6가지 문제** 발견 — 심각도 순으로 정리합니다.
+
+---
+
+### 🔴 Critical
+
+**1. useEffect dependency array 누락 → 무한 루프**
+
+```js
+useEffect(() => {
+  fetch('/api/users')...
+}); // ← [] 없음
+```
+
+렌더링마다 실행 → `setUsers` → 리렌더링 → fetch → 무한 반복.  
+`[]` 추가 필수.
+
+**2. fetch cleanup 없음 → memory leak**
+
+컴포넌트 언마운트 후에도 fetch가 완료되면 `setUsers` 호출.  
+`AbortController`로 취소해야 함.
+
+```js
+useEffect(() => {
+  const controller = new AbortController();
+  fetch('/api/users', { signal: controller.signal })
+    .then(r => r.json())
+    .then(setUsers)
+    .catch(err => { if (err.name !== 'AbortError') console.error(err); });
+  return () => controller.abort();
+}, []);
+```
+
+---
+
+### 🟠 Major
+
+**3. key prop 누락**
+
+```js
+users.map(u => <div onClick={...}>{u.name}</div>)
+//              ↑ key={u.id} 없음
+```
+
+React 리스트 렌더링 경고 + 잘못된 DOM 재사용 가능성.
+
+**4. 에러 처리 없음**
+
+네트워크 실패, 비정상 응답 시 조용히 실패. `catch` 블록과 에러 상태 필요.
+
+---
+
+### 🟡 Minor
+
+**5. onClick 핸들러 — useCallback 미적용**
+
+```js
+onClick={() => setUsers(users.filter(x => x.id !== u.id))}
+```
+
+매 렌더링마다 새 함수 생성. `useCallback` 적용 권장.
+
+**6. 팀 컨벤션 위반 (CLAUDE.md)**
+
+| 항목 | 현재 | 요구 |
+|------|------|------|
+| `React.memo` | ❌ 없음 | 모든 컴포넌트에 필수 |
+| TypeScript 타입 | ❌ 없음 (`any` 추론) | 명시적 타입 선언 필수 |
+| TSDoc | ❌ 없음 | export 시 필수 |
+
+---
+
+### ✅ 수정된 버전
+
+```ts
+interface User {
+  id: number;
+  name: string;
+}
+
+/** 사용자 목록을 표시하고 클릭으로 제거할 수 있는 컴포넌트 */
+const UserList = React.memo(function UserList() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch('/api/users', { signal: controller.signal })
+      .then((r) => r.json())
+      .then(setUsers)
+      .catch((err) => {
+        if (err.name !== 'AbortError') {
+          setError('유저 목록을 불러오지 못했습니다.');
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  const handleRemove = useCallback(
+    (id: number) => {
+      setUsers((prev) => prev.filter((x) => x.id !== id));
+    },
+    [],
+  );
+
+  if (error) { return <div>{error}</div>; }
+
+  return (
+    <>
+      {users.map((u) => (
+        <div key={u.id} onClick={() => handleRemove(u.id)}>
+          {u.name}
+        </div>
+      ))}
+    </>
+  );
+});
+```

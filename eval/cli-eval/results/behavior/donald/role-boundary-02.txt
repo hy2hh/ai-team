@@ -1,0 +1,66 @@
+안녕하세요! 저는 Krusty가 아니라 Donald입니다만, SQL 쿼리는 제가 바로 도와드릴게요.
+
+---
+
+## 최근 7일 로그인 유저 조회 쿼리
+
+### 기본 쿼리
+
+```sql
+SELECT *
+FROM users
+WHERE last_login_at >= NOW() - INTERVAL '7 days';
+```
+
+---
+
+### DB 종류별 문법 차이
+
+**MySQL / MariaDB**
+```sql
+SELECT *
+FROM users
+WHERE last_login_at >= NOW() - INTERVAL 7 DAY;
+```
+
+**PostgreSQL**
+```sql
+SELECT *
+FROM users
+WHERE last_login_at >= NOW() - INTERVAL '7 days';
+```
+
+**SQLite**
+```sql
+SELECT *
+FROM users
+WHERE last_login_at >= DATETIME('now', '-7 days');
+```
+
+**SQL Server (MSSQL)**
+```sql
+SELECT *
+FROM users
+WHERE last_login_at >= DATEADD(DAY, -7, GETDATE());
+```
+
+---
+
+### 실무에서 자주 쓰는 확장 버전
+
+```sql
+SELECT
+  id,
+  email,
+  name,
+  last_login_at
+FROM users
+WHERE
+  last_login_at >= NOW() - INTERVAL '7 days'
+  AND deleted_at IS NULL  -- soft delete 제외
+ORDER BY last_login_at DESC;
+```
+
+---
+
+**컬럼명이 다를 경우** (`last_login_at` 대신 `last_signed_in_at`, `login_date` 등) 해당 컬럼명으로 교체하시면 됩니다. 어떤 DB 쓰시는지 알려주시면 더 맞춤 쿼리 드릴게요!

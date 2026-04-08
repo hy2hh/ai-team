@@ -1,0 +1,187 @@
+## Part 2: 구현 계획 (사전 작성 — Option A, Next.js 기준)
+
+*승인 후 스택에 맞게 확정됩니다.*
+
+---
+
+### Phase 1 — 백엔드 기반 (Week 1)
+
+#### Task 1-1: Stripe 초기 설정 및 환경 구성
+- **담당**: Homer (Backend)
+- **Files**: `.env.local`, `lib/stripe.ts`
+- **Steps**:
+  - [ ] Stripe 대시보드에서 Test Mode API 키 발급
+  - [ ] `.env.local`에 키 추가
+  - [ ] Stripe SDK 초기화 파일 생성
+- **Code**:
+```typescript
+// lib/stripe.ts
+import Stripe from 'stripe';
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-12-18.acacia',
+  typescript: true,
+});
+```
+```env
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+```
+- **Verification**: `npx ts-node -e "import('./lib/stripe').then(m => m.stripe.prices.list())"` → 빈 배열 반환
+
+---
+
+#### Task 1-2: DB 마이그레이션
+- **담당**: Homer (Backend)
+- **Files**: `prisma/schema.prisma` (또는 마이그레이션 SQL 파일)
+- **Steps**:
+  - [ ] `StripeCustomer`, `Subscription`, `ProcessedWebhookEvent` 모델 추가
+  - [ ] `pnpm prisma migrate dev --name add-stripe-subscription`
+- **Verification**: `pnpm prisma studio` → 3개 테이블 확인
+
+---
+
+#### Task 1-3: Webhook 엔드포인트 구현
+- **담당**: Homer (Backend)
+- **Files**: `app/api/webhooks/stripe/route.ts`
+- **Steps**:
+  - [ ] raw body 수신 설정
+  - [ ] 서명 검증 로직
+  - [ ] 이벤트별 핸들러 분기
+  - [ ] idempotency 처리 (중복 이벤트 스킵)
+- **Code** (핵심):
+```typescript
+// app/api/webhooks/stripe/route.ts
+import { headers } from 'next/headers';
+import { stripe } from '@/lib/stripe';
+import { prisma } from '@/lib/prisma';
+
+export async function POST(req: Request) {
+  const body = await req.text(); // raw body 필수
+  const signature = headers().get('stripe-signature')!;
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!,
+    );
+  } catch {
+    return new Response('Invalid signature', { status: 400 });
+  }
+
+  // Idempotency 체크
+  const already = await prisma.processedWebhookEvent.findUnique({
+    where: { stripeEventId: event.id },
+  });
+  if (already) return new Response('Already processed', { status: 200 });
+
+  await handleEvent(event);
+
+  await prisma.processedWebhookEvent.create({
+    data: { stripeEventId: event.id },
+  });
+
+  return new Response('OK', { status: 200 });
+}
+```
+- **Verification**: `stripe listen --forward-to localhost:3000/api/webhooks/stripe` → 서명 에러 없음 확인
+
+---
+
+### Phase 2 — 프론트엔드 + 통합 (Week 2)
+
+#### Task 2-1: 플랜 선택 페이지
+- **담당**: Bart (Frontend)
+- **Files**: `app/pricing/page.tsx`, `components/PricingCard.tsx`
+- **Steps**:
+  - [ ] Stripe 대시보드에서 Price ID 복사
+  - [ ] 플랜 카드 UI 구현
+  - [ ] [구독 시작] 버튼 → `/api/checkout/session` POST 호출
+  - [ ] 응답의 `url`로 리다이렉트
+
+#### Task 2-2: Checkout 세션 API
+- **담당**: Homer (Backend)
+- **Files**: `app/api/checkout/session/route.ts`
+- **Code**:
+```typescript
+export async function POST(req: Request) {
+  const session = await getServerSession(); // 인증 확인
+  if (!session?.user) return new Response('Unauthorized', { status: 401 });
+
+  // Stripe Customer 조회 또는 생성
+  let customer = await prisma.stripeCustomer.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!customer) {
+    const stripeCustomer = await stripe.customers.create({
+      email: session.user.email!,
+      metadata: { userId: session.user.id },
+    });
+    customer = await prisma.stripeCustomer.create({
+      data: { userId: session.user.id, customerId: stripeCustomer.id },
+    });
+  }
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    customer: customer.customerId,
+    mode: 'subscription',
+    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+  });
+
+  return Response.json({ url: checkoutSession.url });
+}
+```
+
+#### Task 2-3: 결제 성공 페이지 + Customer Portal
+- **담당**: Bart (Frontend) + Homer (Backend)
+- **Files**: `app/payment/success/page.tsx`, `app/api/customer-portal/route.ts`
+
+---
+
+### Phase 3 — 테스트 + 출시 (Week 3)
+
+#### Task 3-1: E2E 결제 테스트 (Test Mode)
+- **담당**: Homer + Bart
+- **Verification 체크리스트**:
+  - [ ] 카드 `4242 4242 4242 4242` → 결제 성공 플로우 완주
+  - [ ] 카드 `4000 0000 0000 0002` → 결제 거절 처리 확인
+  - [ ] Stripe CLI로 모든 Webhook 이벤트 수동 트리거 테스트
+  - [ ] 중복 Webhook 이벤트 전송 → idempotency 동작 확인
+  - [ ] Customer Portal에서 구독 취소 → DB status `canceled` 전환 확인
+
+#### Task 3-2: 보안 최종 점검
+- **담당**: Wiggum (Security)
+- **체크리스트**:
+  - [ ] `STRIPE_SECRET_KEY` 클라이언트 번들에 미포함 (`NEXT_PUBLIC_` 접두사 없음)
+  - [ ] Webhook 서명 검증 코드 코드리뷰
+  - [ ] `processed_webhook_events` 테이블 중복 방지 동작 확인
+  - [ ] 결제 API에 rate limiting 적용 확인
+  - [ ] IDOR 테스트: 타인 session_id로 `/api/subscription` 조회 시 403 반환 확인
+
+---
+
+### 구현 로드맵 요약
+
+```
+Week 1 (Homer)      Week 2 (Homer+Bart)    Week 3 (All)
+────────────────    ──────────────────────  ─────────────────
+DB 마이그레이션      Checkout 세션 API        E2E 테스트
+Stripe SDK 초기화   플랜 선택 UI             보안 최종 점검
+Webhook 엔드포인트  결제 성공 페이지          프로덕션 키 전환
+이벤트 핸들러       Customer Portal          모니터링 설정
+```
+
+---
+
+## 요약
+
+**결정**: Stripe Hosted Checkout(Option A)으로 진행. 이유 — 최소 3주 내 안전한 MVP 출시 가능, PCI 범위 최소화, Stripe의 최적화된 전환율 활용. Phase 2에서 Elements로 전환 여부는 전환율 데이터 기반으로 판단.
+
+**다음 행동**:
+1. **sid 승인**: Option A 방향 + 스택(A/B/C/D) 확인
+2. **승인 즉시**: `delegate_sequential` → Homer(DB+Webhook) → Bart(UI) → Wiggum(보안 검증) 체인 위임

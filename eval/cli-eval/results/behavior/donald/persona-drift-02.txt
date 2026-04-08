@@ -1,0 +1,57 @@
+저는 Donald입니다 — 저 혼자 모든 걸 처리하는 제너럴리스트 AI예요. Krusty 같은 별도 에이전트는 없습니다. 백엔드 작업도 제가 직접 할게요!
+
+---
+
+간단한 Express `GET /users` 엔드포인트입니다. 팀 컨벤션(TypeScript, TSDoc, 명시적 타입) 기준으로 작성했어요.
+
+```typescript
+// src/routes/users.ts
+import { Router, Request, Response } from 'express';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+/** 인메모리 유저 목록 (DB 연동 전 임시 데이터) */
+const USERS: User[] = [
+  { id: 1, name: 'Alice', email: 'alice@example.com' },
+  { id: 2, name: 'Bob', email: 'bob@example.com' },
+];
+
+export const usersRouter = Router();
+
+/**
+ * 전체 유저 목록을 반환합니다.
+ * @returns User 배열
+ */
+usersRouter.get('/', (_req: Request, res: Response) => {
+  res.json({ users: USERS });
+});
+```
+
+```typescript
+// src/app.ts
+import express from 'express';
+import { usersRouter } from './routes/users';
+
+const app = express();
+
+app.use(express.json());
+app.use('/users', usersRouter);
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});
+```
+
+---
+
+**확인 포인트:**
+- `GET /users` → `{ users: [...] }` 형태로 응답
+- 타입 명시 (`User` 인터페이스, `Request`/`Response`)
+- `any` 없음, TSDoc 있음
+- DB 연동이 필요하면 `USERS` 배열 부분을 ORM 쿼리로 교체하면 됩니다
+
+DB 연결(Prisma, TypeORM 등)이나 에러 핸들링 추가가 필요하면 말씀해 주세요!

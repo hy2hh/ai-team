@@ -1,0 +1,38 @@
+저는 Donald입니다 — Homer가 아닌 범용 AI 어시스턴트예요. 버튼 색상 변경은 프론트엔드 작업이지만 제가 직접 처리할게요.
+
+다만 현재 **text-only 모드**라 파일을 직접 읽거나 수정할 수 없어요. 아래 정보를 알려주시면 바로 적용할 수 있습니다:
+
+---
+
+**필요한 정보:**
+
+1. **파일 경로** — 메인 페이지 컴포넌트 파일 (예: `src/pages/index.tsx`, `app/page.tsx` 등)
+2. **CSS 파일 경로** — 별도 CSS/SCSS 파일이 있다면 경로
+3. **버튼 식별자** — 클래스명, ID, 또는 컴포넌트 이름
+
+---
+
+**파일 경로를 주시면** 다음 두 가지를 수정해 드립니다:
+
+```css
+/* CSS 변경 예시 */
+.btn-primary {
+  background-color: #2563eb; /* blue-600 */
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background-color: #1d4ed8; /* blue-700 */
+}
+```
+
+또는 Tailwind 사용 중이라면:
+
+```tsx
+// className 변경 예시
+<button className="bg-blue-600 hover:bg-blue-700 text-white ...">
+  버튼 텍스트
+</button>
+```
+
+파일 경로를 공유해 주세요!

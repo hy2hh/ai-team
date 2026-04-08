@@ -1,0 +1,87 @@
+## 원인 분석
+
+### 핵심 문제: 순차 쿼리 (Sequential Queries)
+
+```
+현재 실행 흐름:
+[query1: users]        → 500ms
+                [query2: orders]      → 500ms
+                              [query3: notifs]   → 500ms
+                                           [query4: analytics] → 500ms
+                                                                 총: ~2000ms ❌
+```
+
+4개의 독립적인 쿼리가 `await`으로 직렬 실행됩니다. 각 쿼리가 서로 의존성이 **전혀 없음에도** 앞 쿼리가 끝날 때까지 기다립니다.
+
+---
+
+## 해결책
+
+### 1. `Promise.all()` 병렬 실행 (즉각 적용)
+
+```js
+app.get('/api/dashboard', async (req, res) => {
+  const [user, orders, notifications, analytics] = await Promise.all([
+    db.query('SELECT * FROM users WHERE id = ?', [req.userId]),
+    db.query('SELECT * FROM orders WHERE user_id = ?', [req.userId]),
+    db.query('SELECT * FROM notifications WHERE user_id = ? AND read = false', [req.userId]),
+    db.query('SELECT COUNT(*) as total FROM page_views WHERE user_id = ?', [req.userId]),
+  ]);
+
+  res.json({ user, orders, notifications, analytics });
+});
+```
+
+```
+개선 후 실행 흐름:
+[query1: users    ]
+[query2: orders   ]  → 모두 동시 실행
+[query3: notifs   ]
+[query4: analytics]
+                     총: ~500ms ✅ (가장 느린 쿼리 기준)
+```
+
+**예상 개선: 2000ms → ~500ms (75% 단축)**
+
+---
+
+### 2. 추가 최적화 (근본 원인 제거)
+
+#### `SELECT *` → 필요한 컬럼만 명시
+```sql
+-- ❌ 전체 컬럼 전송 (불필요한 네트워크/메모리 낭비)
+SELECT * FROM users WHERE id = ?
+
+-- ✅ 필요한 컬럼만
+SELECT id, name, email, avatar_url FROM users WHERE id = ?
+```
+
+#### 인덱스 확인
+```sql
+-- 아래 컬럼에 인덱스가 없으면 Full Scan 발생
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read);
+CREATE INDEX IF NOT EXISTS idx_page_views_user_id ON page_views(user_id);
+```
+
+#### orders 쿼리 — 무제한 조회 위험
+```js
+// ❌ 주문이 수천 건이면 전체 전송
+db.query('SELECT * FROM orders WHERE user_id = ?', [req.userId])
+
+// ✅ 페이지네이션 또는 최근 N건으로 제한
+db.query('SELECT id, status, total, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 20', [req.userId])
+```
+
+---
+
+## 우선순위 요약
+
+| 우선순위 | 조치 | 예상 효과 |
+|--------|------|---------|
+| 🔴 즉시 | `Promise.all()` 병렬화 | ~75% 응답 단축 |
+| 🟠 높음 | DB 인덱스 추가 | 쿼리당 10~100x 개선 |
+| 🟡 중간 | `SELECT *` → 필요 컬럼만 | 네트워크/메모리 절감 |
+| 🟢 낮음 | orders LIMIT 추가 | 엣지케이스 안정성 |
+
+**`Promise.all()` 하나만 적용해도 2초 → 500ms 이하로 줄어들 가능성이 높습니다.**
