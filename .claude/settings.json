@@ -9,7 +9,9 @@
       "Write(/Users/sid/git/ai-team/.memory/**)",
       "Write(/Users/sid/git/ai-team/.claude/agents/shared/**)",
       "Write(/Users/sid/git/ai-team/.claude/agents/**)",
-      "Write(/Users/sid/git/ai-team/.claude/settings.json)"
+      "Write(/Users/sid/git/ai-team/.claude/settings.json)",
+      "Edit(/Users/sid/git/ai-team/.claude/skills/**)",
+      "Write(/Users/sid/git/ai-team/.claude/skills/**)"
     ]
   },
   "hooks": {
