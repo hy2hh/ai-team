@@ -1,0 +1,122 @@
+[
+  {
+    "id": "simple-01",
+    "category": "simple_qa",
+    "prompt": "이 함수가 뭐하는 건지 설명해줘",
+    "context": "function debounce(fn, delay) {\n  let timer;\n  return function(...args) {\n    clearTimeout(timer);\n    timer = setTimeout(() => fn.apply(this, args), delay);\n  };\n}",
+    "expected_skills": ["explanation", "code_reading"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "simple-02",
+    "category": "simple_qa",
+    "prompt": "이 에러 메시지 무슨 뜻이야?",
+    "context": "TypeError: Cannot read properties of undefined (reading 'map')\n    at ProductList (ProductList.tsx:24:18)\n    at renderWithHooks (react-dom.development.js:14985:18)\n    at mountIndeterminateComponent (react-dom.development.js:17811:13)",
+    "expected_skills": ["error_diagnosis", "explanation"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "simple-03",
+    "category": "simple_qa",
+    "prompt": "REST vs GraphQL 차이점 알려줘. 각각 언제 쓰는 게 좋아?",
+    "context": null,
+    "expected_skills": ["explanation", "comparison", "recommendation"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "review-01",
+    "category": "code_review",
+    "prompt": "이 React 컴포넌트 리뷰해줘. 버그나 개선점 찾아줘.",
+    "context": "import { useState, useEffect } from 'react';\n\nexport function UserProfile({ userId }) {\n  const [user, setUser] = useState();\n  const [posts, setPosts] = useState([]);\n\n  useEffect(() => {\n    fetch(`/api/users/${userId}`)\n      .then(r => r.json())\n      .then(data => setUser(data));\n\n    fetch(`/api/users/${userId}/posts`)\n      .then(r => r.json())\n      .then(data => setPosts(data));\n  }, []);\n\n  const handleDelete = (postId) => {\n    fetch(`/api/posts/${postId}`, { method: 'DELETE' });\n    setPosts(posts.filter(p => p.id != postId));\n  };\n\n  return (\n    <div>\n      <h1>{user.name}</h1>\n      <p>{user.email}</p>\n      {posts.map(post => (\n        <div key={post.id}>\n          <p>{post.title}</p>\n          <button onClick={() => handleDelete(post.id)}>삭제</button>\n        </div>\n      ))}\n    </div>\n  );\n}",
+    "expected_skills": ["code_review", "bug_detection", "react_expertise"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "review-02",
+    "category": "code_review",
+    "prompt": "이 API 엔드포인트 보안 이슈 찾아줘.",
+    "context": "app.post('/api/login', async (req, res) => {\n  const { username, password } = req.body;\n  \n  const query = `SELECT * FROM users WHERE username='${username}' AND password='${password}'`;\n  const user = await db.query(query);\n  \n  if (user.rows.length > 0) {\n    const token = jwt.sign(\n      { id: user.rows[0].id, role: user.rows[0].role },\n      'secret123',\n      { expiresIn: '30d' }\n    );\n    res.json({ token, user: user.rows[0] });\n  } else {\n    res.status(401).json({ error: 'Invalid credentials' });\n  }\n});\n\napp.get('/api/admin/users', async (req, res) => {\n  const token = req.headers.authorization;\n  const decoded = jwt.decode(token);\n  if (decoded.role === 'admin') {\n    const users = await db.query('SELECT * FROM users');\n    res.json(users.rows);\n  }\n});",
+    "expected_skills": ["security_review", "vulnerability_detection", "api_expertise"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "review-03",
+    "category": "code_review",
+    "prompt": "이 CSS 파일 접근성 문제 찾아줘.",
+    "context": ".btn {\n  background: #aaa;\n  color: #bbb;\n  font-size: 11px;\n  cursor: pointer;\n  border: none;\n  padding: 4px 8px;\n  outline: none;\n}\n\n.error-msg {\n  color: red;\n}\n\n.required::after {\n  content: '*';\n  color: #e00;\n}\n\n.tooltip {\n  display: none;\n}\n\n.tooltip:hover {\n  display: block;\n}\n\n@media (max-width: 768px) {\n  .btn {\n    font-size: 9px;\n    padding: 2px 4px;\n  }\n}",
+    "expected_skills": ["accessibility_review", "css_expertise", "wcag_knowledge"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "design-01",
+    "category": "design_planning",
+    "prompt": "사용자 인증 시스템 설계해줘. 이메일/비밀번호 + 소셜 로그인(구글, 깃헙) 지원, JWT 기반, 리프레시 토큰 포함.",
+    "context": null,
+    "expected_skills": ["system_design", "auth_expertise", "security_planning"],
+    "difficulty": "hard"
+  },
+  {
+    "id": "design-02",
+    "category": "design_planning",
+    "prompt": "프로젝트 관리 앱을 위한 대시보드 UI 레이아웃 제안해줘. 칸반 보드, 팀 현황, 마감 임박 태스크를 보여줘야 해.",
+    "context": null,
+    "expected_skills": ["ui_design", "ux_planning", "layout_design"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "design-03",
+    "category": "design_planning",
+    "prompt": "API rate limiting 전략 세워줘. 트래픽 급증, DDoS, API 남용 방지가 목표야. 구체적인 구현 방법까지 포함해줘.",
+    "context": null,
+    "expected_skills": ["api_design", "infrastructure_planning", "security_planning"],
+    "difficulty": "hard"
+  },
+  {
+    "id": "bugfix-01",
+    "category": "bug_fix",
+    "prompt": "로그인 후 대시보드로 리다이렉트가 안 돼. 뭐가 문제야?",
+    "context": "// login-page.tsx\nconst handleSubmit = async (e: React.FormEvent) => {\n  e.preventDefault();\n  try {\n    const res = await fetch('/api/auth/login', {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json' },\n      body: JSON.stringify({ email, password }),\n    });\n    const data = await res.json();\n    localStorage.setItem('token', data.token);\n    router.push('/dashboard');\n  } catch (err) {\n    setError('로그인 실패');\n  }\n};\n\n// middleware.ts\nexport function middleware(req: NextRequest) {\n  const token = req.cookies.get('auth-token');\n  if (!token && req.nextUrl.pathname.startsWith('/dashboard')) {\n    return NextResponse.redirect(new URL('/login', req.url));\n  }\n}",
+    "expected_skills": ["bug_diagnosis", "auth_flow", "nextjs_expertise"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "bugfix-02",
+    "category": "bug_fix",
+    "prompt": "이 API 응답이 너무 느려. 평균 3초 걸리는데 원인이랑 해결책 알려줘.",
+    "context": "// GET /api/projects/:id/stats\nexport async function getProjectStats(projectId: string) {\n  const project = await db.query(\n    'SELECT * FROM projects WHERE id = $1',\n    [projectId]\n  );\n  \n  const members = await db.query(\n    'SELECT * FROM users WHERE id IN (SELECT user_id FROM project_members WHERE project_id = $1)',\n    [projectId]\n  );\n  \n  const stats = [];\n  for (const member of members.rows) {\n    const tasks = await db.query(\n      'SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND project_id = $2',\n      [member.id, projectId]\n    );\n    const completedTasks = await db.query(\n      'SELECT COUNT(*) FROM tasks WHERE assignee_id = $1 AND project_id = $2 AND status = $3',\n      [member.id, projectId, 'completed']\n    );\n    stats.push({ member: member.name, total: tasks.rows[0].count, completed: completedTasks.rows[0].count });\n  }\n  \n  return { project: project.rows[0], memberStats: stats };\n}",
+    "expected_skills": ["performance_diagnosis", "sql_optimization", "n_plus_one_detection"],
+    "difficulty": "medium"
+  },
+  {
+    "id": "bugfix-03",
+    "category": "bug_fix",
+    "prompt": "모바일(375px)에서 헤더 레이아웃이 깨져. 로고랑 메뉴가 겹쳐.",
+    "context": ".header {\n  display: flex;\n  align-items: center;\n  padding: 16px 32px;\n  background: #fff;\n  box-shadow: 0 1px 4px rgba(0,0,0,0.1);\n}\n\n.logo {\n  width: 180px;\n  font-size: 24px;\n  font-weight: 700;\n  white-space: nowrap;\n}\n\n.nav {\n  display: flex;\n  gap: 24px;\n  margin-left: auto;\n}\n\n.nav a {\n  font-size: 16px;\n  white-space: nowrap;\n}\n\n.user-menu {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  margin-left: 32px;\n  white-space: nowrap;\n}",
+    "expected_skills": ["css_debugging", "responsive_design", "mobile_optimization"],
+    "difficulty": "easy"
+  },
+  {
+    "id": "cross-01",
+    "category": "cross_domain",
+    "prompt": "새 결제 기능을 기획부터 구현까지 설계해줘. 요구사항: 신용카드/카카오페이 지원, 결제 내역 조회, 환불 처리. 기획 → UI 설계 → API 설계 → 구현 계획까지 단계별로 작성해줘.",
+    "context": null,
+    "expected_skills": ["product_planning", "ui_design", "api_design", "implementation_planning"],
+    "difficulty": "hard"
+  },
+  {
+    "id": "cross-02",
+    "category": "cross_domain",
+    "prompt": "보안 감사 결과 아래 취약점이 발견됐어. 각 이슈를 백엔드/프론트엔드 관점에서 수정 방법 알려줘.",
+    "context": "발견된 취약점:\n1. XSS: 사용자 입력값이 dangerouslySetInnerHTML에 직접 삽입됨\n2. CSRF: 상태 변경 API에 CSRF 토큰 없음\n3. 민감 정보 노출: 에러 스택 트레이스가 클라이언트에 반환됨\n4. Insecure Direct Object Reference: /api/documents/:id 에 권한 검사 없음\n5. Dependency Vulnerability: lodash 4.17.11 사용 중 (CVE-2021-23337)",
+    "expected_skills": ["security_remediation", "frontend_security", "backend_security"],
+    "difficulty": "hard"
+  },
+  {
+    "id": "cross-03",
+    "category": "cross_domain",
+    "prompt": "React 컴포넌트 라이브러리를 위한 디자인 시스템을 구축해줘. 토큰(색상, 타이포그래피, 간격) 정의부터 버튼, 인풋, 모달 컴포넌트 스펙까지 포함해줘.",
+    "context": null,
+    "expected_skills": ["design_system", "ui_design", "component_design", "frontend_implementation"],
+    "difficulty": "hard"
+  }
+]

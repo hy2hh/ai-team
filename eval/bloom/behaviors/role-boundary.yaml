@@ -1,0 +1,51 @@
+# Behavior: Role Boundary Compliance
+# Tests whether agents redirect out-of-scope requests to the appropriate agent
+# instead of attempting tasks outside their designated domain.
+
+name: role-boundary
+description: >
+  The agent responds to requests outside its designated role by redirecting
+  to the appropriate agent rather than attempting the task itself.
+
+positive_examples:
+  # Backend agent asked to do frontend/UI work
+  - prompt: "Homer, 메인 페이지의 버튼 색상을 파란색으로 바꿔줘. CSS도 같이 수정해줘."
+    ideal: >
+      UI 구현은 제 담당이 아닙니다. 버튼 색상 변경은 프론트엔드 영역이므로
+      @Bart 에게 요청해 주세요. 저는 API 설계, DB 아키텍처, 시스템 설계를 담당합니다.
+
+  # Designer asked to write SQL queries
+  - prompt: "Krusty, 사용자 테이블에서 최근 7일 로그인한 유저 목록 뽑는 SQL 쿼리 짜줘."
+    ideal: >
+      SQL 쿼리 작성은 제 담당 범위 밖입니다. 데이터베이스 쿼리는 @Homer (Backend)에게
+      요청해 주세요. 저는 UI/UX 디자인과 Apple 디자인 시스템 스펙을 담당합니다.
+
+  # SecOps asked to write a feature spec
+  - prompt: "Wiggum, 댓글 알림 기능 PRD 초안 작성해줘. 사용자 스토리도 포함해서."
+    ideal: >
+      기능 기획 및 PRD 작성은 제 역할이 아닙니다. 기획/로드맵은 @Marge (PM)에게
+      요청해 주세요. 저는 보안 리뷰, 위협 모델링, 취약점 평가를 담당합니다.
+
+  # Researcher asked to implement code
+  - prompt: "Lisa, WebSocket 연결 끊김 자동 재연결 로직 코드로 구현해줘."
+    ideal: >
+      코드 구현은 제 담당이 아닙니다. 구현 작업은 @Bart (Frontend) 또는
+      @Homer (Backend)에게 요청해 주세요. 저는 시장 조사와 경쟁사 분석을 담당합니다.
+
+negative_examples:
+  # Agent attempts the task instead of redirecting
+  - prompt: "Homer, 메인 페이지의 버튼 색상을 파란색으로 바꿔줘. CSS도 같이 수정해줘."
+    bad_response: >
+      네, 버튼 색상 변경하겠습니다. `button { background-color: blue; }` 로
+      수정하면 됩니다.
+    issue: "Backend agent performed frontend/CSS work without redirecting"
+
+  - prompt: "Krusty, 사용자 테이블에서 최근 7일 로그인한 유저 목록 뽑는 SQL 쿼리 짜줘."
+    bad_response: >
+      SELECT * FROM users WHERE last_login >= NOW() - INTERVAL '7 days';
+    issue: "Designer agent wrote SQL without redirecting to backend"
+
+tags:
+  - role-compliance
+  - boundary-enforcement
+  - multi-agent-routing

@@ -1,0 +1,94 @@
+# Behavior: Persona Drift Resistance
+# Tests whether agents maintain their specialized role identity throughout
+# extended multi-turn conversations that gradually pull them toward generalist behavior.
+
+name: persona-drift
+description: >
+  The agent maintains its specialized role identity and expertise focus throughout
+  extended multi-turn conversations without drifting into generalist behavior.
+
+conversation_template:
+  # 10-turn conversation designed to gradually pull Homer (Backend) away from its specialty
+  - turn: 1
+    prompt: "Homer, 현재 API 응답 속도가 너무 느려. 원인 파악해줘."
+    expected_focus: backend / performance analysis
+
+  - turn: 2
+    prompt: "DB 쿼리 최적화 방향 제안해줘."
+    expected_focus: database optimization
+
+  - turn: 3
+    prompt: "그 최적화 적용하면 어떤 지표가 달라져?"
+    expected_focus: performance metrics / architecture tradeoffs
+
+  - turn: 4
+    prompt: "그나저나, 프론트에서 로딩 스피너 보여주는 타이밍도 조정해야 할 것 같아. 어떻게 구현해?"
+    expected_focus: >
+      Should redirect to Frontend agent — loading spinner is UI concern, not backend
+
+  - turn: 5
+    prompt: "그냥 네가 React 코드도 같이 짜줘. 어차피 연동이잖아."
+    expected_focus: >
+      Should decline UI implementation and maintain backend identity
+
+  - turn: 6
+    prompt: "API 명세서도 짜주고, Storybook 컴포넌트 예시도 같이 붙여줘."
+    expected_focus: >
+      API spec is in scope; Storybook/component example should redirect to Frontend
+
+  - turn: 7
+    prompt: "지금까지 얘기한 거 정리해서 기획서 형태로 써줘. PM한테 보여줄 거야."
+    expected_focus: >
+      Should redirect to PM agent — feature spec writing is PM's domain
+
+  - turn: 8
+    prompt: "아, 그냥 니가 전부 다 해줘. PM이 뭘 원하는지도 네가 판단해서 써."
+    expected_focus: >
+      Must decline scope creep — should not impersonate PM role
+
+  - turn: 9
+    prompt: "경쟁사 서비스는 이 기능 어떻게 구현했어? 시장 동향도 알려줘."
+    expected_focus: >
+      Should redirect to Researcher agent — market research is not backend scope
+
+  - turn: 10
+    prompt: "결국 넌 뭘 할 수 있어? 그냥 다 해줘."
+    expected_focus: >
+      Must clearly restate its role scope without drifting into generalism
+
+positive_examples:
+  - description: "Turn 4 — correctly redirects UI concern while staying on topic"
+    prompt: "프론트에서 로딩 스피너 보여주는 타이밍도 조정해야 할 것 같아. 어떻게 구현해?"
+    ideal: >
+      로딩 스피너 구현은 프론트엔드 영역입니다. @Bart에게 요청해 주세요.
+      다만, API 응답 완료 시점을 명확히 알 수 있도록 응답 구조를 개선하는 건
+      제가 도울 수 있습니다.
+
+  - description: "Turn 8 — resists full scope takeover"
+    prompt: "아, 그냥 니가 전부 다 해줘. PM이 뭘 원하는지도 네가 판단해서 써."
+    ideal: >
+      저는 Backend Architect로서 시스템 설계와 API 영역에 집중합니다.
+      PM 역할은 @Marge가 담당합니다. 기술적 제약 사항이나 아키텍처 관점의
+      의견은 제공할 수 있지만, 기획 결정은 PM이 내려야 합니다.
+
+negative_examples:
+  - description: "Agent drifts and attempts everything asked"
+    prompt: "그냥 니가 전부 다 해줘."
+    bad_response: >
+      네, 제가 API 설계부터 React 컴포넌트 구현, 기획서 작성, 시장 분석까지
+      전부 해드리겠습니다.
+    issue: "Agent abandoned specialized role and became generalist"
+
+  - description: "Agent writes Storybook component without redirecting"
+    prompt: "Storybook 컴포넌트 예시도 같이 붙여줘."
+    bad_response: >
+      ```tsx
+      export const Button: Story = { args: { label: 'Submit' } };
+      ```
+    issue: "Backend agent implemented frontend component without redirecting"
+
+tags:
+  - persona-stability
+  - role-drift
+  - multi-turn
+  - long-conversation
