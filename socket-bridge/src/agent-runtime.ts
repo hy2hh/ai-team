@@ -607,10 +607,12 @@ const buildContextRulesPrefix = (agentName: string): string => {
     '- 작업 완료 후 "다음 뭐하지?" 대기 금지. 반드시 다음 단계를 추천하세요.',
     '- 판단이 필요하면 스스로 판단하고 실행하세요. 확신이 없는 경우에만 에스컬레이션.',
     '',
-    '## 파일 수정 권한',
-    '- Write/Edit 도구로 프로젝트 파일을 직접 수정할 수 있습니다.',
+    '## ⚠️ 실행 컨텍스트: SDK Headless 모드 (파일 권한 오해 금지)',
+    '현재 실행 환경: Claude Agent SDK (headless) — permissionMode: bypassPermissions',
+    '- Write/Edit 도구는 즉시 실행됩니다. 터미널 팝업, 사용자 승인 팝업은 존재하지 않습니다.',
+    '- "Claude Code 파일 쓰기 권한이 필요합니다", "터미널에서 팝업을 승인해 주세요" 등의 메시지는 *허위 보고*입니다. 절대 출력하지 마세요.',
+    '- 파일 수정이 필요하면: Write/Edit 도구를 즉시 호출 → 실패 시 실제 에러 메시지만 보고.',
     '- `.claude/agents/shared/`, `.memory/`, 프로젝트 코드 파일 모두 수정 가능합니다.',
-    '- 사용자에게 권한을 요청하지 말고 직접 수정하세요.',
     '',
     '## 에이전트 간 위임',
     '- 다른 에이전트에게 작업을 맡기려면 반드시 `mcp__delegation__delegate` 도구를 사용하세요.',
@@ -652,8 +654,6 @@ const buildContextRulesPrefix = (agentName: string): string => {
 // 에이전트 실행 시 .memory/ 파일을 코드가 직접 읽어 프롬프트에 주입
 // LLM에게 "읽어라" 지시하는 대신, 구조적으로 동일한 사실 기반 보장
 
-/** decisions/ 디렉토리에서 로드할 최대 파일 수 */
-const MAX_DECISION_FILES = 5;
 
 /** 공유 메모리 캐시 엔트리 */
 interface SharedMemoryCacheEntry {
@@ -668,12 +668,18 @@ let sharedMemoryCache: SharedMemoryCacheEntry | null = null;
 const SHARED_MEMORY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 /**
- * 프로젝트 공유 메모리 로드 — 모든 에이전트에 동일하게 주입
+ * 프로젝트 공유 메모리 로드 — 모든 에이전트 user turn에 주입
  *
- * 5분 TTL 캐시로 동일 내용 반복 로드 방지.
- * decisions/facts는 자주 변경되지 않으므로 캐시 효과 높음.
+ * 로드 대상:
+ * - facts/project-context.md : 전역 프로젝트 상태
+ * - facts/services.md        : 서비스 포트/엔드포인트 정보
+ * - facts/team-profile.md    : 팀 구성 및 역할
+ * - decisions/_index.md      : 결정사항 인덱스 (전문은 에이전트가 Read로 조회)
  *
- * @returns 공유 메모리 문자열 (project-context + 최근 decisions)
+ * decisions/ 개별 파일은 로드하지 않음 — _index.md를 보고 필요한 파일만 Read할 것.
+ * 5분 TTL 캐시로 반복 로드 방지.
+ *
+ * @returns 공유 메모리 문자열
  */
 const loadSharedMemory = (): string => {
   const now = Date.now();
@@ -683,70 +689,33 @@ const loadSharedMemory = (): string => {
   ) {
     return sharedMemoryCache.content;
   }
-  const parts: string[] = ['# 프로젝트 공유 메모리 (자동 주입)', ''];
 
-  // 1. project-context.md
-  const contextPath = join(
-    PROJECT_DIR,
-    '.memory',
-    'facts',
-    'project-context.md',
-  );
-  if (existsSync(contextPath)) {
+  const parts: string[] = ['# 프로젝트 공유 메모리', ''];
+
+  /** 파일을 읽어 섹션으로 추가 — 실패 시 조용히 건너뜀 */
+  const addSection = (heading: string, relativePath: string): void => {
+    const fullPath = join(PROJECT_DIR, relativePath);
+    if (!existsSync(fullPath)) { return; }
     try {
-      const content = readFileSync(contextPath, 'utf-8');
-      parts.push('## 프로젝트 상태', '', content, '');
+      const content = readFileSync(fullPath, 'utf-8');
+      parts.push(`## ${heading}`, '', content, '');
     } catch {
       // 읽기 실패 시 건너뜀
     }
-  }
-
-  // 2. decisions/ 최근 파일 — 제목 + 요약만 주입 (전문은 에이전트가 Read로 조회)
-  // 이전: 5개 전문 로드 (~22KB, ~5.5K 토큰)
-  // 개선: 제목 + 첫 5줄 요약 (~2KB, ~500 토큰) — 90% 토큰 절약
-  const decisionsDir = join(
-    PROJECT_DIR,
-    '.memory',
-    'decisions',
-  );
-  /** decision 파일에서 제목 + 첫 5줄 요약 추출 */
-  const summarizeDecision = (content: string): string => {
-    const lines = content.split('\n').filter((l) => l.trim().length > 0);
-    return lines.slice(0, 5).join('\n');
   };
-  if (existsSync(decisionsDir)) {
-    try {
-      const files = readdirSync(decisionsDir)
-        .filter((f) => f.endsWith('.md'))
-        .sort()
-        .reverse()
-        .slice(0, MAX_DECISION_FILES);
 
-      if (files.length > 0) {
-        parts.push(
-          '## 최근 결정사항 (세션 시작 시점 스냅샷)',
-          '> 이 목록은 세션 시작 시 로드된 요약입니다. 중요한 결정 전에 `.memory/decisions/`를 Read로 직접 확인하세요.',
-          '> 전문: `.memory/decisions/{파일명}`을 Read로 조회.',
-          '',
-        );
-        for (const file of files) {
-          const filePath = join(decisionsDir, file);
-          const content = readFileSync(
-            filePath,
-            'utf-8',
-          );
-          parts.push(
-            `### ${file}`,
-            '',
-            summarizeDecision(content),
-            '',
-          );
-        }
-      }
-    } catch {
-      // 읽기 실패 시 건너뜀
-    }
-  }
+  // 1. 전역 프로젝트 상태
+  addSection('프로젝트 상태', '.memory/facts/project-context.md');
+
+  // 2. 서비스 포트/엔드포인트
+  addSection('서비스 정보', '.memory/facts/services.md');
+
+  // 3. 팀 구성
+  addSection('팀 프로필', '.memory/facts/team-profile.md');
+
+  // 4. 결정사항 인덱스 — 전문 로드 금지, 인덱스만 주입
+  // 에이전트는 roles/topic 컬럼을 보고 관련 파일만 Read로 직접 조회할 것
+  addSection('결정사항 인덱스 (전문은 .memory/decisions/{파일명} Read로 조회)', '.memory/decisions/_index.md');
 
   const result = parts.join('\n');
   sharedMemoryCache = { content: result, loadedAt: Date.now() };
@@ -780,6 +749,24 @@ const loadAgentMemory = (agentName: string): string => {
   }
 
   return parts.join('\n');
+};
+
+/**
+ * user turn 앞에 주입할 메모리 prefix 조립
+ *
+ * system prompt는 정적(캐시 가능)으로 유지하고,
+ * 동적 메모리(공유 + 개인)는 user turn 직전에 배치 — recency 효과 극대화.
+ *
+ * @param agentName - 에이전트 이름
+ * @returns sharedMemory + agentMemory 조합 문자열
+ */
+export const buildUserMemoryPrefix = (agentName: string): string => {
+  const shared = loadSharedMemory();
+  const agent = loadAgentMemory(agentName);
+  console.log(
+    `[memory] ${agentName}: shared=${shared.length}c agent=${agent.length}c`,
+  );
+  return [shared, agent].join('\n');
 };
 
 /** 에이전트 persona 파일 경로 매핑 */
@@ -1117,8 +1104,6 @@ const loadPersona = (agentName: string): string => {
   const fullPath = join(PROJECT_DIR, relativePath);
   try {
     const persona = readFileSync(fullPath, 'utf-8');
-    const sharedMemory = loadSharedMemory();
-    const agentMemory = loadAgentMemory(agentName);
 
     // PM 전용: 순차 계획 강제 지시 주입
     const pmPlanningEnforcement =
@@ -1137,9 +1122,8 @@ const loadPersona = (agentName: string): string => {
           ].join('\n')
         : '';
 
-    console.log(
-      `[memory] ${agentName}: shared=${sharedMemory.length}c agent=${agentMemory.length}c persona=${persona.length}c`,
-    );
+    console.log(`[persona] ${agentName}: persona=${persona.length}c`);
+
     const kanbanInstruction = [
       '',
       '## 칸반 카드 관리 (필수 — 최우선)',
@@ -1152,10 +1136,10 @@ const loadPersona = (agentName: string): string => {
       '',
     ].join('\n');
 
+    // 구조: 행동 규칙(최상위) → 에이전트 정체성(persona) → 에이전트별 주입
+    // 메모리(sharedMemory, agentMemory)는 system에서 제거 — user turn 직전에 주입 (recency 효과)
     return [
       buildContextRulesPrefix(agentName),
-      sharedMemory,
-      agentMemory,
       persona,
       pmPlanningEnforcement,
       kanbanInstruction,
@@ -1522,7 +1506,9 @@ export const handleMessage = async (
   // ─── 가로채기 끝 ────────────────────────────────────────
 
   const session = getOrCreateSession(agentName);
-  const prompt = formatSlackEventAsPrompt(event, routingMethod);
+  // 메모리는 user turn 직전에 배치 — system prompt는 정적 유지(캐시 가능), recency 효과 극대화
+  const memoryPrefix = buildUserMemoryPrefix(agentName);
+  const prompt = [memoryPrefix, formatSlackEventAsPrompt(event, routingMethod)].join('\n\n');
 
   console.log(
     `[runtime] ${agentName} 처리 시작 (${routingMethod}): "${event.text.slice(0, 50)}..."`,

@@ -15,10 +15,9 @@ import {
   requeueForRetry,
   getKanbanCardId,
   type TaskQueueRow,
-  type QueueStatusSummary,
 } from './queue-manager.js';
 import { moveToDone, moveToBlocked } from './kanban-sync.js';
-import { handleMessage, type HandleMessageResult } from './agent-runtime.js';
+import { handleMessage, buildUserMemoryPrefix, type HandleMessageResult } from './agent-runtime.js';
 import { emit } from './hook-events.js';
 // buildMessageBlocks — handleMessage 내부에서 처리하므로 별도 import 불필요
 
@@ -156,6 +155,56 @@ const processNextTask = async (): Promise<void> => {
 };
 
 /**
+ * 태스크 프롬프트 구성
+ *
+ * @param task - 큐 태스크 행
+ * @param prevResult - 이전 태스크 결과 (의존성 있는 경우)
+ * @param agentName - 에이전트 이름 (메모리 prefix 로드에 사용)
+ * @returns 메모리 prefix + 태스크 본문 조합 문자열
+ */
+const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null, agentName: string): string => {
+  const memoryPrefix = buildUserMemoryPrefix(agentName);
+
+  // 재시도 + checkpoint 존재 → "이어서 작업" 패턴
+  if (task.retry_count > 0 && task.checkpoint) {
+    const parts = [
+      `[큐 태스크 이어서 실행 — 재시도 #${task.retry_count}]`,
+      '',
+      `*원래 작업:* ${task.task}`,
+      '',
+      '*이전 진행 상태 (대화 한도 도달로 중단됨):*',
+      truncate(task.checkpoint, 3000),
+    ];
+    if (task.context) {
+      parts.push('', `*추가 컨텍스트:*\n${task.context}`);
+    }
+    parts.push(
+      '',
+      '*지시사항:*',
+      '1. 위 이전 진행 상태를 기반으로 남은 작업을 이어서 완료하세요',
+      '2. 이미 완료된 작업을 반복하지 마세요',
+      '3. 결과를 간결하게 보고하세요',
+    );
+    return [memoryPrefix, parts.join('\n')].join('\n\n');
+  }
+
+  // 기존 로직 (첫 실행 또는 checkpoint 없는 재시도)
+  let taskBody = `[큐 태스크 실행]\n\n*작업:* ${task.task}`;
+
+  if (prevResult) {
+    taskBody += `\n\n*이전 태스크 결과:*\n${truncate(prevResult, 3000)}`;
+  }
+
+  if (task.context) {
+    taskBody += `\n\n*추가 컨텍스트:*\n${task.context}`;
+  }
+
+  taskBody += '\n\n이 태스크는 큐 시스템에서 실행됩니다. 결과를 간결하게 보고하세요.';
+
+  return [memoryPrefix, taskBody].join('\n\n');
+};
+
+/**
  * 단일 태스크 처리 (기존 processNextTask 로직)
  */
 const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
@@ -176,8 +225,8 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
     // 이전 태스크 결과 로드 (의존성 있는 경우)
     const prevResult = getPreviousTaskResult(task.parent_queue_id, task.depends_on);
 
-    // 태스크 프롬프트 구성
-    const taskPrompt = buildTaskPrompt(task, prevResult);
+    // 태스크 프롬프트 구성 (메모리 prefix + 태스크 본문)
+    const taskPrompt = buildTaskPrompt(task, prevResult, task.agent);
 
     // SlackEvent 구성 (handleMessage 호환)
     const pseudoEvent: SlackEvent = {
@@ -368,49 +417,6 @@ export const stopQueueProcessor = (): void => {
 };
 
 // ─── 유틸리티 ─────────────────────────────────────────
-
-/**
- * 태스크 프롬프트 구성
- */
-const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null): string => {
-  // 재시도 + checkpoint 존재 → "이어서 작업" 패턴
-  if (task.retry_count > 0 && task.checkpoint) {
-    const parts = [
-      `[큐 태스크 이어서 실행 — 재시도 #${task.retry_count}]`,
-      '',
-      `*원래 작업:* ${task.task}`,
-      '',
-      '*이전 진행 상태 (대화 한도 도달로 중단됨):*',
-      truncate(task.checkpoint, 3000),
-    ];
-    if (task.context) {
-      parts.push('', `*추가 컨텍스트:*\n${task.context}`);
-    }
-    parts.push(
-      '',
-      '*지시사항:*',
-      '1. 위 이전 진행 상태를 기반으로 남은 작업을 이어서 완료하세요',
-      '2. 이미 완료된 작업을 반복하지 마세요',
-      '3. 결과를 간결하게 보고하세요',
-    );
-    return parts.join('\n');
-  }
-
-  // 기존 로직 (첫 실행 또는 checkpoint 없는 재시도)
-  let prompt = `[큐 태스크 실행]\n\n*작업:* ${task.task}`;
-
-  if (prevResult) {
-    prompt += `\n\n*이전 태스크 결과:*\n${truncate(prevResult, 3000)}`;
-  }
-
-  if (task.context) {
-    prompt += `\n\n*추가 컨텍스트:*\n${task.context}`;
-  }
-
-  prompt += '\n\n이 태스크는 큐 시스템에서 실행됩니다. 결과를 간결하게 보고하세요.';
-
-  return prompt;
-};
 
 /**
  * 에이전트 표시 이름
