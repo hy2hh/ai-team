@@ -1,5 +1,100 @@
 # Apple 컴포넌트 선택 가이드
 
+> 전체 Apple 디자인 시스템 레퍼런스: `.claude/context/designer/apple-design-system.md`
+
+---
+
+## 0. Critical 색상 규칙
+
+### 배경 (이진 리듬)
+| 역할 | Hex | 용도 |
+|------|-----|------|
+| Dark Background | `#000000` | 몰입형 섹션, 히어로 |
+| Light Background | `#f5f5f7` | 정보형 섹션, 기본 배경 |
+| Primary Text (light bg) | `#1d1d1f` | 제목·본문 |
+| Text (dark bg) | `#ffffff` | 다크 섹션 텍스트 |
+
+### 강조색 (인터랙티브 요소 전용)
+| 역할 | Hex | 용도 |
+|------|-----|------|
+| Apple Blue (CTA) | `#0071e3` | 버튼, 인터랙티브 요소 |
+| Link Blue (light bg) | `#0066cc` | 텍스트 링크 |
+| Link Blue (dark bg) | `#2997ff` | 다크 섹션 링크 |
+| Focus Ring | `#0071e3` | 키보드 포커스 (2px solid) |
+
+### 보조 색상
+| 역할 | 값 | 용도 |
+|------|----|------|
+| Secondary Text | `rgba(0,0,0,0.8)` | 보조 설명 |
+| Tertiary/Disabled | `rgba(0,0,0,0.48)` | 비활성 |
+| Card Shadow | `rgba(0,0,0,0.22) 3px 5px 30px 0px` | Elevated card |
+| Dark Surface | `#272729`–`#242426` | 다크 모드 레이어 |
+
+**규칙:** `#0071e3` 외 유채색 강조 절대 금지. 총 3–5색 제한 (brand 1 + neutral 2–3 + accent 0–1). 배경색 override 시 텍스트 색상도 반드시 동시 override.
+
+---
+
+## 0.1 타이포그래피 (SF Pro)
+
+| 역할 | Size | Weight | Line Height | Letter Spacing |
+|------|------|--------|-------------|----------------|
+| Display Hero | 56px | 600 | 1.07 | -0.28px |
+| Section Heading | 40px | 600 | 1.10 | normal |
+| Tile Heading | 28px | 400 | 1.14 | 0.196px |
+| Card Title | 21px | 700 | 1.19 | 0.231px |
+| Body | 17px | 400 | 1.47 | -0.374px |
+| Body Emphasis | 17px | 600 | 1.24 | -0.374px |
+| Button Large | 18px | 300 | 1.00 | normal |
+| Link / Caption | 14px | 400 | 1.29–1.43 | -0.224px |
+| Micro | 12px | 400/600 | 1.33 | -0.12px |
+
+**서체 규칙:** `SF Pro Display` (20px+) / `SF Pro Text` (19px 이하) — 혼용 금지. Fallback: `Helvetica Neue, Helvetica, Arial, sans-serif`. 최대 2 폰트 패밀리. 음수 letter-spacing 필수. weight 800/900 절대 금지. 제목·카피에 `text-balance` / `text-pretty` 적용.
+
+---
+
+## 0.2 Border Radius 스케일
+
+| 토큰 | 값 | 용도 |
+|------|----|------|
+| micro | 5px | 최소 요소 |
+| standard | 8px | 버튼, 카드 |
+| input | 11px | 인풋 필드 |
+| panel | 12px | 패널, 시트 |
+| pill | 980px | CTA 링크 ("Learn more") |
+| circle | 50% | 미디어 컨트롤 |
+
+---
+
+## 0.3 Elevation & Shadow
+
+| 레벨 | 처리 방식 | 용도 |
+|------|----------|------|
+| Flat | No shadow | 기본 섹션 |
+| Navigation Glass | `backdrop-filter: saturate(180%) blur(20px)` + `rgba(0,0,0,0.8)` | Sticky nav |
+| Subtle Lift | `rgba(0,0,0,0.22) 3px 5px 30px 0px` | Elevated card |
+| Focus | `2px solid #0071e3` | 키보드 포커스 |
+
+Shadow는 극히 드물게 — 대부분 요소는 shadow 없음.
+
+---
+
+## 0.4 레이아웃
+
+- 기본 단위: 8px
+- 최대 콘텐츠 너비: 980px, 중앙 정렬
+- Hero: full-viewport-width, 단일 컬럼
+- 섹션 구분: `#000000` / `#f5f5f7` 배경 교차 (거터 없음)
+- 터치 타겟 최소: 44px
+- 텍스트 입력 최소: 16px (iOS 줌 방지)
+- Tailwind arbitrary 값 금지 — `p-[16px]` → `p-4`, `mx-[8px]` → `mx-2`
+- 섹션 수직 패딩 최소 80px — 유틸리티 앱도 apple.com 여백 기준 적용
+
+Navigation: Sticky 48px, `rgba(0,0,0,0.8)` + `backdrop-filter: saturate(180%) blur(20px)`. Glass effect 필수 — 불투명 nav 금지. Links: 12px SF Pro Text, white.
+
+카드: Border 없음, 5–8px radius, Shadow: `rgba(0,0,0,0.22) 3px 5px 30px 0px` (elevated만).
+
+---
+
 ## 1. 컴포넌트 선택 의사결정 트리
 
 ```
