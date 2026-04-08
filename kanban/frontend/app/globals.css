@@ -1043,9 +1043,9 @@ select:focus-visible {
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
+  border: 1px solid var(--color-point-border);
+  background: var(--color-point);
+  color: #ffffff;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1055,8 +1055,8 @@ select:focus-visible {
   flex-shrink: 0;
 }
 .theme-toggle-btn:hover {
-  background: var(--color-bg-card);
-  border-color: var(--color-border-strong);
+  background: var(--color-point-hover);
+  border-color: var(--color-point);
 }
 .theme-toggle-btn:active {
   transform: scale(0.92) rotate(15deg);
