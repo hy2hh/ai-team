@@ -868,7 +868,7 @@ const executeSingle = async (
     const pmApp = findAgentApp('pm', apps);
     // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가 (🧠 또는 ✅ 제거 후)
     try { await app.client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'brain' }); } catch { /* 없으면 무시 */ }
-    await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'hammer_and_pick');
+    await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'writing_hand');
     console.log(`[reaction] ⚒️ 순차 위임 시작 → 사용자 메시지: ${event.ts}`);
     const seqResults: Array<{ agent: string; text: string; changedFiles: string[] }> = [];
 
@@ -887,7 +887,7 @@ const executeSingle = async (
       // ⚒️ PM 위임 메시지에 작업 중 리액션 추가 (step 시작)
       if (seqPmTs) {
         const firstTargetApp = findAgentApp(step.agents[0], apps);
-        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'white_check_mark', 'hammer_and_pick');
+        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'white_check_mark', 'writing_hand');
         console.log(`[reaction] ⚒️ 순차 위임 step ${si + 1} 시작 → PM 메시지: ${seqPmTs}`);
       }
 
@@ -972,7 +972,7 @@ const executeSingle = async (
       // ✅ PM 위임 메시지 ⚒️ → ✅ 교체 (step 완료, 실패 시 제외)
       if (seqPmTs && !stepHasFailure) {
         const firstTargetApp = findAgentApp(step.agents[0], apps);
-        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'hammer_and_pick', 'white_check_mark');
+        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'writing_hand', 'white_check_mark');
         console.log(`[reaction] ✅ 순차 위임 step ${si + 1} 완료 → PM 메시지: ${seqPmTs}`);
       }
 
@@ -1084,7 +1084,7 @@ const executeSingle = async (
     // PM이 순차 위임 전체 완료 후 리뷰했으므로 recommend_next_phase 재요청 불필요
 
     // ✅ 사용자 원본 메시지 완료 리액션 전환
-    await safeSwapReaction(app, event.channel, event.ts, 'hammer_and_pick', 'white_check_mark');
+    await safeSwapReaction(app, event.channel, event.ts, 'writing_hand', 'white_check_mark');
     console.log(`[reaction] ✅ 순차 위임 완료 → 사용자 메시지: ${event.ts}`);
     return;
   }
@@ -1104,7 +1104,7 @@ const executeSingle = async (
   let agentExecutionCount = 0;
   // ⚒️ 사용자 원본 메시지에 처리 중 리액션 추가 (🧠 또는 ✅ 제거 후)
   try { await app.client.reactions.remove({ channel: event.channel, timestamp: event.ts, name: 'brain' }); } catch { /* 없으면 무시 */ }
-  await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'hammer_and_pick');
+  await safeSwapReaction(app, event.channel, event.ts, 'white_check_mark', 'writing_hand');
   console.log(`[reaction] ⚒️ 허브 루프 시작 → 사용자 메시지: ${event.ts}`);
   // 현재 라운드의 PM 메시지 (위임 에이전트가 리액션할 대상)
   let currentPmTs = result.postedTs;
@@ -1148,7 +1148,7 @@ const executeSingle = async (
           targetApp,
           event.channel,
           currentPmTs,
-          'hammer_and_pick',
+          'writing_hand',
         );
         console.log(
           `[reaction] ⚒️ ${target} → PM 메시지: ${currentPmTs}`,
@@ -1193,7 +1193,7 @@ const executeSingle = async (
           targetApp,
           event.channel,
           currentPmTs,
-          'hammer_and_pick',
+          'writing_hand',
           'white_check_mark',
         );
         console.log(
@@ -1229,7 +1229,7 @@ const executeSingle = async (
               batchApp,
               event.channel,
               currentPmTs!,
-              'hammer_and_pick',
+              'writing_hand',
             );
           }),
         );
@@ -1288,7 +1288,7 @@ const executeSingle = async (
             batchApps[i],
             event.channel,
             currentPmTs,
-            'hammer_and_pick',
+            'writing_hand',
             'white_check_mark',
           );
           console.log(
@@ -1482,7 +1482,7 @@ const executeSingle = async (
   }
 
   // ✅ 사용자 원본 메시지 완료 리액션 전환
-  await safeSwapReaction(app, event.channel, event.ts, 'hammer_and_pick', 'white_check_mark');
+  await safeSwapReaction(app, event.channel, event.ts, 'writing_hand', 'white_check_mark');
   console.log(`[reaction] ✅ 허브 루프 완료 → 사용자 메시지: ${event.ts}`);
   // Hub 완료
   console.log('[hub] Hub 완료 — 모든 에이전트 리액션 처리됨');
@@ -3291,7 +3291,7 @@ const main = async () => {
           apps[0].client.reactions.remove({
             channel: orphan.channel!,
             timestamp: orphan.messageTs,
-            name: 'hammer_and_pick',
+            name: 'writing_hand',
           }).then(() => {
             console.log(`[${label}] ⚒️ 제거: ${orphan.messageTs}`);
           }).catch(() => {

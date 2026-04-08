@@ -1587,7 +1587,7 @@ export const handleMessage = async (
         await slackApp.client.reactions.add({
           channel: event.channel,
           timestamp: ts,
-          name: 'hammer_and_pick',
+          name: 'writing_hand',
         });
         console.log(`[reaction] ⚒️ 처리 중 추가: ${ts}`);
       } catch (err) {
@@ -2406,7 +2406,7 @@ export const handleMessage = async (
             await slackApp.client.reactions.remove({
               channel: event.channel,
               timestamp: ts,
-              name: 'hammer_and_pick',
+              name: 'writing_hand',
             });
             await slackApp.client.reactions.add({
               channel: event.channel,
@@ -2717,7 +2717,7 @@ export const handleMessage = async (
           await slackApp.client.reactions.remove({
             channel: event.channel,
             timestamp: event.ts,
-            name: 'hammer_and_pick',
+            name: 'writing_hand',
           });
           await slackApp.client.reactions.add({
             channel: event.channel,
@@ -2770,7 +2770,7 @@ export const handleMessage = async (
           await slackApp.client.reactions.remove({
             channel: event.channel,
             timestamp: ts,
-            name: 'hammer_and_pick',
+            name: 'writing_hand',
           });
           await slackApp.client.reactions.add({
             channel: event.channel,

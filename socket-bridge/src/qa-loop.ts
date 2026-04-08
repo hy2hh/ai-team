@@ -676,7 +676,7 @@ export const runDirectQA = async (
     await slackApp.client.reactions.add({
       channel: event.channel,
       timestamp: event.ts,
-      name: 'hammer_and_pick',
+      name: 'writing_hand',
     });
     console.log(`[reaction] ⚒️ QA 처리 중 추가: ${event.ts}`);
   } catch {
@@ -726,7 +726,7 @@ export const runDirectQA = async (
     await slackApp.client.reactions.remove({
       channel: event.channel,
       timestamp: event.ts,
-      name: 'hammer_and_pick',
+      name: 'writing_hand',
     });
     await slackApp.client.reactions.add({
       channel: event.channel,
