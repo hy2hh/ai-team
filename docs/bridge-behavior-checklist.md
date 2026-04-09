@@ -381,6 +381,62 @@
 
 ---
 
+## 33. 메모리 시스템 — 세션 시작 순서
+
+> **검증 방법:** 에이전트 세션 시작 직후 Slack 응답이나 로그에서 읽은 파일 순서 확인. 또는 에이전트에게 "세션 시작 시 뭘 읽었어?"라고 직접 질문
+
+- [ ] 세션 시작 순서: `tasks/active-{role}.md` → `facts/project-context.md` → `research/index.md` → `facts/agents/{role}/` → `handoff/index.md` (이 순서대로)
+- [ ] `handoff/index.md` 로드 시 본인 role 포함 항목만 Read (전체 파일 일괄 로드 안 함)
+- [ ] `decisions/_index.md` 조회 시 3월 항목은 `archive/2026-03/summary.md`로 이동, 개별 파일 직접 Read 안 함
+- [ ] `research/index.md` 확인 시 오늘 작업 관련 주제만 선택적 Read (전체 로드 안 함)
+
+---
+
+## 34. 메모리 시스템 — 에이전트 이름 및 역할
+
+> **검증 방법:** 에이전트가 자기소개하거나 다른 에이전트를 언급할 때 이름 확인
+
+- [ ] Designer → `Krusty` (Donald 아님)
+- [ ] Researcher → `Lisa` (Donald 아님)
+- [ ] `active-designer.md` 헤더 = "Active Tasks — Designer Krusty"
+- [ ] `active-researcher.md` 헤더 = "Active Tasks — Researcher Lisa"
+- [ ] `tasks/active.md` 인덱스에 "Donald" 문자열 없음 — `grep -c Donald .memory/tasks/active.md`가 0 반환
+
+---
+
+## 35. 메모리 시스템 — 읽기/쓰기 권한 준수
+
+> **검증 방법:** 에이전트가 메모리 파일 수정 시 어느 파일을 수정하는지 확인
+
+- [ ] 각 에이전트가 자기 `active-{role}.md`만 수정 (다른 에이전트 파일 수정 안 함)
+- [ ] `facts/project-context.md`, `facts/team-profile.md` 수정 시 Marge만 — 다른 에이전트가 직접 수정하면 이상
+- [ ] `facts/agents/{role}/` 파일은 해당 role 에이전트가 직접 작성 (PM 승인 요청 없음)
+- [ ] `learnings/` 디렉토리에 신규 .jsonl 파일 생성 안 함 (deprecated — `facts/agents/{role}/context.md` 사용)
+- [ ] `heartbeats/` 디렉토리에 `.json` 파일 없음 — `ls .memory/heartbeats/*.json 2>/dev/null` 빈 결과
+
+---
+
+## 36. 메모리 시스템 — decisions 인덱스 정합성
+
+> **검증 방법:** 새 decision 파일 작성 후 _index.md에 행이 추가됐는지 확인
+
+- [ ] 새 decision 파일 작성 시 `decisions/_index.md` 테이블에 행 자동 추가 (에이전트가 빠뜨리지 않음)
+- [ ] frontmatter에 `date`, `topic`, `roles`, `summary` 4개 필드 모두 존재
+- [ ] topic이 허용 목록 안에 있음: `architecture|process|quality|memory|team|product|tooling|kanban|testing|operations|prompting|design-system|planning`
+- [ ] 3월 개별 파일은 `decisions/` 루트에 없음 — `ls .memory/decisions/2026-03-*.md 2>/dev/null` 빈 결과
+
+---
+
+## 37. 메모리 시스템 — Designer→Frontend 워크플로 체인
+
+> **검증 방법:** UI 관련 작업 요청 후 위임 순서 확인
+
+- [ ] UI 포함 작업 위임 시 Krusty(Designer) → Bart(Frontend) 순서로 sequential 실행
+- [ ] Bart에게 디자인 스펙 없이 직접 UI 구현 위임 안 됨 (Krusty 스펙 선행 필수)
+- [ ] 예외(버그 수정, 텍스트만 변경)는 Bart 직접 위임 허용
+
+---
+
 ## 관련 파일 및 진단 명령어
 
 | 기능 | 파일 | 진단 명령어 |
