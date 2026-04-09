@@ -1401,9 +1401,13 @@ export const handleMessage = async (
 ): Promise<HandleMessageResult> => {
   // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
   // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
+  // delegation(에이전트 간 위임)인 경우 버튼 없이 B(practical) 자동 선택
   /** 선택된 모드 결과 (버튼 메시지 ts 포함) — 인플레이스 업데이트에 활용 */
   let researchModeContext: ResearchModeResult | undefined;
-  if (agentName === 'researcher' && isResearchRequest(event)) {
+  if (agentName === 'researcher' && isResearchRequest(event) && routingMethod === 'delegation') {
+    console.log(`[research-mode] delegation 모드: depth=practical 자동 선택`);
+    event.text = `${event.text}\n\ndepth=practical`;
+  } else if (agentName === 'researcher' && isResearchRequest(event)) {
     const threadTs = event.thread_ts ?? event.ts;
     console.log(`[research-mode] 리서치 모드 선택 대기: ${threadTs}`);
 
