@@ -1460,12 +1460,11 @@ const executeSingle = async (
       // 계속 위임 — PM 재위임 알림 메시지 게시 후 currentPmTs 갱신
       // QA 등 다음 에이전트가 이 메시지에 ✍️ 리액션을 달도록 함
       const targetNames = targets.map((t) => t.agent).join(', ');
-      const delegationReason = targets[0]?.reason?.slice(0, 100) ?? '재작업 요청';
       try {
         const announcementResult = await pmApp.client.chat.postMessage({
           channel: event.channel,
           thread_ts: event.thread_ts ?? event.ts,
-          text: `🔄 [${targetNames}] ${delegationReason}`,
+          text: `🔄 [${targetNames}] 재작업 요청`,
         });
         if (announcementResult.ts) {
           currentPmTs = announcementResult.ts as string;
