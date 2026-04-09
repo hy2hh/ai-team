@@ -27,7 +27,7 @@
 
 ## 쓰기 규칙 요약
 
-- **facts/**: PM만 작성, 역할별 하위는 본인 직접
+- **facts/**: `project-context.md`, `team-profile.md`는 Marge 관리. 나머지(`services.md` 등)와 `facts/agents/{role}/`는 관련 에이전트 직접 작성 (PM 승인 불필요)
 - **tasks/**: 본인 `active-{role}.md`만 수정
 - **decisions/**: frontmatter(`date/topic/roles/summary`) 필수 + `_index.md` 테이블 추가
 - **handoff/**: `handoff/index.md` 업데이트 필수, 7일 후 삭제

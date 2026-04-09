@@ -15,10 +15,11 @@ Entry point: `index.md`
 5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
 
 ## Read/Write Rules
-- **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: Marge.
+- **facts/**: Read always. `project-context.md`, `team-profile.md`는 Marge 관리. 나머지 파일과 `facts/agents/{role}/`는 관련 에이전트 직접 작성 가능.
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
 - **decisions/**: 조회·작성 시 `/decision-ops` 스킬 호출.
 - **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
+- **heartbeats/**: SQLite `memory.db`에만 저장. `.json` 파일 생성 금지. Bridge가 10분마다 자동 갱신.
 - **claims/**: Deprecated `.md` file directory (kept for `.gitkeep` only). Actual claim state lives in `memory.db` SQLite claims table.
 
 ## What NOT to Store

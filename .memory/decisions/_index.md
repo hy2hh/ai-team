@@ -20,11 +20,16 @@
 | 04-06 | `2026-04-06_meeting-12_AI-엔지니어-에이전트Frink…` | all | team | Frink 신설 필요성 평가 회의 의견 (보류 결론) |
 | 04-07 | `2026-04-07_meeting-13_Chalmers-QA…` | qa,backend,frontend | testing | Chalmers e2e: Playwright CLI 채택, MCP 미채택 |
 | 04-07 | `2026-04-07_read-cost-optimization` | all | memory | 메모리 Read 비용 56K→12K 토큰 절감 — 파일시스템 3단계 전략 |
-| 04-09 | `2026-04-09_krusty-toss-style-upgrade` | designer,frontend,backend | design-system | Krusty 에이전트 Apple→토스 디자인 시스템 전면 전환 (회의 #8) |
-| 04-09 | `2026-04-09_meeting-9_toss-design-gap-analysis` | designer,frontend,backend | design-system | 토스 디자인 3계층 토큰·TDS 11종·Closed Token Layer 도입 (회의 #9) |
+| 04-09 | `2026-04-09_krusty-toss-style-upgrade` | designer,frontend,backend | design-system | Krusty 에이전트 Apple→토스 디자인 시스템 전면 전환 결정 요약 |
+| 04-09 | `2026-04-09_meeting-8_Krusty-에이전트-토스Toss-스타일…` | designer,frontend,backend | design-system | Krusty 토스 전환 전략 — 디자인 시스템 마이그레이션 설계 (회의 #8) |
+| 04-09 | `2026-04-09_meeting-9_toss-design-gap-analysis` | designer,frontend,backend | design-system | 토스 디자인 3계층 토큰·TDS 11종·Closed Token Layer 도입 갭 분석 (회의 #9) |
+| 04-09 | `2026-04-09_meeting-9_Krusty-토스-스타일-디자이너-업그레이드-잔여-갭…` | designer,frontend,backend | design-system | Krusty 잔여 갭 6종 분석 및 구현 계획 확정 (회의 #9 후속) |
+| 04-09 | `2026-04-09_meeting-10_Krusty-토스-디자인-에이전트-구현-계획-수립-재작업` | designer,frontend,backend | design-system | Krusty 토스 디자인 구현 계획 재수립 (회의 #10) |
+| 04-09 | `2026-04-09_meeting-11_새로운-알림-시스템-설계-DB-스키마-및-UI-컴포넌트` | backend,designer | architecture | 알림 시스템 DB 2-테이블 구조·Partial Index·pg_notify 설계 (회의 #11) |
+| 04-09 | `2026-04-09_meeting-12_새로운-알림-시스템-설계-DB-스키마-UI-컴포넌트` | backend,designer | architecture | 알림 시스템 단일 테이블·Redis 캐싱·월별 파티셔닝 설계 (회의 #12) |
 
 ## 2026-03 결정사항 (아카이브)
 
 → **`archive/2026-03/summary.md`** 참조 (11개 결정사항 압축 요약)
 
-개별 파일 필요 시: `archive/2026-03/` 디렉토리 직접 이동 예정 (Phase 1 완료 후)
+개별 파일 필요 시: `archive/2026-03/` 디렉토리에서 직접 Read

@@ -1,6 +1,6 @@
 # 2026년 3월 결정사항 요약 (아카이브)
 
-> 개별 파일은 `/Users/sid/git/ai-team/.memory/decisions/` 루트에 원본 보관
+> 개별 파일은 `.memory/decisions/` 루트에 원본 보관
 > 상세 내용이 필요하면 해당 파일 직접 Read
 
 ## 결정사항 목록

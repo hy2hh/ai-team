@@ -35,10 +35,10 @@
 ## 참조 파일
 
 - `active-pm.md` — PM Marge 태스크
-- `active-designer.md` — Designer 태스크
+- `active-designer.md` — Designer Krusty 태스크
 - `active-frontend.md` — Frontend Bart 태스크
 - `active-backend.md` — Backend Homer 태스크
-- `active-researcher.md` — Researcher 태스크
+- `active-researcher.md` — Researcher Lisa 태스크
 - `active-secops.md` — SecOps Wiggum 태스크
 - `active-triage.md` — Triage Agent 태스크
 - `backlog.md` — 대기 중 태스크 (전체 목록)

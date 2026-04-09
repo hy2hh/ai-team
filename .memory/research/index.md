@@ -8,6 +8,7 @@
 - 같은 주제 파일 있으면 CREATE 금지 → UPDATE만
 - 파일명: `{topic}.md` (날짜 prefix 없음)
 - 파일 상단 frontmatter 업데이트 필수 (`last-updated`, `confidence`, `sources`)
+- 이 인덱스의 `last-updated`는 파일 내 frontmatter와 **반드시 동일**하게 유지 (drift 방지)
 
 ## 지식 베이스
 

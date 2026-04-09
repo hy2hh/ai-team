@@ -17,11 +17,6 @@
 
 - [ ] Tier 2 warn 로그 분석 → deny 전환 여부 결정 | P1 | Homer | 2026-04-06 | 📅 마일스톤: 2026-04-20 (2주 후)
 
-## SecOps — 미완료
-
-- [ ] Slack Bot Token 권한 범위 검토 (Slack App 관리 콘솔 직접 확인 필요) | MEDIUM | Wiggum | 2026-03-27
-- [ ] 에이전트 실행 샌드박스 검토 — 런타임 격리 가능 여부 (장기 과제) | MEDIUM | Wiggum | 2026-03-27
-
 ## 에이전트 자율 진화 시스템 (Adaptive Harness 리서치 기반)
 > 출처: docs/2026-04-04_adaptive-harness-research.md
 

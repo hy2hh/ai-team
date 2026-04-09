@@ -1,5 +1,3 @@
-> ⚠️ 이 파일은 이동됨 → `facts/workflow-designer-frontend-chain.md` 참조
-
 # 워크플로 규칙: Designer → Frontend 위임 체인
 
 > 등록일: 2026-04-08

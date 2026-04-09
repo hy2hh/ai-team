@@ -12,6 +12,7 @@
 │   ├── team-profile.md   — Team members, roles, Slack bots
 │   ├── project-context.md — Goals, tech stack, constraints
 │   ├── services.md       — External service identifiers per project
+│   ├── workflow-designer-frontend-chain.md — Designer→Frontend 위임 체인 규칙
 │   ├── {topic}.md        — Add as needed (e.g., api-contracts.md)
 │   └── agents/
 │       ├── pm/           — PM agent's own facts (직접 쓰기 가능)
@@ -23,7 +24,8 @@
 ├── heartbeats/
 │   └── (SQLite memory.db에 저장됨 — bridge가 10분마다 갱신)
 ├── tasks/
-│   ├── active.md         — Index (역할별 파일 링크)
+│   ├── index.md          — 전체 현황 요약 (role별 태스크 상태 + 백로그 요약)
+│   ├── active.md         — 역할별 파일 링크 목록 (role → active-{role}.md 매핑)
 │   ├── active-{role}.md  — 역할별 진행 중 태스크 (6개)
 │   ├── backlog.md        — Queued tasks (prioritized)
 │   └── done.md           — Completed (rotate monthly)
@@ -36,6 +38,15 @@
 │   └── YYYY-MM-DD_{topic}.md — Architectural/strategic decisions
 ├── conversations/
 │   └── YYYY-MM-DD_{channel}.md — Important cross-agent discussions
+├── claims/           ⚠️ Deprecated — .gitkeep만 유지. 실제 claim 상태는 memory.db SQLite
+├── contracts/        ⚠️ 현재 미사용 (empty) — 향후 에이전트 간 계약 문서 저장 예정
+├── walkthroughs/     ⚠️ 현재 미사용 (empty)
+├── design/           — 장기 보존 UI/UX 디자인 스펙 (handoff와 달리 만료 없음)
+│   └── {project}-ui-spec.md
+├── learnings/        ⚠️ Deprecated — lisa-learnings.jsonl은 context.md로 대체됨 (2026-04-10). 신규 기록 금지
+│   └── lisa-learnings.jsonl  (레거시, 읽기 전용)
+├── logs/             — Bridge 자동 생성 이벤트 로그 (수동 쓰기 금지)
+│   └── task-events.jsonl
 └── research/
     ├── index.md    — 리서치 목록 (주제, last-updated, confidence)
     └── {topic}.md  — 주제별 지식 베이스 (날짜 prefix 없음, 재조사 시 UPDATE)
@@ -73,7 +84,7 @@
   ```yaml
   ---
   date: YYYY-MM-DD
-  topic: architecture|process|quality|memory|team|product|tooling|kanban|testing|operations|prompting
+  topic: architecture|process|quality|memory|team|product|tooling|kanban|testing|operations|prompting|design-system|planning
   roles: [all] 또는 [frontend, backend, ...] 등 관련 역할
   summary: 핵심 결정 한줄 요약
   ---

@@ -4,12 +4,12 @@
 
 | Role | File |
 |------|------|
-| PM Donald | `active-pm.md` |
-| Frontend Donald | `active-frontend.md` |
-| Backend Donald | `active-backend.md` |
-| Designer Donald | `active-designer.md` |
-| Researcher Donald | `active-researcher.md` |
-| SecOps Donald | `active-secops.md` |
+| Marge (PM) | `active-pm.md` |
+| Bart (Frontend) | `active-frontend.md` |
+| Homer (Backend) | `active-backend.md` |
+| Krusty (Designer) | `active-designer.md` |
+| Lisa (Researcher) | `active-researcher.md` |
+| Wiggum (SecOps) | `active-secops.md` |
 | Triage Agent | `active-triage.md` |
 
 ## 규칙
