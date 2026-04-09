@@ -37,8 +37,8 @@
 ├── conversations/
 │   └── YYYY-MM-DD_{channel}.md — Important cross-agent discussions
 └── research/
-    ├── index.md              — 리서치 목록 (제목, 날짜, 파일 링크)
-    └── YYYY-MM-DD_{topic}.md — 리서치 원본 결과 (Lisa 작성)
+    ├── index.md    — 리서치 목록 (주제, last-updated, confidence)
+    └── {topic}.md  — 주제별 지식 베이스 (날짜 prefix 없음, 재조사 시 UPDATE)
 ```
 
 ## Writing Rules
@@ -53,11 +53,6 @@
 ### facts/ (root)
 - Persistent knowledge only (team changes, tech stack, API contracts)
 - Owner: PM only — others propose via Slack, PM updates
-- Keep files under 200 lines — split if growing
-
-### facts/agents/{role}/
-- Each agent can write their own facts directly — no PM approval needed
-- Use for role-specific knowledge: local decisions, component notes, domain-specific context
 - Keep files under 200 lines — split if growing
 
 ### tasks/
@@ -92,9 +87,24 @@
 
 ### research/
 - Owner: Lisa (Researcher) — 리서치 완료 후 직접 저장
-- Format: `YYYY-MM-DD_{topic}.md`
-- `research/index.md` 업데이트 필수
-- 만료 없음 — 장기 보관
+- Format: `{topic}.md` (날짜 prefix 금지 — 주제가 파일 이름)
+- 새 리서치 시작 전 `research/index.md` 먼저 확인 → 같은 주제 파일 있으면 **CREATE 금지, UPDATE만**
+- 각 파일 상단에 frontmatter 필수:
+  ```
+  last-updated: YYYY-MM-DD
+  confidence: high | medium | low
+  sources: [url, ...]
+  ```
+- `research/index.md` 업데이트 필수 (파일명, 주제, last-updated)
+- 만료 없음 — 장기 보관. 300줄 초과 시 파일 하단 `## Archive` 섹션으로 구버전 이동
+
+### facts/agents/{role}/
+- 각 에이전트가 자기 역할 디렉토리에 직접 작성 (PM 승인 불필요)
+- **대상**: 도구/시스템의 비문서화 동작, 발견된 제약, 반복 실수 방지용 operational 지식
+  - 예: `facts/agents/backend/slack-mcp.md` — Slack MCP throttle 한계, 인증 오류 패턴
+  - 예: `facts/agents/frontend/next-app-quirks.md` — Next.js 라우터 특이 동작
+- research/(외부 동향), decisions/(팀 결정)과 구분 — 여기는 **내부 operational 사실**만
+- 작업 중 새 발견 시 즉시 업데이트. 파일 없으면 CREATE 허용
 
 ## Conflict Resolution
 - Each agent writes only to their own active file (동시쓰기 방지)

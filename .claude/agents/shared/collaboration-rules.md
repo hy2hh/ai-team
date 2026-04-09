@@ -58,12 +58,15 @@
 
 ### After Completing
 1. `active-{role}.md` → `done.md` 이동
-2. 새 지식 → `facts/` 업데이트
+2. 새 지식 분류 후 저장:
+   - 팀 공통 사실 (기술스택, 팀 변경 등) → `facts/` (PM 승인 필요)
+   - 역할 특화 operational 지식 → `facts/agents/{role}/` (**직접 작성, 즉시 업데이트**)
+     - 도구/MCP/API 비문서화 동작, 발견된 제약
+     - 반복 실수 패턴, 함정, 회피법
 3. 결정 → `decisions/YYYY-MM-DD_{topic}.md`
    - 회의록: `decisions/YYYY-MM-DD_meeting-N_{주제}-결정-{결론}.md` (예: `..._결정-CLI채택-MCP미채택.md`)
    - 회의록 헤더 필수: `> 최종결정: [한 줄 결론]` — 요약 주입 시에도 결론이 보이도록
 4. 핸드오프 → `handoff/{from}-to-{to}_{topic}.md`
-5. 반복 이슈 학습 → `decisions/YYYY-MM-DD_lesson-{topic}.md` (react-process.md §8)
 
 ### File Ownership
 - `facts/`: 모든 에이전트가 직접 읽고 쓸 수 있음

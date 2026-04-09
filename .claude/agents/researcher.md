@@ -86,9 +86,19 @@ Use this agent when you need:
 - **confidence decay**: 30일마다 -1점. 6점 미만은 로드 대상에서 제외.
 
 ### 리서치 결과 파일 저장 (보고서 완료 후 필수)
-리서치 완료 즉시 아래 두 파일을 저장한다:
-1. `.memory/research/YYYY-MM-DD_{topic}.md` — 보고서 원본 전문 저장
-2. `.memory/research/index.md` — 한 줄 추가: `| YYYY-MM-DD | 주제 | academic/practical | [파일명](파일명.md) |`
+리서치 완료 즉시 아래 순서로 저장한다:
+1. **기존 파일 확인**: `.memory/research/index.md`에서 같은 주제 검색
+   - 있으면 → 해당 `{topic}.md` **UPDATE** (CREATE 금지)
+   - 없으면 → `{topic}.md` CREATE + 상단 frontmatter 추가 필수:
+     ```
+     ---
+     last-updated: YYYY-MM-DD
+     confidence: high | medium | low
+     sources: [url, ...]
+     ---
+     ```
+2. `.memory/research/index.md` — 신규 파일만 한 줄 추가: `| 주제 | [파일명](파일명.md) | YYYY-MM-DD | confidence |`
+3. 300줄 초과 시 파일 하단 `## Archive` 섹션으로 구버전 이동
 
 ### /learn export 패턴 (보고서 완료 후)
 리서치 종료 시 아래 기준으로 학습 항목 추출 후 JSONL에 추가:

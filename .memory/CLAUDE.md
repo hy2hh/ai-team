@@ -5,9 +5,14 @@
 Entry point: `index.md`
 
 ## Session Start Protocol
+
+> **메모리 읽기 단계만 기술.** git pull, qa-metrics 등 전체 프로토콜은 `.claude/agents/shared/session-bootstrap.md` 참조.
+
 1. Read `tasks/active-{your-role}.md` — your current tasks
 2. Read `facts/project-context.md` — project state
-3. Check `handoff/index.md` → 본인 role 포함 파일만 Read
+3. Scan `research/index.md` → 오늘 작업과 관련된 topic 파일 있으면 Read
+4. Scan `facts/agents/{your-role}/` → operational 지식 있으면 Read
+5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
 
 ## Read/Write Rules
 - **facts/**: Read always. Write only for persistent info (team changes, tech stack). Owner: Marge.

@@ -18,8 +18,10 @@
 
 1. Read `tasks/active-{your-role}.md`
 2. Read `facts/project-context.md`
-3. Check `handoff/index.md` → 본인 role 포함 파일만 Read
-4. Check Slack #ai-team for unread mentions
+3. Scan `research/index.md` → 오늘 작업과 관련된 topic 파일 있으면 Read
+4. Scan `facts/agents/{your-role}/` → operational 지식 있으면 Read
+5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
+6. Check Slack #ai-team for unread mentions
 
 > decisions 조회·작성 필요 시 → `/decision-ops` 스킬 호출
 

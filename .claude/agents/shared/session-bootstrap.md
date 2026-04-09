@@ -30,13 +30,20 @@
 2. Read `.memory/tasks/active-{role}.md`
 3. Read `.memory/facts/project-context.md`
 4. Check `.memory/facts/qa-metrics.md` — 자기 역할의 FAIL 빈도 확인 (자가 리뷰 우선순위 조정)
-5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
+5. Scan `.memory/research/index.md` → 오늘 작업과 관련된 topic 파일 있으면 Read
+6. Scan `.memory/facts/agents/{role}/` → 역할별 operational 지식 있으면 Read
+7. Check `handoff/index.md` → 본인 role 포함 파일만 Read
 
 > decisions 조회·작성 → `/decision-ops` 스킬 호출
 
 ## Session End Protocol
-1. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)
-2. Slack 완료 보고 (행동 + 결과 + 다음 단계)
+1. **Operational 지식 저장** — 아래 중 하나라도 해당하면 `facts/agents/{role}/` 즉시 업데이트:
+   - 도구/MCP/API에서 문서에 없는 동작 발견
+   - 반복될 수 있는 실수 패턴 또는 함정 확인
+   - 시스템 제약/한계 발견 (rate limit, 인증 오류 패턴 등)
+   - 다음 세션에서 알면 시간을 아낄 operational 사실
+2. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)
+3. Slack 완료 보고 (행동 + 결과 + 다음 단계)
 
 ## 프로세스 (스킬 자동 로드)
 위임→`/agent-delegate` | 핸드오프→`/agent-handoff` | 디버깅→`/agent-debug` | 리뷰→`/agent-review` | 기획→`/agent-plan` | 구현→`/agent-implement` | 완료→`/agent-verify` | API→`/agent-api-contract` | TDD→`/agent-tdd`

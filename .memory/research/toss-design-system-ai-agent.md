@@ -1,3 +1,11 @@
+---
+last-updated: 2026-04-09
+confidence: high
+sources:
+  - https://toss.tech/article/toss-design-system
+  - https://toss.im/slash-21/sessions/3-3
+---
+
 # 토스 디자인 시스템 AI 에이전트 적용 리서치
 
 > ⚠️ 이 보고서의 수치는 2026-04-09 기준입니다. 현재와 다를 수 있습니다.
