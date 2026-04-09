@@ -205,6 +205,50 @@ const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null, agentNam
 };
 
 /**
+ * 최종 실패 시 PM에게 상황 보고
+ *
+ * PM이 직접 상황을 판단하여 대안 시도 / 재위임 / 사용자 에스컬레이션을 결정한다.
+ * PM 자신이 실패한 경우에는 재귀 방지를 위해 호출하지 않는다.
+ */
+const notifyPmOfFailure = async (
+  slackApp: App,
+  task: TaskQueueRow,
+  errorMsg: string,
+  skippedCount: number,
+): Promise<void> => {
+  if (task.agent === 'pm') { return; }
+
+  const failedAgent = agentDisplayName(task.agent);
+  const pmPrompt = [
+    `[PM 상황 보고] ${failedAgent} 에이전트가 모든 재시도 후에도 최종 실패했습니다.`,
+    '',
+    `**실패한 작업:** ${truncate(task.task, 300)}`,
+    `**오류 원인:** ${truncate(errorMsg, 200)}`,
+    `**스킵된 후속 작업 수:** ${skippedCount}개`,
+    '',
+    '현재 상황을 판단하여 다음 중 하나를 선택하세요:',
+    '1. 다른 에이전트에게 재위임하거나 접근 방식을 바꿔 재시도',
+    '2. 사용자(sid)에게 실패 상황을 보고하고 지시 요청',
+  ].join('\n');
+
+  const pseudoEvent: SlackEvent = {
+    type: 'queue_failure_notify',
+    channel: task.channel,
+    channel_name: 'queue',
+    user: 'queue-processor',
+    text: pmPrompt,
+    ts: `pm-notify-${task.id}`,
+    thread_ts: task.thread_ts,
+    threadTopic: `pm-failure-notify:${task.id}`,
+    mentions: [],
+    raw: {},
+  };
+
+  console.log(`[queue-processor] PM 실패 알림 전송: ${task.id} (${failedAgent} 실패)`);
+  await handleMessage('pm', pseudoEvent, 'queue-failure-notify', slackApp, true, false, 'high');
+};
+
+/**
  * 단일 태스크 처리 (기존 processNextTask 로직)
  */
 const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
@@ -374,6 +418,11 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
           // 알림 실패 무시
         }
       }
+
+      // PM에게 실패 상황 보고 — PM이 대안/재위임/사용자 에스컬레이션 판단
+      notifyPmOfFailure(slackApp, task, errorMsg, skipped).catch((err) =>
+        console.error('[queue-processor] PM 실패 알림 오류:', err),
+      );
     }
   }
 };
