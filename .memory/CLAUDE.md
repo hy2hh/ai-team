@@ -19,7 +19,7 @@ Entry point: `index.md`
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.
 - **decisions/**: 조회·작성 시 `/decision-ops` 스킬 호출.
 - **conversations/**: Format `YYYY-MM-DD_{channel}.md`. Auto-expire after 7 days.
-- **heartbeats/**: SQLite `memory.db`에만 저장. `.json` 파일 생성 금지. Bridge가 10분마다 자동 갱신.
+- **heartbeats/**: SQLite `memory.db`에만 저장. `.json` 파일 생성 금지. Bridge가 5분마다 heartbeat 갱신 (10분 이상 미갱신 시 stale 처리).
 - **claims/**: Deprecated `.md` file directory (kept for `.gitkeep` only). Actual claim state lives in `memory.db` SQLite claims table.
 
 ## What NOT to Store

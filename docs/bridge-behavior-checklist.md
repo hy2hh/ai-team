@@ -437,6 +437,86 @@
 
 ---
 
+## 38. 메모리 시스템 — 에이전트 자발적 기록 (태스크)
+
+> **검증 방법:** 에이전트에게 작업을 시킨 후 active-{role}.md와 done.md를 확인
+> ```bash
+> # 역할별 active 태스크 수 확인
+> for role in pm designer frontend backend researcher secops triage; do
+>   count=$(grep -c "^\- \[" .memory/tasks/active-${role}.md 2>/dev/null || echo 0)
+>   echo "${role}: ${count}개"
+> done
+> ```
+
+- [ ] 에이전트가 새 작업 시작 시 `tasks/active-{role}.md`에 항목 자동 추가 (`[ ] task | created | priority`)
+- [ ] 작업 완료 시 active에서 항목 제거 후 `tasks/done.md`로 이동 (완료일 포함)
+- [ ] 에이전트가 다른 에이전트의 active 파일 수정 안 함
+- [ ] `tasks/index.md`의 태스크명이 각 `active-{role}.md`에 실제 존재하는 항목과 일치 (고아 링크 없음)
+
+---
+
+## 39. 메모리 시스템 — 에이전트 자발적 기록 (의사결정)
+
+> **검증 방법:** 아키텍처·프로세스 결정이 포함된 대화 후 decisions/ 확인
+
+- [ ] 에이전트가 아키텍처/프로세스 결정 시 `decisions/YYYY-MM-DD_{topic}.md` 자동 작성
+- [ ] 작성 즉시 `decisions/_index.md` 테이블에 행 추가 (에이전트가 빠뜨리지 않음)
+- [ ] 결정 파일 frontmatter에 `date`, `topic`, `roles`, `summary`, `status` 5개 필드 모두 존재
+- [ ] `status`는 `accepted | superseded | deprecated` 중 하나
+- [ ] 수동 요청 없이도 결정 사항 기록 (`sid`가 "기록해줘" 안 해도)
+
+---
+
+## 40. 메모리 시스템 — 에이전트 자발적 기록 (핸드오프)
+
+> **검증 방법:** 에이전트 간 작업 위임 후 handoff/ 확인
+
+- [ ] 에이전트가 다른 에이전트에게 작업 인계 시 `handoff/{from}-to-{to}_{topic}.md` 자동 작성
+- [ ] 핸드오프 파일 작성 즉시 `handoff/index.md` 업데이트 (to/from/topic/date 한 줄)
+- [ ] 7일 초과 핸드오프 파일에 ⚠️ 만료 표시 또는 삭제 — `handoff/index.md`에 만료 여부 표시
+- [ ] Bart active 태스크에 UI 항목 있을 때 `handoff/designer-to-frontend_*.md` 파일도 존재 (`ls .memory/handoff/designer-to-frontend_*.md 2>/dev/null`)
+
+---
+
+## 41. 메모리 시스템 — 에이전트 자발적 기록 (운영 지식)
+
+> **검증 방법:** 에이전트가 새 도구/시스템 제약 발견 시 context.md 업데이트 여부 확인
+
+- [ ] 에이전트가 undocumented 동작/제약 발견 시 `facts/agents/{role}/` 에 기록 (파일명 자유, 주제별 분리 또는 `context.md` 통합 모두 허용)
+- [ ] `learnings/` 신규 기록 없음 (deprecated) — 운영 지식은 `facts/agents/{role}/` 사용
+- [ ] 리서치 완료 시 Lisa가 `research/{topic}.md` 작성/갱신 및 `research/index.md` 업데이트
+- [ ] 같은 주제 리서치 파일 중복 생성 안 함 (기존 파일 UPDATE 원칙) — `research/index.md` 먼저 확인
+- [ ] `research/{topic}.md` 300줄 초과 시 하단 `## Archive` 섹션으로 구버전 이동 (파일 분리 금지)
+  - `wc -l .memory/research/*.md` 로 300줄 초과 파일 확인
+
+---
+
+## 42. 메모리 시스템 — 에이전트 자발적 기록 (대화·디자인 장기보존)
+
+> **검증 방법:** 주요 논의 후 conversations/, UI 작업 후 design/ 확인
+
+- [ ] actionable outcome이 있는 에이전트 간 논의 후 `conversations/YYYY-MM-DD_{channel}.md` 자동 생성
+- [ ] 7일 초과 conversations 파일에 만료 표시 또는 삭제 (facts/decisions로 미승격 시)
+- [ ] Krusty가 장기 보존 UI 스펙 작성 시 `design/{project}-ui-spec.md`로 저장 (handoff와 별도 — 만료 없음)
+  - 단순 handoff 전달용 → `handoff/designer-to-frontend_*.md`
+  - 장기 참조용 UI 스펙 → `design/` (프로젝트 전체 수명 동안 유효)
+
+---
+
+## 43. 메모리 시스템 — 자발적 갱신 (인덱스 동기화)
+
+> **검증 방법:** 여러 작업 사이클 후 각 인덱스 파일이 실제 파일과 동기화됐는지 확인
+
+- [ ] `decisions/_index.md` 행 수 = `.memory/decisions/*.md` 파일 수 (`_index.md` 및 archive 제외)
+  - `ls .memory/decisions/*.md 2>/dev/null | grep -v "_index" | wc -l` vs _index.md 데이터 행 수
+- [ ] `research/index.md`의 last-updated = 각 `research/{topic}.md` frontmatter last-updated와 일치
+  - drift 발생 시 에이전트가 스스로 수정
+- [ ] `handoff/index.md`에 없는 handoff 파일 없음 (고아 파일)
+  - `ls .memory/handoff/*.md | grep -v index` 결과 전부 index에 있어야 함
+- [ ] `tasks/active.md`의 링크가 실제 존재하는 `active-{role}.md` 파일과 1:1 대응
+
+---
+
 ## 관련 파일 및 진단 명령어
 
 | 기능 | 파일 | 진단 명령어 |
