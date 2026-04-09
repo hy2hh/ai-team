@@ -517,6 +517,151 @@
 
 ---
 
+---
+
+## 44. E2E 시나리오 — Triage 라우팅 정확성
+
+> **검증 방법:** Slack #ai-team에 아래 메시지를 실제로 전송 후 어느 에이전트가 응답했는지 확인
+
+| 입력 메시지 | 기대 에이전트 | 실제 |
+|------------|-------------|------|
+| "칸반 보드 UI 버그 수정해줘" | Bart (Frontend) | |
+| "DB 인덱스 최적화 방법 알려줘" | Homer (Backend) | |
+| "보안 취약점 점검해줘" | Wiggum (SecOps) | |
+| "AI 코딩 어시스턴트 시장 조사해줘" | Lisa (Researcher) | |
+| "다음 스프린트 계획 세워줘" | Marge (PM) | |
+| "알림 컴포넌트 새로 디자인해줘" | Krusty (Designer) 먼저, 이후 Bart | |
+
+- [ ] 잘못 라우팅된 케이스 0건
+- [ ] Triage 로그 확인: `tmux capture-pane -t ai-team-bridge -p | grep "\[triage\]\|\[route\]"`
+
+---
+
+## 45. E2E 시나리오 — 에이전트 협업 체인 실제 실행
+
+> **검증 방법:** "새 UI 컴포넌트 만들어줘" 요청 후 Slack 메시지 흐름 및 파일 생성 관찰
+
+- [ ] Krusty가 먼저 실행되어 handoff 파일 작성 (`handoff/designer-to-frontend_*.md` 생성)
+- [ ] Bart는 Krusty 완료 후에 실행 시작 (동시 실행 안 됨)
+- [ ] Bart가 Krusty handoff 파일을 실제로 Read했는지 — Bart의 응답에서 디자인 스펙 내용 반영 확인
+- [ ] Chalmers가 Bart 완료 후 자동으로 검증 실행 (QA hook 발동)
+- [ ] 전체 체인 완료 시 Slack에 ✅ 표시
+
+---
+
+## 46. E2E 시나리오 — 세션 연속성 (새 세션 복원)
+
+> **검증 방법:** 에이전트에게 작업을 주고 중간에 세션 재시작 후 상태 복원 확인
+
+- [ ] 세션 재시작 후 에이전트가 이전 `active-{role}.md` 태스크를 인식 ("저번에 하던 X 작업 계속")
+- [ ] `handoff/index.md`에 본인 role 핸드오프 있으면 새 세션에서 자동 인식
+- [ ] 세션 재시작 후 에이전트에게 "지금 진행 중인 작업 뭐야?" 질문 → active 파일 내용과 일치
+- [ ] 컨텍스트 복원 후 중단된 지점부터 작업 재개 가능
+
+---
+
+## 47. E2E 시나리오 — 메모리 격리 및 권한 경계
+
+> **검증 방법:** 에이전트에게 권한 밖 파일 수정을 유도해서 거부하는지 확인
+
+- [ ] Bart에게 Homer의 `active-backend.md` 수정 요청 → 거부 또는 자기 파일만 수정
+- [ ] Bart에게 `facts/project-context.md` 직접 수정 요청 → Marge에게 제안 후 처리
+- [ ] Lisa에게 `facts/team-profile.md` 변경 요청 → Marge 통해 처리하도록 유도
+- [ ] 에이전트가 `learnings/` 신규 파일 생성 시도 시 `facts/agents/{role}/context.md` 로 리다이렉트
+
+---
+
+## 48. E2E 시나리오 — 중복 방지 (Research)
+
+> **검증 방법:** 이미 리서치된 주제를 다시 요청해서 중복 파일이 생기지 않는지 확인
+
+- [ ] `research/index.md`에 이미 있는 주제 재조사 요청 → 신규 파일 생성 안 하고 기존 파일 UPDATE
+- [ ] `research/index.md` 확인 로그가 Lisa 응답에 나타남 ("기존 파일 업데이트합니다" 또는 파일 수정 흔적)
+- [ ] 재조사 후 `research/index.md`의 `last-updated`가 갱신됨
+- [ ] 파일 frontmatter `last-updated`도 동시에 갱신됨
+
+---
+
+## 49. E2E 시나리오 — Ralph Loop 복잡 시나리오
+
+> **검증 방법:** Ralph Loop가 걸린 작업을 실제 실행하면서 반복 검증 사이클 관찰
+> 시나리오: 작업 → QA → 이슈 검출 → 수정 → QA → 또 검출 → 수정 → QA(clean) → 리뷰 → 완료
+
+- [ ] **사이클 1**: 에이전트 초기 작업 완료 → Chalmers QA 자동 실행
+- [ ] **이슈 검출**: Chalmers가 FAIL 판정 후 구체적 이슈 목록 제시
+- [ ] **자동 수정**: 에이전트가 이슈 목록 기반으로 수정 (사용자 개입 없이)
+- [ ] **사이클 2**: 수정 후 Chalmers 재실행 → 이전 이슈 해결 확인 + 신규 이슈 검사
+- [ ] **반복**: 새 이슈 발견 시 수정 → 재QA 사이클 자동 반복
+- [ ] **종료 조건**: Chalmers PASS (`NO_MORE_ISSUES_FOUND`) 또는 max-iterations 도달 시 루프 탈출
+- [ ] **완료 판정**: 루프 탈출 후 최종 리뷰어(사용자 또는 Chalmers)의 PASS로 완료 선언
+- [ ] 루프 반복 횟수 로그 확인: `tmux capture-pane -t ai-team-bridge -p | grep "\[qa-loop\]"`
+- [ ] 완료 프로미스 없이 무한 루프 도는 케이스 없음 (completion-promise 또는 max-iterations 필수)
+
+---
+
+## 50. E2E 시나리오 — Cross-Verify 자동 실행
+
+> **검증 방법:** 에이전트 작업 완료 후 Chalmers가 자동으로 검증하는지 Slack 및 로그 확인
+
+- [ ] 에이전트 작업 완료 시 `[cross-verify]` 로그 자동 출력
+- [ ] Chalmers가 원래 계획(Feature Spec 또는 PM 지시)과 구현 결과를 비교 검증
+- [ ] 검증 PASS 시 Slack에 ✅ + "검증 완료" 메시지
+- [ ] 검증 FAIL 시 구체적 불일치 목록 + 자동 재작업 요청 (에이전트에게 위임)
+- [ ] Cross-Verify 없이 완료 선언하는 케이스 없음 (`[cross-verify] skipped` 로그 조건 확인)
+
+---
+
+## 51. E2E 시나리오 — Claim/Collision 방지
+
+> **검증 방법:** 동시에 같은 작업을 두 에이전트가 처리하려 할 때 충돌 방지 확인
+
+- [ ] 동일 메시지에 두 에이전트가 동시 응답 시도 시 Claim 선점한 에이전트만 실행
+- [ ] Claim 실패 에이전트 로그: `grep "\[claim\] denied\|\[claim\] lost"` 출력
+- [ ] Claim 만료(TTL 초과) 후 다른 에이전트가 재시도 가능
+- [ ] `memory.db` claims 테이블 확인: `sqlite3 data/memory.db "SELECT * FROM claims ORDER BY created_at DESC LIMIT 10"`
+
+---
+
+## 52. E2E 시나리오 — 에러 복구 및 큐 재처리
+
+> **검증 방법:** 에이전트 실행 중 강제 인터럽트 후 복구 동작 확인
+
+- [ ] 에이전트 실행 중 타임아웃 발생 시 ❌ 리액션 + 에러 메시지 Slack 게시
+- [ ] 큐에 대기 중인 다음 작업이 에러 무관하게 정상 처리 계속
+- [ ] 에러 발생 에이전트의 active 태스크가 stuck 상태로 남지 않음 (자동 정리 또는 manual 복구 방법 문서화)
+- [ ] Bridge 재시작 후 큐에 남은 작업 재처리: `socket-bridge/CLAUDE.md` 재시작 규칙 확인
+
+---
+
+## 53. E2E 시나리오 — Heartbeat 실시간 갱신
+
+> **검증 방법:** Bridge 실행 중 실제 heartbeat 갱신 확인
+
+```bash
+# 현재 heartbeat 상태 조회
+sqlite3 data/memory.db "SELECT role, status, updated_at FROM heartbeats ORDER BY updated_at DESC"
+
+# 5분 후 재조회 → updated_at 변경됐는지 확인
+```
+
+- [ ] Bridge heartbeat가 5분 이내 간격으로 `updated_at` 갱신됨
+- [ ] 에이전트 작업 시작 시 해당 role의 `status = 'active'`, `currentTask` 업데이트
+- [ ] 에이전트 작업 완료 시 `status = 'idle'`로 복귀
+- [ ] 10분 이상 미갱신 heartbeat 자동 stale 처리 (Bridge 재시작 시 cleanup 실행)
+
+---
+
+## 54. E2E 시나리오 — Rate Limiting 준수
+
+> **검증 방법:** 빠른 연속 요청 시 rate limit 동작 확인
+
+- [ ] 짧은 시간 내 다수 메시지 전송 시 `[rate-limiter]` 로그 출력
+- [ ] Rate limit 초과 시 Slack에 "잠시 후 다시 시도해주세요" 또는 큐 대기 안내
+- [ ] Rate limit 해제 후 대기 중인 메시지 순서대로 처리
+- [ ] Rate limit으로 인한 메시지 유실 없음 (큐 보존 확인)
+
+---
+
 ## 관련 파일 및 진단 명령어
 
 | 기능 | 파일 | 진단 명령어 |
