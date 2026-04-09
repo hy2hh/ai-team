@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT=8765
-SEED_FILE="$SCRIPT_DIR/bloom-data"
+SEED_FILE="$SCRIPT_DIR/bloom-data/seed.yaml"
 
 while [[ $# -gt 0 ]]; do
   case $1 in

@@ -1,218 +1,187 @@
-이제 각 역할의 관점을 직접 종합해서 기획을 진행하겠습니다.
+## Part 2: 구현 계획 (사전 작성 — Option A, Next.js 기준)
+
+*승인 후 스택에 맞게 확정됩니다.*
 
 ---
 
-## 🧭 Stripe 월간 구독 결제 시스템 — 기획 브레인스토밍 종합
+### Phase 1 — 백엔드 기반 (Week 1)
 
----
-
-### ⚠️ 먼저: 핵심 명확화 질문 1개
-
-**어떤 서비스에 결제를 붙이는 건가요?**
-
-> (A) ai-team 플랫폼 자체에 구독 과금 추가
-> (B) 별도 개발 중인 SaaS 제품에 추가  
-> (C) 새로 시작하는 제품 (스택 미정)
-
-→ 기술 스택과 백엔드 DB 설계가 이 답에 따라 달라집니다. 그러나 **Stripe 연동 설계 자체는 스택 무관하게 공통**이므로 아래 브레인스토밍은 지금 바로 시작합니다.
-
----
-
-## Part 1: 브레인스토밍 종합 (Homer + Bart + Wiggum + Lisa + Krusty 관점)
-
----
-
-### 🏗️ Homer (Backend) 관점
-
-**DB 스키마 (최소)**
-```sql
--- 고객 매핑
-stripe_customers (
-  id, user_id FK, stripe_customer_id UNIQUE, created_at
-)
-
--- 구독 상태
-stripe_subscriptions (
-  id, user_id FK, stripe_subscription_id UNIQUE,
-  stripe_price_id,
-  status  -- trialing | active | past_due | canceled | unpaid
-  current_period_end,
-  cancel_at_period_end BOOLEAN,
-  created_at, updated_at
-)
-
--- 결제 이력 (Webhook으로 자동 기록)
-stripe_invoices (
-  id, user_id FK, stripe_invoice_id UNIQUE,
-  amount_paid, currency, status, paid_at
-)
-```
-
-**API 엔드포인트 (최소 4개)**
-```
-POST /api/stripe/checkout-session    → 결제 세션 생성
-POST /api/stripe/portal-session      → 구독 관리 포털 세션 생성
-GET  /api/subscriptions/me           → 내 구독 상태 조회
-POST /api/webhooks/stripe            → Stripe → 서버 이벤트 수신
-```
-
-**Webhook 이벤트 (필수 처리 5개)**
-```
-checkout.session.completed         → subscription 활성화
-customer.subscription.updated      → 플랜 변경/취소 예약
-customer.subscription.deleted      → 구독 완전 해지
-invoice.payment_succeeded          → 갱신 성공 기록
-invoice.payment_failed             → 갱신 실패 → 사용자 알림 트리거
-```
-
-**Webhook Idempotency**: 처리된 이벤트 ID를 DB 저장해서 중복 처리 방지.
-
----
-
-### 🖥️ Bart (Frontend) 관점
-
-**Stripe.js 통합 방식 비교**
-
-| 방식 | 구현 시간 | UX 제어 | 추천 상황 |
-|------|-----------|---------|---------|
-| **Stripe Checkout (호스팅)** | 0.5일 | 낮음 (Stripe 페이지) | MVP, 빠른 출시 |
-| **Payment Element (임베디드)** | 3-5일 | 높음 (앱 내 통합) | 브랜드 UX 필요 시 |
-| **Customer Portal (관리)** | 0.5일 | 낮음 (Stripe 페이지) | 구독 관리 자동화 |
-
-**Stripe Checkout 핵심 코드**
+#### Task 1-1: Stripe 초기 설정 및 환경 구성
+- **담당**: Homer (Backend)
+- **Files**: `.env.local`, `lib/stripe.ts`
+- **Steps**:
+  - [ ] Stripe 대시보드에서 Test Mode API 키 발급
+  - [ ] `.env.local`에 키 추가
+  - [ ] Stripe SDK 초기화 파일 생성
+- **Code**:
 ```typescript
-// 서버: 세션 생성
-const session = await stripe.checkout.sessions.create({
-  mode: 'subscription',
-  customer: stripeCustomerId,
-  line_items: [{ price: priceId, quantity: 1 }],
-  success_url: `${baseUrl}/dashboard?checkout=success`,
-  cancel_url: `${baseUrl}/pricing`,
+// lib/stripe.ts
+import Stripe from 'stripe';
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-12-18.acacia',
+  typescript: true,
 });
-
-// 클라이언트: 리다이렉트
-const stripe = await loadStripe(process.env.NEXT_PUBLIC_STRIPE_KEY);
-await stripe.redirectToCheckout({ sessionId: session.id });
 ```
+```env
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+```
+- **Verification**: `npx ts-node -e "import('./lib/stripe').then(m => m.stripe.prices.list())"` → 빈 배열 반환
 
 ---
 
-### 🔒 Wiggum (SecOps) 관점
+#### Task 1-2: DB 마이그레이션
+- **담당**: Homer (Backend)
+- **Files**: `prisma/schema.prisma` (또는 마이그레이션 SQL 파일)
+- **Steps**:
+  - [ ] `StripeCustomer`, `Subscription`, `ProcessedWebhookEvent` 모델 추가
+  - [ ] `pnpm prisma migrate dev --name add-stripe-subscription`
+- **Verification**: `pnpm prisma studio` → 3개 테이블 확인
 
-**PCI DSS 범위**
-- Stripe.js 사용 시 → **SAQ A 레벨** (가장 낮은 등급, 서버에 카드 데이터 없음)
-- 카드번호/CVV/만료일은 절대 서버 통과 금지 → Stripe 토큰/PaymentMethod ID만 처리
+---
 
-**Webhook 보안 (필수)**
+#### Task 1-3: Webhook 엔드포인트 구현
+- **담당**: Homer (Backend)
+- **Files**: `app/api/webhooks/stripe/route.ts`
+- **Steps**:
+  - [ ] raw body 수신 설정
+  - [ ] 서명 검증 로직
+  - [ ] 이벤트별 핸들러 분기
+  - [ ] idempotency 처리 (중복 이벤트 스킵)
+- **Code** (핵심):
 ```typescript
-// stripe-signature 헤더 검증 필수
-const event = stripe.webhooks.constructEvent(
-  req.rawBody,           // ← 반드시 raw body (JSON.parse 전)
-  req.headers['stripe-signature'],
-  process.env.STRIPE_WEBHOOK_SECRET
-);
-// 실패 시 400 반환, 처리 중단
+// app/api/webhooks/stripe/route.ts
+import { headers } from 'next/headers';
+import { stripe } from '@/lib/stripe';
+import { prisma } from '@/lib/prisma';
+
+export async function POST(req: Request) {
+  const body = await req.text(); // raw body 필수
+  const signature = headers().get('stripe-signature')!;
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!,
+    );
+  } catch {
+    return new Response('Invalid signature', { status: 400 });
+  }
+
+  // Idempotency 체크
+  const already = await prisma.processedWebhookEvent.findUnique({
+    where: { stripeEventId: event.id },
+  });
+  if (already) return new Response('Already processed', { status: 200 });
+
+  await handleEvent(event);
+
+  await prisma.processedWebhookEvent.create({
+    data: { stripeEventId: event.id },
+  });
+
+  return new Response('OK', { status: 200 });
+}
+```
+- **Verification**: `stripe listen --forward-to localhost:3000/api/webhooks/stripe` → 서명 에러 없음 확인
+
+---
+
+### Phase 2 — 프론트엔드 + 통합 (Week 2)
+
+#### Task 2-1: 플랜 선택 페이지
+- **담당**: Bart (Frontend)
+- **Files**: `app/pricing/page.tsx`, `components/PricingCard.tsx`
+- **Steps**:
+  - [ ] Stripe 대시보드에서 Price ID 복사
+  - [ ] 플랜 카드 UI 구현
+  - [ ] [구독 시작] 버튼 → `/api/checkout/session` POST 호출
+  - [ ] 응답의 `url`로 리다이렉트
+
+#### Task 2-2: Checkout 세션 API
+- **담당**: Homer (Backend)
+- **Files**: `app/api/checkout/session/route.ts`
+- **Code**:
+```typescript
+export async function POST(req: Request) {
+  const session = await getServerSession(); // 인증 확인
+  if (!session?.user) return new Response('Unauthorized', { status: 401 });
+
+  // Stripe Customer 조회 또는 생성
+  let customer = await prisma.stripeCustomer.findUnique({
+    where: { userId: session.user.id },
+  });
+  if (!customer) {
+    const stripeCustomer = await stripe.customers.create({
+      email: session.user.email!,
+      metadata: { userId: session.user.id },
+    });
+    customer = await prisma.stripeCustomer.create({
+      data: { userId: session.user.id, customerId: stripeCustomer.id },
+    });
+  }
+
+  const checkoutSession = await stripe.checkout.sessions.create({
+    customer: customer.customerId,
+    mode: 'subscription',
+    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/pricing`,
+  });
+
+  return Response.json({ url: checkoutSession.url });
+}
 ```
 
-**보안 체크리스트**
-- [ ] `STRIPE_SECRET_KEY` 환경변수 전용 (절대 코드 하드코딩 금지)
-- [ ] Webhook 엔드포인트 Rate Limiting 적용
-- [ ] HTTPS 강제 (HTTP → HTTPS 리다이렉트)
-- [ ] `stripe_customer_id` 클라이언트 노출 금지 (Portal URL은 서버에서 생성)
-- [ ] 구독 상태 검증을 서버에서만 수행 (클라이언트 상태 신뢰 금지)
+#### Task 2-3: 결제 성공 페이지 + Customer Portal
+- **담당**: Bart (Frontend) + Homer (Backend)
+- **Files**: `app/payment/success/page.tsx`, `app/api/customer-portal/route.ts`
 
 ---
 
-### 🔭 Lisa (Research) 관점
+### Phase 3 — 테스트 + 출시 (Week 3)
 
-**Stripe vs 대안 비교**
+#### Task 3-1: E2E 결제 테스트 (Test Mode)
+- **담당**: Homer + Bart
+- **Verification 체크리스트**:
+  - [ ] 카드 `4242 4242 4242 4242` → 결제 성공 플로우 완주
+  - [ ] 카드 `4000 0000 0000 0002` → 결제 거절 처리 확인
+  - [ ] Stripe CLI로 모든 Webhook 이벤트 수동 트리거 테스트
+  - [ ] 중복 Webhook 이벤트 전송 → idempotency 동작 확인
+  - [ ] Customer Portal에서 구독 취소 → DB status `canceled` 전환 확인
 
-| 솔루션 | 수수료 | 난이도 | 추천 시나리오 |
-|--------|--------|--------|-------------|
-| **Stripe Billing** | 0.5%/거래 | 중 | 스타트업 → 중견, 표준 선택 |
-| Chargebee | $599/월~ | 낮음 | 대기업, 복잡한 플랜 구조 |
-| Paddle | 5% + $0.5 | 낮음 | 글로벌 MoR 필요 시 |
-| Lemon Squeezy | 5% | 매우 낮음 | 인디 제품, 간단한 구조 |
-
-→ **Stripe Billing이 정답**. 수수료 최저, 문서 최고, 국내 연동 레퍼런스 풍부.
-
-**SaaS 구독 UX 베스트 프랙티스**
-1. **연간/월간 토글**: 연간 할인 20% 표시 (연간 ARR 증가에 효과적)
-2. **Free Trial**: 7-14일 (카드 등록 요구 → 전환율 높음)
-3. **취소 방지**: 취소 전 "1개월 일시정지" 옵션 제시
-4. **결제 실패 복구**: 이메일 알림 → 앱 내 배너 → Grace Period 7일
+#### Task 3-2: 보안 최종 점검
+- **담당**: Wiggum (Security)
+- **체크리스트**:
+  - [ ] `STRIPE_SECRET_KEY` 클라이언트 번들에 미포함 (`NEXT_PUBLIC_` 접두사 없음)
+  - [ ] Webhook 서명 검증 코드 코드리뷰
+  - [ ] `processed_webhook_events` 테이블 중복 방지 동작 확인
+  - [ ] 결제 API에 rate limiting 적용 확인
+  - [ ] IDOR 테스트: 타인 session_id로 `/api/subscription` 조회 시 403 반환 확인
 
 ---
 
-### 🎨 Krusty (Designer) 관점
+### 구현 로드맵 요약
 
-**핵심 화면 4개**
 ```
-1. 플랜 선택 페이지
-   [Free] [Pro ★] [Enterprise]
-    연간/월간 토글 (연간 20% 할인)
-    기능 비교 테이블
-    [지금 시작하기] CTA
-
-2. Checkout (Stripe 호스팅 또는 임베디드)
-   → Stripe Checkout 사용 시: Stripe 페이지로 이동
-   → Payment Element 사용 시: 앱 내 결제 폼
-
-3. 성공 페이지
-   "🎉 구독 완료!" 확인 메시지
-   다음 결제일, 포함 기능 요약
-   [대시보드로 이동] 버튼
-
-4. 구독 관리 (Settings > Billing)
-   현재 플랜 + 상태 (Active/Past Due)
-   다음 결제일 + 금액
-   [플랜 변경] [카드 변경] [구독 취소] → Customer Portal
+Week 1 (Homer)      Week 2 (Homer+Bart)    Week 3 (All)
+────────────────    ──────────────────────  ─────────────────
+DB 마이그레이션      Checkout 세션 API        E2E 테스트
+Stripe SDK 초기화   플랜 선택 UI             보안 최종 점검
+Webhook 엔드포인트  결제 성공 페이지          프로덕션 키 전환
+이벤트 핸들러       Customer Portal          모니터링 설정
 ```
 
 ---
 
-## 🎯 접근 방식 3가지 제안 (sid 결정 필요)
+## 요약
 
-### Option A: **Stripe Checkout + Customer Portal** ← *PM 추천 (MVP)*
-- **개발 기간**: ~3-5일
-- **방식**: 결제는 Stripe Checkout, 관리는 Customer Portal (모두 Stripe 호스팅 페이지)
-- **장점**: 가장 빠른 출시, PCI 범위 최소화, edge case(3D Secure 등) 자동 처리
-- **단점**: 브랜드 UI에서 벗어남, 커스터마이징 제한
-- **추천 이유**: 검증 안 된 제품에 빠른 출시가 우선. 나중에 임베디드로 마이그레이션 쉬움.
+**결정**: Stripe Hosted Checkout(Option A)으로 진행. 이유 — 최소 3주 내 안전한 MVP 출시 가능, PCI 범위 최소화, Stripe의 최적화된 전환율 활용. Phase 2에서 Elements로 전환 여부는 전환율 데이터 기반으로 판단.
 
-### Option B: **Payment Element (완전 임베디드)**
-- **개발 기간**: ~2-3주
-- **방식**: 앱 내 결제 폼 + 구독 관리 화면 직접 구현
-- **장점**: 완전한 브랜드 UX, 화면 이탈 없음
-- **단점**: 구현 복잡도 3배↑, 결제 실패/재시도 로직 직접 구현 필요
-- **추천 이유**: PMF 확인 후 성장 단계에서 고려
-
-### Option C: **하이브리드 (Checkout → Portal → 이후 임베디드 전환)**
-- **개발 기간**: ~1주
-- **방식**: Option A로 시작, 단계적으로 임베디드 전환
-- **장점**: 빠른 출시 + 성장에 따른 점진적 개선 가능
-- **추천 이유**: 현실적인 중간 경로
-
----
-
-## 📋 PM 추천 결정
-
-**Option A (Stripe Checkout + Customer Portal)** 로 v1 출시 추천.
-
-**근거**:
-1. 아직 구독 UX가 검증되지 않은 상태에서 빠른 출시 > 완벽한 UI
-2. Stripe Checkout은 이미 수억 명이 검증한 결제 UX
-3. PCI 컴플라이언스 리스크 최소화 (Wiggum 관점)
-4. 구현 시간 5일 vs 3주 → Opportunity Cost 명확
-
-**다음 행동**: sid의 두 가지 확인 후 Feature Spec 작성 즉시 시작
-
----
-
-## ❓ sid에게 결정 요청 (2가지)
-
-**Q1.** 위 3가지 옵션 중 어느 방향으로 진행할까요?
-→ PM 추천은 **Option A** (Stripe Checkout + Customer Portal)
-
-**Q2.** 이 결제 시스템은 어떤 서비스에 붙이는 건가요? (기술 스택 파악용)
-→ 스택 확인 후 Homer에게 백엔드 구현 계획, Bart에게 프론트엔드 구현 계획을 즉시 위임합니다.
+**다음 행동**:
+1. **sid 승인**: Option A 방향 + 스택(A/B/C/D) 확인
+2. **승인 즉시**: `delegate_sequential` → Homer(DB+Webhook) → Bart(UI) → Wiggum(보안 검증) 체인 위임

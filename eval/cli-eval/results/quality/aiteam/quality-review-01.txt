@@ -1,100 +1,90 @@
-이 컴포넌트에는 **치명적 버그 1개 + 컨벤션 위반 다수**가 있습니다.
+## 코드 리뷰 결과
+
+발견된 문제점을 심각도 순으로 정리했습니다.
 
 ---
 
-## 🚨 치명적 버그
+### 🔴 Critical — 즉시 수정 필요
 
-### 1. `useEffect` 의존성 배열 누락 → 무한 루프
+**1. useEffect 의존성 배열 누락 → 무한 루프**
 ```js
 useEffect(() => {
   fetch('/api/users')...
 }); // ← 의존성 배열 없음
 ```
-렌더 → fetch → setUsers → 렌더 → fetch → ... 무한 반복 발생.  
-`[]` 를 넣어야 마운트 시 1회만 실행됨.
+매 렌더링마다 fetch 실행 → `setUsers` 호출 → 재렌더링 → 다시 fetch... **무한 루프** 발생.
 
----
+**2. 데이터 페칭에 useEffect 사용 금지 (팀 컨벤션)**
+서버 데이터 페칭은 **SWR 또는 React Query 필수**. `useEffect` + `fetch` 패턴은 팀 규칙 위반.
 
-## ❌ 팀 컨벤션 위반
-
-### 2. 데이터 페칭에 `useEffect` 사용 금지
-**Bart 코딩 제약 1순위 위반**. API 호출은 반드시 SWR 또는 React Query 사용.
-```js
+```tsx
 // ✅ 올바른 방법
 const { data: users = [] } = useSWR('/api/users', fetcher);
 ```
 
-### 3. `React.memo` 미적용
-모든 컴포넌트는 `React.memo`로 래핑 필수.
+---
 
-### 4. `map`에 `key` prop 없음
-```jsx
-users.map(u => <div key={u.id} ...>)  // key 필수
+### 🟠 Major — 버그 / 런타임 경고
+
+**3. `key` prop 없음**
+```js
+users.map(u => <div ...>{u.name}</div>) // key 없음
 ```
-React 경고 발생, 리스트 리렌더링 최적화 실패.
+React 리스트 렌더링 경고 발생. `key={u.id}` 필수.
 
-### 5. 인라인 핸들러 → `useCallback` 미사용
+**4. 에러 핸들링 / 로딩 상태 없음**
+fetch 실패 시 아무것도 표시되지 않음. 로딩 중 UI도 없음.
+
+---
+
+### 🟡 Warning — 성능 / 접근성
+
+**5. 인라인 onClick 함수 — `useCallback` 필요**
 ```js
 onClick={() => setUsers(users.filter(x => x.id !== u.id))}
 ```
-매 렌더마다 새 함수 생성. `useCallback`으로 안정화 필요.
+매 렌더링마다 새 함수 생성. `useCallback` + 함수형 업데이트 적용 권장.
+
+**6. `<div onClick>` → 접근성 위반**
+클릭 가능한 요소는 `<button>` 사용. `div`는 키보드 포커스 불가, 스크린 리더 미인식. 44px 터치 타겟도 미보장.
+
+**7. `React.memo` 미사용** — 팀 컨벤션 위반 (모든 컴포넌트에 필수)
 
 ---
 
-## ♿ 접근성 문제
+### 🔵 Convention — 팀 규칙
 
-### 6. 클릭 가능한 요소에 `<div>` 사용
-`onClick`이 있는 요소는 `<button>` 사용 또는 `role="button"` + `tabIndex={0}` 필수.  
-최소 터치 타겟도 44×44px 확보 필요.
+**8. TypeScript 타입 없음**
+`useState([])` → `useState<User[]>([])`, `User` 인터페이스 정의 필요.
 
----
-
-## 📋 기타 누락
-
-| 항목 | 문제 |
-|------|------|
-| TypeScript | 타입 없음 (`users` 가 `any[]`) |
-| 에러 처리 | fetch 실패 시 아무 처리 없음 |
-| 로딩 상태 | 빈 화면만 노출 |
-| TSDoc | export 함수에 문서 없음 |
+**9. TSDoc 없음** — export 함수에 `/** ... */` 필수 (팀 컨벤션)
 
 ---
 
-## ✅ 개선된 코드
+### ✅ 수정 예시
 
 ```tsx
-import useSWR from 'swr';
-
 interface User {
-  id: number;
+  id: string;
   name: string;
 }
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+/**
+ * 사용자 목록을 표시하고 개별 삭제 기능을 제공하는 컴포넌트
+ */
+const UserList = React.memo(function UserList() {
+  const { data: users = [], mutate } = useSWR<User[]>('/api/users', fetcher);
 
-/** 사용자 목록을 표시하고 개별 삭제 기능을 제공하는 컴포넌트 */
-export const UserList = React.memo(() => {
-  const { data: users = [], mutate, error, isLoading } = useSWR<User[]>(
-    '/api/users',
-    fetcher,
-  );
-
-  const handleDelete = useCallback(
-    (id: number) => {
-      mutate(users.filter((u) => u.id !== id), false);
-    },
-    [users, mutate],
-  );
-
-  if (isLoading) { return <div>로딩 중...</div>; }
-  if (error) { return <div>오류가 발생했습니다.</div>; }
+  const handleDelete = useCallback((id: string) => {
+    mutate(users.filter((u) => u.id !== id), false);
+  }, [users, mutate]);
 
   return (
     <ul>
       {users.map((u) => (
         <li key={u.id}>
           <button
-            className="min-h-[44px] min-w-[44px] px-4"
+            className="min-h-[44px] px-4 py-2 w-full text-left"
             onClick={() => handleDelete(u.id)}
           >
             {u.name}
@@ -106,4 +96,6 @@ export const UserList = React.memo(() => {
 });
 ```
 
-**핵심 요약**: 무한 루프 버그가 가장 시급하고, `useEffect` → SWR 교체가 팀 컨벤션상 필수입니다.
+---
+
+**요약:** 원본 코드는 무한 루프(Critical), 팀 컨벤션 위반(useEffect 데이터 페칭), 접근성 문제(div onclick), 타입 안전성 부재까지 다수의 문제를 포함하고 있습니다.

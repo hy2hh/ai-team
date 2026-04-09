@@ -1,354 +1,225 @@
-# Stripe 월간 구독 결제 시스템 — 전체 설계 계획
+# Stripe 월간 구독 결제 시스템 — 전체 계획
 
 ---
 
-## 📋 1. 기획 (Product)
+## 1. 기획 (Product)
 
-### 핵심 사용자 시나리오
-1. 신규 가입 → 플랜 선택 → 결제 정보 입력 → 구독 시작
-2. 기존 사용자 → 플랜 업그레이드/다운그레이드
-3. 구독 해지 → 만료일까지 서비스 유지
-4. 결제 실패 → 재시도 알림 → 자동 재결제
+### 핵심 사용자 흐름
+```
+회원가입/로그인
+  → 플랜 선택 (Free / Pro / Enterprise)
+  → 결제 정보 입력 (Stripe Elements)
+  → 구독 활성화 확인
+  → 대시보드 (구독 상태, 청구 내역, 플랜 변경, 해지)
+```
 
-### 구독 플랜 구조 (예시)
-| 플랜 | 가격 | Stripe Price ID |
-|------|------|-----------------|
-| Free | 무료 | — |
-| Pro | ₩9,900/월 | price_xxx |
-| Team | ₩29,900/월 | price_yyy |
+### 플랜 설계 (예시)
+| 플랜 | 가격 | 핵심 기능 |
+|------|------|-----------|
+| Free | ₩0/월 | 기본 기능 |
+| Pro | ₩9,900/월 | 전체 기능 |
+| Enterprise | 커스텀 | 팀 + API |
 
-### 핵심 성공 지표
-- 결제 전환율 (플랜 선택 → 결제 완료)
-- 구독 유지율 (Churn Rate)
-- 결제 실패율
+### 비즈니스 규칙
+- 무료 → 유료 업그레이드: 즉시 적용, 잔여일 비례 청구
+- 다운그레이드: 현재 구독 만료 후 적용
+- 해지: 기간 종료까지 서비스 유지 (즉시 만료 아님)
+- 결제 실패 시: 3일/5일/7일 재시도 → 구독 정지
 
 ---
 
-## 🏗️ 2. 기술 아키텍처
+## 2. 기술 설계 — 백엔드
 
-```
-[프론트엔드]                    [백엔드]                    [Stripe]
-  React App
-  Stripe.js  ──카드 토큰──▶  POST /subscriptions  ──API──▶  Customer
-  Elements                   POST /webhooks  ◀──Webhook──   Subscription
-                              GET  /billing                  Invoice
-                                     │
-                              [데이터베이스]
-                              users.stripe_customer_id
-                              subscriptions.status
-                              subscriptions.current_period_end
-```
+### DB 스키마
+```sql
+-- 구독 상태 관리
+CREATE TABLE subscriptions (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES users(id),
+  stripe_customer_id     VARCHAR NOT NULL UNIQUE,
+  stripe_subscription_id VARCHAR UNIQUE,
+  plan          VARCHAR NOT NULL DEFAULT 'free', -- free | pro | enterprise
+  status        VARCHAR NOT NULL DEFAULT 'active', -- active | past_due | canceled | trialing
+  current_period_start TIMESTAMPTZ,
+  current_period_end   TIMESTAMPTZ,
+  cancel_at_period_end BOOLEAN DEFAULT false,
+  created_at    TIMESTAMPTZ DEFAULT now(),
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
 
-### 데이터 흐름 원칙
-- **카드 번호는 절대 백엔드를 거치지 않음** — Stripe.js가 직접 Stripe 서버로 전송
-- 백엔드는 `PaymentMethod ID`만 수신
-- 모든 구독 상태 변경은 **Webhook 이벤트 기반**으로 처리
-
----
-
-## 🖥️ 3. 프론트엔드 설계
-
-### 사용 라이브러리
-```bash
-@stripe/stripe-js       # Stripe.js 로더
-@stripe/react-stripe-js # React Elements 컴포넌트
-```
-
-### 컴포넌트 구조
-```
-pages/
-  billing/
-    billing-page.tsx          # 메인 청구 페이지
-components/
-  billing/
-    PlanSelector.tsx           # 플랜 선택 카드
-    CheckoutForm.tsx           # 결제 폼 (Stripe Elements 포함)
-    PaymentMethodCard.tsx      # 저장된 카드 표시
-    SubscriptionStatus.tsx     # 현재 구독 상태
-    BillingHistory.tsx         # 청구 내역
-hooks/
-  useBilling.ts                # 청구 관련 API 훅
-  useSubscription.ts           # 구독 상태 훅
+-- 결제 이벤트 감사 로그 (불변)
+CREATE TABLE payment_events (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID REFERENCES users(id),
+  stripe_event_id VARCHAR NOT NULL UNIQUE, -- 중복 처리 방지
+  event_type      VARCHAR NOT NULL,
+  payload         JSONB NOT NULL,
+  processed_at    TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-### CheckoutForm 핵심 구현 패턴
-```tsx
-// CheckoutForm.tsx — Stripe Elements 활용
-import { useStripe, useElements, CardElement } from '@stripe/react-stripe-js';
-
-/** 결제 정보를 입력받고 구독을 생성하는 폼 컴포넌트 */
-export const CheckoutForm = React.memo(({ planId, onSuccess }: Props) => {
-  const stripe = useStripe();
-  const elements = useElements();
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!stripe || !elements) { return; }
-
-    setIsLoading(true);
-    setError(null);
-
-    // 1. PaymentMethod 생성 (카드 정보는 Stripe로만 전송)
-    const { paymentMethod, error: pmError } = await stripe.createPaymentMethod({
-      type: 'card',
-      card: elements.getElement(CardElement)!,
-    });
-
-    if (pmError) {
-      setError(pmError.message ?? '결제 오류가 발생했습니다.');
-      setIsLoading(false);
-      return;
-    }
-
-    // 2. 백엔드에 PaymentMethod ID만 전송
-    const result = await createSubscription({
-      paymentMethodId: paymentMethod.id,
-      planId,
-    });
-
-    // 3. 3DS 인증 필요 시 처리
-    if (result.requiresAction) {
-      const { error: confirmError } = await stripe.confirmCardPayment(
-        result.clientSecret,
-      );
-      if (confirmError) {
-        setError(confirmError.message ?? '인증 실패');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    onSuccess();
-    setIsLoading(false);
-  }, [stripe, elements, planId, onSuccess]);
-
-  return (
-    <form onSubmit={handleSubmit}>
-      <CardElement options={CARD_ELEMENT_OPTIONS} />
-      {error && <ErrorMessage message={error} />}
-      <button type="submit" disabled={!stripe || isLoading}>
-        {isLoading ? '처리 중...' : '구독 시작'}
-      </button>
-    </form>
-  );
-});
+### API 엔드포인트
 ```
-
-### 상태 관리 전략
-- 구독 상태: React Query(SWR) — 서버 상태
-- 결제 폼 UI 상태: 로컬 useState
-- 플랜 선택: URL 파라미터 (`?plan=pro`)
-
----
-
-## 🏗️ 4. 백엔드 설계
-
-### API 엔드포인트 명세
-
-| Method | Path | 설명 |
-|--------|------|------|
-| `POST` | `/api/subscriptions` | 구독 생성 |
-| `PATCH` | `/api/subscriptions/:id` | 플랜 변경 |
-| `DELETE` | `/api/subscriptions/:id` | 구독 해지 |
-| `GET` | `/api/billing/portal` | Stripe Customer Portal URL |
-| `GET` | `/api/billing/invoices` | 청구 내역 |
-| `POST` | `/api/webhooks/stripe` | Stripe Webhook 수신 |
-
-### 구독 생성 로직
-```typescript
-// POST /api/subscriptions
-const createSubscription = async (req: Request, res: Response) => {
-  const { paymentMethodId, planId } = req.body;
-  const userId = req.user.id;
-
-  // 1. Stripe Customer 생성 또는 조회
-  let customerId = await getUserStripeCustomerId(userId);
-  if (!customerId) {
-    const customer = await stripe.customers.create({
-      email: req.user.email,
-      metadata: { userId },
-    });
-    customerId = customer.id;
-    await saveStripeCustomerId(userId, customerId);
-  }
-
-  // 2. PaymentMethod를 Customer에 연결
-  await stripe.paymentMethods.attach(paymentMethodId, {
-    customer: customerId,
-  });
-
-  // 3. 기본 결제 수단 설정
-  await stripe.customers.update(customerId, {
-    invoice_settings: { default_payment_method: paymentMethodId },
-  });
-
-  // 4. 구독 생성
-  const subscription = await stripe.subscriptions.create({
-    customer: customerId,
-    items: [{ price: PLAN_PRICE_IDS[planId] }],
-    payment_behavior: 'default_incomplete',
-    expand: ['latest_invoice.payment_intent'],
-  });
-
-  // 5. 3DS 필요 여부 반환
-  const paymentIntent = subscription.latest_invoice?.payment_intent;
-  if (paymentIntent?.status === 'requires_action') {
-    return res.json({
-      requiresAction: true,
-      clientSecret: paymentIntent.client_secret,
-    });
-  }
-
-  return res.json({ subscriptionId: subscription.id });
-};
+POST /api/billing/checkout          → Stripe Checkout Session 생성
+POST /api/billing/portal            → Stripe Customer Portal 세션 생성
+POST /api/billing/webhook           → Stripe Webhook 수신 (서명 검증 필수)
+GET  /api/billing/subscription      → 현재 구독 상태 조회
+POST /api/billing/cancel            → 구독 해지 예약
+POST /api/billing/reactivate        → 해지 취소
 ```
 
 ### Webhook 처리 (핵심)
-```typescript
-// POST /api/webhooks/stripe
-const handleWebhook = async (req: Request, res: Response) => {
-  // 서명 검증 필수
-  const sig = req.headers['stripe-signature'] as string;
-  let event: Stripe.Event;
+```
+수신 이벤트 → stripe.webhooks.constructEvent() 서명 검증
+  → stripe_event_id로 중복 체크 (payment_events 테이블)
+  → 이미 처리됨 → 200 OK 즉시 반환 (멱등성)
+  → 신규 → 트랜잭션 내 처리
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.rawBody,  // raw body 필수 (파싱 전)
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET!,
-    );
-  } catch (err) {
-    return res.status(400).json({ error: 'Webhook 서명 검증 실패' });
-  }
-
-  // 이벤트 타입별 처리
-  switch (event.type) {
-    case 'customer.subscription.updated':
-      await syncSubscriptionStatus(event.data.object as Stripe.Subscription);
-      break;
-    case 'customer.subscription.deleted':
-      await deactivateSubscription(event.data.object as Stripe.Subscription);
-      break;
-    case 'invoice.payment_succeeded':
-      await handlePaymentSuccess(event.data.object as Stripe.Invoice);
-      break;
-    case 'invoice.payment_failed':
-      await handlePaymentFailure(event.data.object as Stripe.Invoice);
-      break;
-  }
-
-  res.json({ received: true });
-};
+핵심 이벤트:
+  customer.subscription.created   → 구독 활성화, 사용자 플랜 업데이트
+  customer.subscription.updated   → 플랜 변경, 상태 동기화
+  customer.subscription.deleted   → 구독 만료, 플랜 다운그레이드
+  invoice.payment_succeeded        → 결제 성공 이메일 발송
+  invoice.payment_failed           → 결제 실패 이메일 + 재시도 안내
+  customer.subscription.trial_will_end → 트라이얼 종료 3일 전 알림
 ```
 
-### 데이터베이스 스키마
-```sql
--- 구독 테이블
-CREATE TABLE subscriptions (
-  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id               UUID NOT NULL REFERENCES users(id),
-  stripe_customer_id    VARCHAR(255) NOT NULL,
-  stripe_subscription_id VARCHAR(255) UNIQUE NOT NULL,
-  plan_id               VARCHAR(50) NOT NULL,
-  status                VARCHAR(50) NOT NULL,  -- active, past_due, canceled, ...
-  current_period_start  TIMESTAMPTZ NOT NULL,
-  current_period_end    TIMESTAMPTZ NOT NULL,
-  cancel_at_period_end  BOOLEAN DEFAULT FALSE,
-  created_at            TIMESTAMPTZ DEFAULT NOW(),
-  updated_at            TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 인덱스
-CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
-CREATE INDEX idx_subscriptions_stripe_id ON subscriptions(stripe_subscription_id);
+### 서비스 레이어 구조
+```typescript
+// SubscriptionService
+createCustomer(userId)              // Stripe Customer 생성 + DB 저장
+createCheckoutSession(userId, plan) // 결제 페이지 URL 생성
+syncSubscriptionFromStripe(sub)     // Stripe 구독 → DB 동기화
+handleWebhookEvent(event)           // 이벤트 라우팅 + 멱등 처리
+cancelSubscription(userId)          // period_end에 해지 예약
 ```
 
 ---
 
-## 🔒 5. 보안 설계
+## 3. 기술 설계 — 프론트엔드
 
-### 카드 정보 보안
-- ✅ PCI DSS 준수 — Stripe.js가 카드 정보를 직접 처리, 백엔드 무통과
-- ✅ `publishableKey`만 프론트에 노출 — `secretKey`는 서버에만
-- ✅ 환경변수로 키 관리 (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`)
-
-### Webhook 보안
-- ✅ **서명 검증 필수** — `stripe.webhooks.constructEvent()` 사용
-- ✅ Raw body 파싱 미들웨어 별도 적용 (JSON 파싱 전 원본 유지)
-- ✅ 멱등성(Idempotency) 처리 — 동일 이벤트 중복 처리 방지
-
-```typescript
-// 멱등성 처리 예시
-const processedEvents = new Set<string>(); // 실제 환경: Redis 사용
-
-const handleWebhook = async (event: Stripe.Event) => {
-  if (processedEvents.has(event.id)) {
-    return; // 중복 이벤트 무시
-  }
-  processedEvents.add(event.id);
-  // ... 처리
-};
+### 컴포넌트 구조
+```
+/billing
+  PricingPage           → 플랜 비교 + CTA
+  CheckoutSuccessPage   → 결제 완료 (Stripe redirect)
+  BillingDashboard      → 현재 구독 상태
+    ├─ SubscriptionStatus   → 플랜명, 갱신일, 상태 배지
+    ├─ InvoiceHistory       → 청구 내역 목록
+    └─ PlanActions          → 업그레이드/다운그레이드/해지 버튼
 ```
 
-### API 보안
-- ✅ 모든 결제 API에 인증 미들웨어 적용
-- ✅ Rate Limiting — 결제 엔드포인트 (예: 10회/분)
-- ✅ 소유권 검증 — 구독 조회 시 `userId` 매칭 확인
-- ✅ HTTPS 강제 — Stripe 요구사항
-
-### 민감 데이터 로깅 금지
-```typescript
-// ❌ 금지
-logger.info('결제 처리', { cardNumber, cvv });
-
-// ✅ 올바른 방식
-logger.info('결제 처리', { customerId, planId, subscriptionId });
+### 결제 흐름 (Stripe Hosted Checkout 권장)
 ```
+사용자가 "Pro 구독" 클릭
+  → POST /api/billing/checkout → sessionId + url 수신
+  → window.location.href = url (Stripe Checkout 페이지로 이동)
+  → 결제 완료 → success_url 으로 redirect (/billing/success?session_id=...)
+  → 성공 페이지에서 구독 상태 확인 후 대시보드 표시
+```
+
+> **왜 Stripe Elements 대신 Hosted Checkout?**  
+> PCI DSS 범위를 Stripe 서버로 제한 → 우리 서버가 카드 데이터를 직접 다루지 않음.  
+> 커스텀 UI가 필수라면 Stripe.js + Payment Element 사용 가능.
+
+### 상태 관리
+```typescript
+// 구독 훅
+const useSubscription = () => {
+  // SWR/React Query로 GET /api/billing/subscription 폴링
+  // 결제 완료 직후엔 webhook delay 고려해 낙관적 업데이트
+}
+
+// 게이팅 훅
+const useFeatureGate = (feature: Feature) => {
+  const { subscription } = useSubscription();
+  return isFeatureAllowed(subscription.plan, feature);
+}
+```
+
+### 에러 UX
+- 결제 실패: 명확한 실패 사유 + "결제 정보 업데이트" 링크
+- Customer Portal 연동: 카드 변경, 청구 주소, 인보이스 다운로드를 Stripe 호스팅 페이지에 위임
 
 ---
 
-## 📅 6. 구현 로드맵
+## 4. 보안 설계
 
-### Phase 1 — 기반 구축 (1주)
-- [ ] Stripe 계정 설정, 테스트/프로덕션 키 분리
-- [ ] DB 스키마 마이그레이션
-- [ ] Stripe SDK 설치 및 초기화
-
-### Phase 2 — 백엔드 API (1주)
-- [ ] Customer 생성/조회 로직
-- [ ] 구독 생성/해지 API
-- [ ] Webhook 핸들러 + 서명 검증
-
-### Phase 3 — 프론트엔드 (1주)
-- [ ] Stripe Elements 연동
-- [ ] CheckoutForm 컴포넌트
-- [ ] 구독 상태 UI (플랜 카드, 청구 내역)
-
-### Phase 4 — 검증 및 보안 (3일)
-- [ ] Stripe CLI로 Webhook 로컬 테스트
-- [ ] 3DS 시나리오 테스트
-- [ ] 결제 실패/재시도 시나리오 테스트
-- [ ] 보안 리뷰 (@Wiggum)
-
-### Phase 5 — 배포 (2일)
-- [ ] 프로덕션 Webhook 등록
-- [ ] 모니터링 알림 설정 (결제 실패율 임계값)
-- [ ] Stripe Dashboard 연동 확인
-
----
-
-## ⚠️ 핵심 주의사항
-
-| 항목 | 설명 |
+### 결제 데이터 보호
+| 항목 | 규칙 |
 |------|------|
-| Raw Body | Webhook 경로에 JSON 파서 적용 금지, `express.raw()` 별도 사용 |
-| 구독 상태 | DB 직접 수정 금지, **반드시 Webhook 이벤트 기반**으로 동기화 |
-| 플랜 변경 | `stripe.subscriptions.update()`로 처리, 일할 정산 자동 처리 |
-| 테스트 카드 | `4242 4242 4242 4242` (성공), `4000 0000 0000 9995` (실패) |
-| 환경 분리 | 테스트키/프로덕션키 절대 혼용 금지 |
+| 카드 번호 | **절대 서버에 저장 금지**. Stripe 토큰만 저장 |
+| Webhook Secret | 환경변수로만 관리. 코드/로그에 노출 금지 |
+| Stripe API Key | Secret key는 서버사이드 전용. Publishable key만 클라이언트 노출 |
+| Customer ID | DB에만 저장, API 응답에서 불필요한 노출 최소화 |
+
+### Webhook 보안 (필수)
+```typescript
+// 반드시 raw body 사용 (JSON.parse 전)
+const sig = req.headers['stripe-signature'];
+const event = stripe.webhooks.constructEvent(
+  req.rawBody,           // ← Buffer/string, 파싱 전
+  sig,
+  process.env.STRIPE_WEBHOOK_SECRET
+);
+// 검증 실패 시 400 반환 — 처리하지 않음
+```
+
+### 접근 제어
+- 모든 `/api/billing/*` 엔드포인트: 인증 미들웨어 필수
+- 구독 조회: `userId === session.userId` 검증 (타인 구독 조회 불가)
+- 관리자 기능(강제 플랜 변경): 별도 admin role 체크
+
+### 감사 로그
+- 모든 구독 변경 이벤트를 `payment_events` 테이블에 불변 기록
+- 결제 실패, 해지, 플랜 변경은 별도 알림 이메일 발송
+
+### Rate Limiting
+- `/api/billing/checkout`: 사용자당 10req/min 제한 (중복 세션 생성 방지)
+- `/api/billing/webhook`: IP 화이트리스트 + Stripe 서명으로 이중 검증
 
 ---
 
-어느 Phase부터 시작하면 좋을지, 또는 특정 부분을 더 깊게 파고들까요? (예: Webhook 로컬 테스트 설정, Customer Portal 연동, 플랜 업그레이드 일할 정산 처리 등)
+## 5. 구현 단계 (추천 순서)
+
+```
+Phase 1 — 기반 (1~2일)
+  ✅ Stripe 계정 설정, Product/Price 생성
+  ✅ DB 스키마 마이그레이션
+  ✅ Stripe Customer 생성 + 저장 로직
+
+Phase 2 — 결제 플로우 (2~3일)
+  ✅ Checkout Session API
+  ✅ Webhook 수신 + 멱등 처리
+  ✅ 구독 상태 DB 동기화
+
+Phase 3 — 프론트엔드 (2일)
+  ✅ PricingPage + 업그레이드 버튼
+  ✅ 결제 성공/실패 페이지
+  ✅ BillingDashboard + Customer Portal 연동
+
+Phase 4 — 안정화 (1~2일)
+  ✅ 결제 실패 이메일 알림
+  ✅ Feature gating (플랜별 기능 제한)
+  ✅ Stripe Test Mode로 전체 플로우 E2E 테스트
+  ✅ 프로덕션 전환 전 보안 체크리스트 점검
+```
+
+---
+
+## 6. 테스트 체크리스트
+
+```
+□ 신규 구독 생성 → DB 상태 확인
+□ 결제 성공 webhook → 플랜 활성화 확인
+□ 결제 실패 webhook (카드 4000000000000341) → past_due 전환
+□ 구독 해지 → period_end까지 서비스 유지
+□ 해지 취소 → 정상 복구
+□ 동일 webhook 이벤트 2회 전송 → 중복 처리 없음 확인
+□ 인증 없이 /api/billing/* 접근 → 401 반환
+□ 다른 사용자 구독 조회 시도 → 403 반환
+```
+
+---
+
+**다음 단계 추천:** Phase 1부터 시작하고 싶다면 구체적인 기술 스택(Next.js, Node/Express, DB 종류)을 알려주시면 실제 코드 구현으로 바로 들어갈 수 있어요.
