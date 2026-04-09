@@ -1457,9 +1457,25 @@ const executeSingle = async (
 
       // PM이 targets.length === 0으로 완료를 선언했으므로 recommend_next_phase 재요청 불필요
     } else {
-      // 계속 위임 — 중간 리뷰는 skipPosting이므로 currentPmTs 업데이트 없음
+      // 계속 위임 — PM 재위임 알림 메시지 게시 후 currentPmTs 갱신
+      // QA 등 다음 에이전트가 이 메시지에 ✍️ 리액션을 달도록 함
+      const targetNames = targets.map((t) => t.agent).join(', ');
+      const delegationReason = targets[0]?.reason?.slice(0, 100) ?? '재작업 요청';
+      try {
+        const announcementResult = await pmApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `🔄 [${targetNames}] ${delegationReason}`,
+        });
+        if (announcementResult.ts) {
+          currentPmTs = announcementResult.ts as string;
+          console.log(`[hub] PM 재위임 알림 게시 → currentPmTs 갱신: ${currentPmTs}`);
+        }
+      } catch (err) {
+        console.warn('[hub] PM 재위임 알림 게시 실패 (무시):', err);
+      }
       console.log(
-        `[hub] PM 추가 위임: [${targets.join(', ')}]`,
+        `[hub] PM 추가 위임: [${targetNames}]`,
       );
     }
   }
