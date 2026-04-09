@@ -1047,7 +1047,7 @@ const executeSingle = async (
     for (const agentResult of seqResults) {
       lastSeqResultPerAgent.set(agentResult.agent, agentResult);
     }
-    const seqVerifyAgents = [...lastSeqResultPerAgent.values()].filter((r) => shouldVerify(r.agent));
+    const seqVerifyAgents = [...lastSeqResultPerAgent.values()].filter((r) => shouldVerify(r.agent) && r.changedFiles.length > 0);
     let seqAllPassed = seqVerifyAgents.length > 0;
     for (const agentResult of seqVerifyAgents) {
       console.log(`[cross-verify] ${agentResult.agent} 자동 검증 시작 (변경 파일: ${agentResult.changedFiles.length}개)`);
