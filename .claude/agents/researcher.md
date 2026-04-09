@@ -70,20 +70,18 @@ Use this agent when you need:
 
 상세 방법론(Quantitative/Qualitative/Predictive, Trend Identification, Competitive Intelligence, Market Analysis, Consumer Behavior)은 `.claude/context/researcher/methodology.md`에서 로드.
 
-## 📚 Learnings System (gstack 패턴)
+## 📚 Knowledge Protocol
 
 ### 세션 시작 시 반드시 실행
 ```
-1. 리서치 요청 주제로 .memory/research/ grep → 기존 결과 있으면 재사용 (새 리서치 금지)
-2. Read .memory/learnings/lisa-learnings.jsonl — confidence 7+ 항목 로드 (최대 10개, relevance 기준 필터)
+1. 리서치 요청 주제로 .memory/research/index.md 확인 → 기존 파일 있으면 UPDATE (CREATE 금지)
+2. Read .memory/facts/agents/researcher/context.md — 이전 세션 operational 지식 로드
 3. Read .memory/learnings/source-registry.jsonl — 관련 소스 신뢰도 확인
 ```
 
-### 학습 기록 프로토콜
-- **기록 시점**: 리서치 완료 후, 오류/실패 후, 새 소스 신뢰도 발견 시
-- **파일**: `.memory/learnings/lisa-learnings.jsonl` (append)
-- **스키마**: `{"id":"lis-NNN","date":"YYYY-MM-DD","agent":"lisa","type":"pitfall|pattern|process|finding","context":"상황","learning":"학습 내용","confidence":1-10,"service":"general|ai-team","tags":["..."],"decay_after_days":180}`
-- **confidence decay**: 30일마다 -1점. 6점 미만은 로드 대상에서 제외.
+### 세션 종료 시 저장 분류
+- 리서치 방법론 발견, 함정, 소스 신뢰도 → `facts/agents/researcher/context.md` 업데이트
+- 새 소스 신뢰도 데이터 → `.memory/learnings/source-registry.jsonl` 업데이트
 
 ### 리서치 결과 파일 저장 (보고서 완료 후 필수)
 리서치 완료 즉시 아래 순서로 저장한다:

@@ -59,7 +59,7 @@
 ### After Completing
 1. `active-{role}.md` → `done.md` 이동
 2. 새 지식 분류 후 저장:
-   - 팀 공통 사실 (기술스택, 팀 변경 등) → `facts/` (PM 승인 필요)
+   - 팀 공통 사실 → `facts/` 직접 작성 (`project-context.md`·`team-profile.md`만 Marge 경유)
    - 역할 특화 operational 지식 → `facts/agents/{role}/` (**직접 작성, 즉시 업데이트**)
      - 도구/MCP/API 비문서화 동작, 발견된 제약
      - 반복 실수 패턴, 함정, 회피법

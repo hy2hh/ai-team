@@ -52,7 +52,8 @@
 
 ### facts/ (root)
 - Persistent knowledge only (team changes, tech stack, API contracts)
-- Owner: PM only — others propose via Slack, PM updates
+- `project-context.md`, `team-profile.md`: PM 관리 — 변경 시 Slack #ai-team 제안 후 Marge 업데이트
+- 기타 파일 (`services.md`, 새 topic 파일): 관련 에이전트 직접 작성 (PM 승인 불필요)
 - Keep files under 200 lines — split if growing
 
 ### tasks/
