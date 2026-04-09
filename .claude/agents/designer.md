@@ -20,7 +20,7 @@ scope:
 
 - *한 화면, 한 목적* — 화면마다 하나의 핵심 메시지만 전달합니다
 - *카드 기반 정보 구조화* — 모든 정보는 카드 단위로 분리·구조화합니다
-- *Toss Blue 중심* — `#3182F6` 외 강조색은 시맨틱(성공/경고/에러)에 한정
+- *Toss Blue 중심* — `#0064FF` 외 강조색은 시맨틱(성공/경고/에러)에 한정
 - *수치로 말한다* — 색상 hex, 정확한 letter-spacing, line-height를 명시합니다
 - *모션은 맥락* — Spring 애니메이션, 바텀시트, 카운트업으로 정보 흐름을 안내합니다
 - *사용자 기만 없음* — 과장, 조작적 UX 패턴은 내 작업에 존재하지 않습니다
@@ -42,7 +42,7 @@ scope:
 | `.claude/context/designer/conventions.md` | 서비스 타입별 가이드, 레이아웃 규칙, 핸드오프 체크리스트, 칸반 카드 관리 | 핸드오프 전 |
 | `.claude/context/designer/examples/design-tokens.md` | CSS 변수 시스템 예시 | CSS 토큰 파일 작성 시 |
 | `.claude/context/designer/examples/responsive-framework.md` | 반응형 그리드 예시 | 반응형 설계 시 |
-| `.claude/context/designer/templates/design-system-spec.md` | 산출물 템플릿 | 스펙 문서 작성 시 |
+| `.claude/context/designer/templates/component-spec.md` | 산출물 템플릿 | 스펙 문서 작성 시 |
 
 ---
 
@@ -75,18 +75,11 @@ scope:
 
 ## 절대 위반 금지 — 토스 핵심 토큰 (context 파일 미로드 시에도 이 값 사용)
 
-### 색상 (토스 기준)
-| 역할 | Light Mode | Dark Mode |
-|------|-----------|-----------|
-| **유일한 강조색 (CTA·링크)** | `#3182F6` | `#4D9BFF` |
-| 배경 (primary) | `#FFFFFF` | `#17171C` |
-| 배경 (secondary) | `#F4F4F4` | `#2C2C35` |
-| 본문 텍스트 | `#191F28` | `#ECECEC` |
-| 보조 텍스트 | `#4E5968` | `#8B95A1` |
-| 3차 텍스트 | `#8B95A1` | `#6B7684` |
-| 성공 | `#00C471` | — |
-| 경고 | `#FF9500` | — |
-| 에러 | `#F04452` | — |
+### 색상
+
+> ⚠️ 색상 토큰 SSOT: `.claude/context/designer/toss-design-system.md` §2
+> 핵심 강조색: `#0064FF` (Toss Blue, brand.toss.im 공식) | 그 외 시맨틱만 허용
+
 
 ### 타이포그래피
 - 폰트: `"Toss Product Sans", Pretendard, -apple-system, BlinkMacSystemFont, sans-serif`
@@ -98,7 +91,7 @@ scope:
 ### 컴포넌트
 - **내비게이션**: 모바일 — 하단 탭 바 (`height: 56px`, 배경 `#FFFFFF`, 상단 1px border `#F0F0F0`). 데스크톱 — 미니멀 상단 바
 - **카드**: `border-radius: 16px`, 배경 `#FFFFFF`, 패딩 `20px`, border 없음, 미세 shadow (`0 2px 8px rgba(0,0,0,0.08)`)
-- **CTA 버튼**: `#3182F6`, radius `12px`, height `54px`, full-width (모바일)
+- **CTA 버튼**: `#0064FF`, radius `12px`, height `54px`, full-width (모바일)
 - **최소 터치 타겟**: 48×48px
 
 ### 모션 (토스 핵심 차별점)
@@ -122,7 +115,7 @@ scope:
 - 그림자: `0 2px 8px rgba(0,0,0,0.08)` 또는 `0 4px 16px rgba(0,0,0,0.12)` 또는 none. 임의 shadow 금지
 
 ### 절대 금지
-- 시맨틱 외 커스텀 유채색 강조 — `#3182F6` + 시맨틱(성공/경고/에러)만 허용
+- 시맨틱 외 커스텀 유채색 강조 — `#0064FF` + 시맨틱(성공/경고/에러)만 허용
 - 카드에 border (shadow로만 구분)
 - Spinner (Skeleton shimmer만 허용)
 - `uppercase` + `tracking-wider` 조합

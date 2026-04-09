@@ -1,8 +1,8 @@
 # Design System — 토스(Toss) 스타일
 
-> 출처: toss.im 앱 + Toss Design System (TDS)
-> Krusty(Designer) 에이전트가 UI 생성 시 참조하는 기준 문서
-> ⚠️ Apple 디자인 시스템에서 전환됨 (2026-04-09)
+> 출처: toss.im 앱 + Toss Design System (TDS) + brand.toss.im 공식
+> Krusty(Designer) 에이전트가 UI 생성 시 참조하는 기준 문서 — **단일 정본(SSOT)**
+> ⚠️ Apple 디자인 시스템에서 전환됨 (2026-04-09) | 색상값 `#0064FF`로 통일 (2026-04-09, 회의 #10)
 
 ---
 
@@ -11,7 +11,7 @@
 **토스 핵심 철학: 한 화면, 한 목적 — 카드 기반 정보 구조화**
 
 - 밝고 깨끗한 배경(`#F4F4F4`) 위에 `#FFFFFF` 카드로 정보 분리
-- 강조색 `#3182F6` (Toss Blue) + 시맨틱 컬러(성공/경고/에러)만 허용
+- 강조색 `#0064FF` (Toss Blue) + 시맨틱 컬러(성공/경고/에러)만 허용
 - 모션이 맥락 — Spring 애니메이션으로 정보 흐름 안내
 - 여백이 위계 — 섹션 간 32px, 카드 내부 20px
 - 배경에 그라디언트·텍스처 절대 금지
@@ -24,12 +24,12 @@
 
 | 역할 | Light | Dark | 용도 |
 |------|-------|------|------|
-| **Toss Blue (CTA)** | `#3182F6` | `#4D9BFF` | 버튼, 인터랙티브 요소 |
-| Toss Blue Hover | `#1B64DA` | — | 호버 상태 |
-| Toss Blue Pressed | `#1957C2` | — | 프레스 상태 |
-| Focus Ring | `#3182F6` | — | 키보드 포커스 (2px solid) |
+| **Toss Blue (CTA)** | `#0064FF` | `#4D9BFF` | 버튼, 인터랙티브 요소 |
+| Toss Blue Hover | `#0052CC` | — | 호버 상태 |
+| Toss Blue Pressed | `#0041A3` | — | 프레스 상태 |
+| Focus Ring | `#0064FF` | — | 키보드 포커스 (2px solid) |
 
-> `#3182F6` 외 커스텀 유채색 강조 금지. 시맨틱 컬러(성공/경고/에러)만 예외 허용.
+> `#0064FF` 외 커스텀 유채색 강조 금지. 시맨틱 컬러(성공/경고/에러)만 예외 허용.
 
 ### 2-2. Background
 
@@ -57,7 +57,7 @@
 | Success | `#00C471` | 완료, 수익, 긍정 |
 | Warning | `#FF9500` | 주의, 경고 |
 | Error / Loss | `#F04452` | 에러, 손실, 위험 |
-| Info | `#3182F6` | 정보 (Primary와 동일) |
+| Info | `#0064FF` | 정보 (Primary와 동일) |
 
 ### 2-5. Surface
 
@@ -132,7 +132,7 @@
 - Height: `56px`
 - Background: `#FFFFFF`
 - 상단 border: `1px solid #F0F0F0`
-- 아이콘: 24px, 비활성 `#8B95A1`, 활성 `#3182F6`
+- 아이콘: 24px, 비활성 `#8B95A1`, 활성 `#0064FF`
 - 라벨: 11px, weight 500
 
 **데스크톱 — 미니멀 상단 바**
@@ -144,11 +144,11 @@
 
 | 유형 | Background | Text | Radius | Height |
 |------|-----------|------|--------|--------|
-| Primary (CTA) | `#3182F6` | `#FFFFFF` | `12px` | `54px` |
+| Primary (CTA) | `#0064FF` | `#FFFFFF` | `12px` | `54px` |
 | Secondary | `#F2F4F6` | `#4E5968` | `12px` | `54px` |
 | Danger | `#F04452` | `#FFFFFF` | `12px` | `54px` |
-| Ghost | `transparent` | `#3182F6` | `12px` | `54px` |
-| Small | `#3182F6` | `#FFFFFF` | `8px` | `36px` |
+| Ghost | `transparent` | `#0064FF` | `12px` | `54px` |
+| Small | `#0064FF` | `#FFFFFF` | `8px` | `36px` |
 
 - 최소 터치 타겟: **48×48px** (필수)
 - 모바일 CTA: **full-width** (좌우 20px 패딩 유지)
@@ -166,7 +166,7 @@
 ### Input Fields
 
 - Height: `54px`
-- Background: `#F2F4F6` (비활성) / `#FFFFFF` (활성, 1px border `#3182F6`)
+- Background: `#F2F4F6` (비활성) / `#FFFFFF` (활성, 1px border `#0064FF`)
 - Radius: `8px`
 - Padding: `0 16px`
 - 플레이스홀더: `#8B95A1`
@@ -214,7 +214,7 @@
 ## 8. Do's and Don'ts
 
 **Do:**
-- `#3182F6` 단일 강조색 + 시맨틱 컬러
+- `#0064FF` 단일 강조색 + 시맨틱 컬러
 - 카드 기반 정보 구조화 (한 카드, 한 정보 그룹)
 - 한 화면, 한 목적 — 핵심 CTA 1개
 - 하단 탭 바 네비게이션 (모바일)
@@ -244,9 +244,9 @@
 ```css
 :root {
   /* Primary */
-  --toss-blue:          #3182F6;
-  --toss-blue-hover:    #1B64DA;
-  --toss-blue-pressed:  #1957C2;
+  --toss-blue:          #0064FF;
+  --toss-blue-hover:    #0052CC;
+  --toss-blue-pressed:  #0041A3;
   --toss-blue-dark:     #4D9BFF;
 
   /* Background */

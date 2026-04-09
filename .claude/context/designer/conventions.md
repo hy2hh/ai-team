@@ -17,7 +17,7 @@
 > **파일 우선순위**: `component-guide.md` > `toss-design-system.md`. 값 충돌 시 `component-guide.md` 기준 사용. `toss-design-system.md`는 토스 디자인 원전 참조용.
 
 **ai-team 내부 툴 = 토스 스타일이 기본값**
-- Primary: `#3182F6` (Toss Blue)
+- Primary: `#0064FF` (Toss Blue)
 - 폰트: Toss Product Sans (fallback: Pretendard, -apple-system, sans-serif)
 - 배경: `#F4F4F4` (page) / `#FFFFFF` (card)
 - 카드 radius: 16px, no border, subtle shadow

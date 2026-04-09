@@ -75,7 +75,7 @@
 | Default | {val} | {val} | — | — | |
 | Hover | {val} | {val} | — | — | |
 | Active/Pressed | {val} | {val} | — | — | |
-| Focus | {val} | {val} | `2px solid #3182F6` | — | |
+| Focus | {val} | {val} | `2px solid #0064FF` | — | |
 | Disabled | `#F2F4F6` | `#B0B8C1` | — | — | |
 | Loading | — | — | — | — | Skeleton shimmer |
 | Error | — | `#F04452` | — | — | |
@@ -111,5 +111,5 @@
 - [ ] 대비 4.5:1 이상
 - [ ] `aria-label` 또는 `aria-labelledby`
 - [ ] 키보드 접근 가능
-- [ ] Focus ring: `2px solid #3182F6`
+- [ ] Focus ring: `2px solid #0064FF`
 - [ ] `reduced-motion` 대응
