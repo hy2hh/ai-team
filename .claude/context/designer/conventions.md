@@ -14,15 +14,15 @@
 |-------------|---------------|
 | ai-team 내부 툴 (칸반, 메모리 뷰어, 대시보드 등) | `.claude/context/designer/component-guide.md` |
 
-> **파일 우선순위**: `component-guide.md` > `apple-design-system.md`. 값 충돌 시 `component-guide.md` 기준 사용. `apple-design-system.md`는 iOS/macOS HIG 원전 참조용.
+> **파일 우선순위**: `component-guide.md` > `toss-design-system.md`. 값 충돌 시 `component-guide.md` 기준 사용. `toss-design-system.md`는 토스 디자인 원전 참조용.
 
-**ai-team 내부 툴 = Apple 스타일이 기본값**
-- Primary: `#0071e3` (Apple Blue)
-- 폰트: SF Pro Display/Text (fallback: Helvetica Neue, Arial)
-- 배경: `#f5f5f7` (light) / `#000000` (dark section)
-- 카드 radius: 8px (standard), no border, subtle shadow
-- 최대 콘텐츠 너비: 980px, 중앙 정렬
-- 간격 단위: 8px 기반
+**ai-team 내부 툴 = 토스 스타일이 기본값**
+- Primary: `#3182F6` (Toss Blue)
+- 폰트: Toss Product Sans (fallback: Pretendard, -apple-system, sans-serif)
+- 배경: `#F4F4F4` (page) / `#FFFFFF` (card)
+- 카드 radius: 16px, no border, subtle shadow
+- 좌우 패딩: 20px (모바일)
+- 간격 단위: 4px 기반, 섹션 간격 32px
 
 ---
 
@@ -31,9 +31,9 @@
 - Layout 방식 우선순위: Flexbox → CSS Grid (2D 레이아웃에만)
 - 모바일이 PRIMARY — 모든 디자인은 모바일부터 시작
 - **텍스트 입력 최소 16px** (iOS Safari 자동 줌 방지)
-- **터치 타겟 최소 44px**
+- **터치 타겟 최소 48px**
 - 자식 요소 간격: `gap` 클래스 사용 (`space-*` 금지)
-- Tailwind arbitrary 값 지양 (`p-[16px]` → `p-4`)
+- Tailwind arbitrary 값 지양 (`p-[20px]` → `p-5`)
 
 ---
 
@@ -66,6 +66,7 @@
 - [ ] Responsive behavior (breakpoint별 레이아웃 변화)
 - [ ] Accessibility notes (대비 비율, ARIA, 키보드)
 - [ ] Dark/Light 불변/가변 토큰 목록
+- [ ] Motion specs (Spring 파라미터, duration, easing)
 
 > ⚠️ CSS 토큰 파일 경로 미제공 시 핸드오프 완료로 인정하지 않음
 
