@@ -573,7 +573,7 @@ const isValidAgent = (name: string): boolean =>
 
 // ─── 리액션 유틸리티 ─────────────────────────────────────
 
-/** 리액션 추가 (실패 무시, rate limited) */
+/** 리액션 추가 (실패 로깅 후 무시, rate limited) */
 const safeAddReaction = async (
   app: App,
   channel: string,
@@ -588,8 +588,12 @@ const safeAddReaction = async (
         name,
       }),
     );
-  } catch {
-    // 리액션 실패 무시
+  } catch (err) {
+    // already_reacted는 정상 케이스 — 무시
+    const errMsg = err instanceof Error ? err.message : String(err);
+    if (!errMsg.includes('already_reacted')) {
+      console.warn(`[reaction] add ${name} 실패 (ts=${ts}):`, errMsg);
+    }
   }
 };
 
@@ -884,9 +888,9 @@ const executeSingle = async (
       // git diff 스냅샷 (step 전)
       const beforeSnapshot = snapshotChangedFiles();
 
-      // ⚒️ PM 위임 메시지에 작업 중 리액션 추가 (step 시작)
+      // ⚒️ 첫 번째 에이전트 앱으로 PM 위임 메시지에 작업 중 리액션 추가 (step 시작)
+      const firstTargetApp = findAgentApp(step.agents[0], apps);
       if (seqPmTs) {
-        const firstTargetApp = findAgentApp(step.agents[0], apps);
         await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'white_check_mark', 'writing_hand');
         console.log(`[reaction] ⚒️ 순차 위임 step ${si + 1} 시작 → PM 메시지: ${seqPmTs}`);
       }
@@ -971,7 +975,6 @@ const executeSingle = async (
 
       // ✅ PM 위임 메시지 ⚒️ → ✅ 교체 (step 완료, 실패 시 제외)
       if (seqPmTs && !stepHasFailure) {
-        const firstTargetApp = findAgentApp(step.agents[0], apps);
         await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'writing_hand', 'white_check_mark');
         console.log(`[reaction] ✅ 순차 위임 step ${si + 1} 완료 → PM 메시지: ${seqPmTs}`);
       }
@@ -1142,7 +1145,7 @@ const executeSingle = async (
         accumulatedResults,
       );
 
-      // ⚒️ 위임 에이전트가 PM 메시지에 리액션
+      // ⚒️ 위임받은 에이전트 앱으로 PM 메시지에 작업 중 리액션
       if (currentPmTs) {
         await safeAddReaction(
           targetApp,
@@ -1187,7 +1190,7 @@ const executeSingle = async (
         );
       }
 
-      // ✅ 완료 전환
+      // ✅ 위임받은 에이전트 앱으로 완료 전환
       if (currentPmTs) {
         await safeSwapReaction(
           targetApp,
@@ -1218,7 +1221,7 @@ const executeSingle = async (
         findAgentApp(t.agent, apps),
       );
 
-      // ⚒️ 각 에이전트가 PM 메시지에 리액션
+      // ⚒️ 각 에이전트 앱으로 PM 메시지에 작업 중 리액션
       if (currentPmTs) {
         await Promise.all(
           batchApps.map((batchApp, i) => {
@@ -1282,7 +1285,7 @@ const executeSingle = async (
           );
         }
 
-        // ✅ 각 에이전트 완료 전환
+        // ✅ 각 에이전트 앱으로 완료 전환
         if (currentPmTs) {
           await safeSwapReaction(
             batchApps[i],
