@@ -2577,11 +2577,17 @@ const main = async () => {
             deleteRunContext(tCtx.controlId);
             cancelledCount++;
           }
-          // 큐 태스크도 전부 취소
+          // 큐 태스크 에이전트 중단 — 큐 태스크는 task.id로 activeAgents에 등록되므로
+          // tCtx.eventTs로는 찾지 못함 → running task.id를 조회해 직접 중단
+          const runningTaskIds = getRunningTaskIdsByThread(ctx.threadTs);
+          for (const taskId of runningTaskIds) {
+            cancelAgent(taskId);
+          }
+          // 큐 태스크 DB 상태도 취소 처리
           const queueResult = cancelQueueByThread(ctx.threadTs);
           cancelledCount += queueResult.count;
           console.log(
-            `[control] ⏹️ 전체 중단: thread=${ctx.threadTs}, agents=${threadContexts.length}, queue=${queueResult.count}`,
+            `[control] ⏹️ 전체 중단: thread=${ctx.threadTs}, agents=${threadContexts.length}, queue=${queueResult.count} (running aborted=${runningTaskIds.length})`,
           );
         } catch (err) {
           console.error(
