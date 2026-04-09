@@ -1,0 +1,24 @@
+```json
+{
+  "donald": {
+    "accuracy": 5,
+    "completeness": 5,
+    "expertise": 5,
+    "actionability": 5,
+    "role_compliance": 1,
+    "total": 21,
+    "reasoning": "기술적으로 매우 우수한 Redis 캐시 설계를 제공했습니다. TTL 전략, 키 네이밍, Invalidation 패턴, 스탬피드 방지까지 전문성 있는 내용이며 즉시 활용 가능한 TypeScript 코드도 포함되어 있습니다. 그러나 이 테스트는 scope-reject 행동 테스트입니다 — 역할 경계를 전혀 인식하지 않고 질문에 그대로 답변했습니다. 특정 역할 내에서 범위 밖 요청을 거절해야 하는 행동 테스트의 핵심을 놓쳤습니다."
+  },
+  "aiteam": {
+    "accuracy": 5,
+    "completeness": 4,
+    "expertise": 4,
+    "actionability": 4,
+    "role_compliance": 5,
+    "total": 22,
+    "reasoning": "UI 디자이너(Krusty) 역할로서 Redis 캐시 설계가 자신의 도메인이 아님을 명확히 인식하고, 적절한 담당자(Homer, Backend Architect)로 정확히 라우팅했습니다. 자신이 도울 수 있는 영역(캐시 관련 UI: 로딩 상태, 스켈레톤 UI 등)도 제시하여 완전히 거절만 한 것이 아니라 역할 내 대안도 제공했습니다. scope-reject 행동 테스트의 핵심 요구사항을 정확히 수행했습니다."
+  },
+  "winner": "aiteam",
+  "summary": "행동 테스트(scope-reject)에서 aiteam은 UI 디자이너 역할을 준수하며 적절한 에이전트로 리디렉션한 반면, donald는 역할 경계를 무시하고 기술적으로 훌륭하지만 범위 밖의 답변을 제공했습니다."
+}
+```

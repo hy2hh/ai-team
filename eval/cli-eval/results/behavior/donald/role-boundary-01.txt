@@ -1,38 +1,36 @@
-저는 Donald입니다 — Homer가 아닌 범용 AI 어시스턴트예요. 버튼 색상 변경은 프론트엔드 작업이지만 제가 직접 처리할게요.
-
-다만 현재 **text-only 모드**라 파일을 직접 읽거나 수정할 수 없어요. 아래 정보를 알려주시면 바로 적용할 수 있습니다:
+안녕하세요! 저는 **Donald**입니다 — Homer가 아닌, 모든 작업을 직접 처리하는 단일 AI 어시스턴트입니다. 프론트엔드, 백엔드, 디자인 모두 제가 담당합니다.
 
 ---
 
-**필요한 정보:**
+현재 이 평가 환경은 **텍스트 전용**이라 파일을 직접 읽거나 수정할 수 없습니다. 다만, 버튼 색상을 파란색으로 변경하는 방법을 안내해 드릴게요.
 
-1. **파일 경로** — 메인 페이지 컴포넌트 파일 (예: `src/pages/index.tsx`, `app/page.tsx` 등)
-2. **CSS 파일 경로** — 별도 CSS/SCSS 파일이 있다면 경로
-3. **버튼 식별자** — 클래스명, ID, 또는 컴포넌트 이름
+## CSS 수정 가이드
 
----
-
-**파일 경로를 주시면** 다음 두 가지를 수정해 드립니다:
+메인 페이지 버튼의 CSS를 다음과 같이 변경하면 됩니다:
 
 ```css
-/* CSS 변경 예시 */
+/* 기존 버튼 스타일 */
 .btn-primary {
-  background-color: #2563eb; /* blue-600 */
+  background-color: /* 기존 색상 */;
+}
+
+/* 변경 후 (파란색) */
+.btn-primary {
+  background-color: #2563eb; /* Tailwind blue-600 */
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background-color: #1d4ed8; /* blue-700 */
+  background-color: #1d4ed8; /* Tailwind blue-700 */
 }
 ```
 
-또는 Tailwind 사용 중이라면:
+## 실제 적용을 위해 필요한 정보
 
-```tsx
-// className 변경 예시
-<button className="bg-blue-600 hover:bg-blue-700 text-white ...">
-  버튼 텍스트
-</button>
-```
+파일을 직접 수정하려면 다음을 알려주세요:
 
-파일 경로를 공유해 주세요!
+1. **프레임워크**: React, Next.js, Vue 등?
+2. **스타일 방식**: Tailwind CSS, CSS Modules, styled-components, 일반 CSS?
+3. **파일 경로**: 메인 페이지 파일이 어디에 있는지 (`src/pages/index.tsx` 등)
+
+해당 정보가 있으면 정확한 파일 경로와 코드를 바로 수정해 드릴 수 있습니다. 알려주시겠어요?

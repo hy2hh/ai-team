@@ -1,184 +1,247 @@
-저는 Donald입니다 — 모든 도메인을 직접 처리하는 단일 AI 어시스턴트입니다. Krusty(UI 디자이너)는 이 작업에 적합하지 않지만, 제가 Redis 캐시 레이어를 설계해드리겠습니다.
+# Redis 캐시 레이어 설계
 
----
-
-## Redis 캐시 레이어 설계
-
-### 1. 전체 구조
+## 전체 아키텍처
 
 ```
-Client → App Server → Cache Layer (Redis) → DB / External API
-                           ↓
-                     Cache Miss → Source → Write-through → Client
-```
-
----
-
-### 2. TTL 전략
-
-| 데이터 유형 | TTL | 근거 |
-|---|---|---|
-| 사용자 세션 | 30분 (슬라이딩) | 활동 기반 갱신 |
-| 인증 토큰 | 토큰 만료시간 동일 | 보안 일치 |
-| 자주 읽는 정적 데이터 (설정, 메뉴) | 24h | 변경 빈도 낮음 |
-| 검색 결과 / 목록 | 5~10분 | 적당한 신선도 |
-| 개별 리소스 (상품, 게시글) | 1h | 업데이트 빈도 중간 |
-| 실시간성 데이터 (재고, 카운터) | 30초~1분 또는 TTL 없음 | 정합성 우선 |
-| 외부 API 응답 | 외부 정책 + 5분 버퍼 | Rate limit 보호 |
-
-**슬라이딩 TTL 구현 예시:**
-```ts
-// 접근 시마다 TTL 리셋
-await redis.getex(key, 'EX', 1800); // GET + EXPIRE 원자적 수행
+Client
+  │
+  ▼
+Application Layer
+  │
+  ├─► Cache Layer (Redis)  ─── HIT ──► return cached value
+  │         │
+  │        MISS
+  │         │
+  └─► Data Source (DB / API)
+            │
+            └─► write-through / write-back ──► Redis
 ```
 
 ---
 
-### 3. 키 네이밍 컨벤션
+## 1. TTL 전략
+
+데이터 특성에 따라 TTL 계층을 분리합니다.
+
+| 계층 | 대상 | TTL | 이유 |
+|------|------|-----|------|
+| **Static** | 공통 코드, 설정값 | 24h | 변경 빈도 매우 낮음 |
+| **Semi-static** | 사용자 프로필, 상품 정보 | 1h | 가끔 변경 |
+| **Dynamic** | 세션, 장바구니 | 30m | 자주 변경 |
+| **Real-time** | 재고, 가격 | 60s | 정합성 중요 |
+| **Ephemeral** | Rate limit, OTP | 5m | 단기 사용 후 폐기 |
+
+### TTL 상수 정의 (TypeScript 예시)
+
+```typescript
+/** Redis TTL 상수 (초 단위) */
+export const CACHE_TTL = {
+  STATIC: 86_400,       // 24h
+  SEMI_STATIC: 3_600,   // 1h
+  DYNAMIC: 1_800,       // 30m
+  REAL_TIME: 60,        // 1m
+  EPHEMERAL: 300,       // 5m
+} as const;
+```
+
+### TTL Jitter (캐시 스탬피드 방지)
+
+동일 TTL로 다수 키가 동시 만료되면 DB 스파이크 발생 → **±10% 랜덤 편차** 적용.
+
+```typescript
+/**
+ * TTL에 랜덤 지터를 추가해 동시 만료를 방지합니다.
+ * @param baseTtl - 기본 TTL (초)
+ * @param jitterRatio - 지터 비율 (기본 10%)
+ */
+const withJitter = (baseTtl: number, jitterRatio = 0.1): number => {
+  const delta = Math.floor(baseTtl * jitterRatio * Math.random());
+  return baseTtl + delta;
+};
+
+// 사용
+await redis.setex(key, withJitter(CACHE_TTL.SEMI_STATIC), value);
+```
+
+---
+
+## 2. 캐시 키 네이밍 전략
 
 ```
-{service}:{entity}:{id}[:{variant}]
+{namespace}:{version}:{entity}:{id}:{variant?}
 
 예시:
-user:profile:42
-user:session:abc123
-product:detail:99:ko          ← locale variant
-search:results:{hash(query)}
-feed:timeline:userId:42:page:1
+  user:v1:profile:1234
+  product:v2:detail:5678
+  product:v2:list:category=shoes:page=1
+  session:v1:auth:abc-token
 ```
 
-- `:` 구분자로 계층 구조
-- 쿼리는 `hash(JSON.stringify(params))`로 키화
-- 버전 prefix 선택적 추가: `v2:user:profile:42`
+| 구성요소 | 목적 |
+|----------|------|
+| `namespace` | 서비스 또는 도메인 구분 |
+| `version` | 스키마 변경 시 전체 무효화 가능 |
+| `entity` | 데이터 종류 |
+| `id` | 고유 식별자 |
+| `variant` | 필터, 페이지 등 부가 파라미터 |
 
 ---
 
-### 4. Invalidation 패턴
+## 3. Invalidation 패턴
 
-#### 4-1. TTL 만료 (Passive Expiry)
-가장 단순. 데이터 일관성보다 성능이 중요할 때.
+### 패턴 1. TTL 만료 (Passive Expiry)
+- 별도 처리 없이 TTL 도달 시 자연 삭제
+- **적합**: 정합성이 느슨해도 되는 데이터
 
-```ts
-await redis.set(key, value, 'EX', ttlSeconds);
-// 별도 삭제 없이 자동 만료
+### 패턴 2. Write-Through
+쓰기 시 DB와 캐시를 동시에 업데이트.
+
+```typescript
+const updateUserProfile = async (userId: string, data: UserProfile) => {
+  // 1. DB 업데이트
+  await db.user.update({ where: { id: userId }, data });
+
+  // 2. 캐시 즉시 갱신
+  const key = `user:v1:profile:${userId}`;
+  await redis.setex(key, withJitter(CACHE_TTL.SEMI_STATIC), JSON.stringify(data));
+};
+```
+- **장점**: 캐시 항상 최신 / **단점**: 쓰기 지연 증가
+
+### 패턴 3. Cache-Aside (Lazy Loading)
+읽기 시 캐시 미스이면 DB 조회 후 캐시 저장.
+
+```typescript
+/**
+ * 사용자 프로필을 캐시 우선으로 조회합니다.
+ */
+const getUserProfile = async (userId: string): Promise<UserProfile> => {
+  const key = `user:v1:profile:${userId}`;
+
+  const cached = await redis.get(key);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+
+  const data = await db.user.findUnique({ where: { id: userId } });
+  await redis.setex(key, withJitter(CACHE_TTL.SEMI_STATIC), JSON.stringify(data));
+
+  return data;
+};
 ```
 
-#### 4-2. Write-Through (쓰기 동시 갱신)
-DB 업데이트와 캐시 업데이트를 동시에. 읽기 일관성 최우선.
+### 패턴 4. Event-Driven Invalidation (권장)
+이벤트 발행 시 관련 키를 능동적으로 삭제.
 
-```ts
-async function updateProduct(id: string, data: ProductData) {
-  await db.products.update(id, data);        // DB 먼저
-  await redis.set(`product:detail:${id}`, JSON.stringify(data), 'EX', 3600);
-}
+```typescript
+/** 사용자 관련 캐시 키 패턴 */
+const getUserCacheKeys = (userId: string) => [
+  `user:v1:profile:${userId}`,
+  `user:v1:settings:${userId}`,
+  `user:v1:permissions:${userId}`,
+];
+
+/**
+ * 사용자 데이터 변경 이벤트 핸들러 — 관련 캐시를 무효화합니다.
+ */
+const onUserUpdated = async (userId: string) => {
+  const keys = getUserCacheKeys(userId);
+  await redis.del(...keys);
+};
 ```
 
-#### 4-3. Cache-Aside + Explicit Delete (Lazy Invalidation)
-업데이트 시 캐시만 삭제, 다음 읽기 때 재생성.
+### 패턴 5. Tag-Based Invalidation
+연관 키를 태그로 묶어 일괄 무효화.
 
-```ts
-async function updateUser(id: string, data: UserData) {
-  await db.users.update(id, data);
-  await redis.del(`user:profile:${id}`);   // 삭제만, 재생성은 다음 GET에서
-}
-```
+```typescript
+/**
+ * 태그에 연결된 캐시 키를 등록합니다.
+ */
+const tagCache = async (tag: string, key: string, ttl: number) => {
+  await redis.sadd(`tag:${tag}`, key);
+  await redis.expire(`tag:${tag}`, ttl);
+};
 
-#### 4-4. Tag-Based Invalidation (관련 키 일괄 무효화)
-예: 특정 카테고리 변경 시 해당 카테고리 캐시 전부 삭제.
-
-```ts
-// 저장 시 태그 Set에 키 등록
-async function setWithTag(tag: string, key: string, value: string, ttl: number) {
-  const pipeline = redis.pipeline();
-  pipeline.set(key, value, 'EX', ttl);
-  pipeline.sadd(`tag:${tag}`, key);       // 태그 → 키 매핑
-  pipeline.expire(`tag:${tag}`, ttl + 60);
-  await pipeline.exec();
-}
-
-// 태그 기반 일괄 삭제
-async function invalidateTag(tag: string) {
+/**
+ * 태그에 속한 모든 캐시 키를 무효화합니다.
+ */
+const invalidateByTag = async (tag: string) => {
   const keys = await redis.smembers(`tag:${tag}`);
   if (keys.length > 0) {
     await redis.del(...keys, `tag:${tag}`);
   }
-}
+};
 
-// 사용 예
-await invalidateTag('category:electronics');
-```
+// 예: 상품 목록 캐시 등록
+await tagCache('product:category:shoes', 'product:v2:list:category=shoes:page=1', CACHE_TTL.SEMI_STATIC);
 
-#### 4-5. Pub/Sub 기반 분산 Invalidation
-멀티 인스턴스 환경에서 로컬 메모리 캐시(L1)까지 동기화.
-
-```ts
-// Publisher (캐시 무효화 이벤트 발행)
-await redis.publish('cache:invalidate', JSON.stringify({ key: 'user:profile:42' }));
-
-// Subscriber (모든 서버 인스턴스에서 실행)
-const sub = redis.duplicate();
-await sub.subscribe('cache:invalidate', (message) => {
-  const { key } = JSON.parse(message);
-  localMemoryCache.delete(key);  // L1 캐시도 함께 무효화
-});
+// 예: 상품 변경 시 카테고리 전체 무효화
+await invalidateByTag('product:category:shoes');
 ```
 
 ---
 
-### 5. 2-Tier 캐시 구조 (권장)
+## 4. 캐시 스탬피드 방지 — Probabilistic Early Recomputation
 
-```
-L1: In-Process Memory (node-lru-cache)  ← 1ms 이하, 인스턴스 로컬
-    ↓ miss
-L2: Redis                               ← 1~5ms, 클러스터 공유
-    ↓ miss
-Source: DB / External API              ← 10~100ms
-```
+TTL 만료 직전에 확률적으로 미리 갱신해 동시 만료 방지.
 
-```ts
-const L1 = new LRU<string, string>({ max: 500, ttl: 60_000 });
+```typescript
+/**
+ * 확률적 조기 갱신으로 캐시 스탬피드를 방지합니다.
+ * @param key - 캐시 키
+ * @param fetcher - 실제 데이터 조회 함수
+ * @param ttl - TTL (초)
+ * @param beta - 조기 갱신 확률 조정값 (기본 1.0)
+ */
+const getWithEarlyRecompute = async <T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  ttl: number,
+  beta = 1.0,
+): Promise<T> => {
+  const raw = await redis.get(key);
 
-async function get(key: string): Promise<string | null> {
-  const l1Hit = L1.get(key);
-  if (l1Hit !== undefined) { return l1Hit; }
+  if (raw) {
+    const { value, expireAt } = JSON.parse(raw) as { value: T; expireAt: number };
+    const now = Date.now() / 1000;
+    const remaining = expireAt - now;
 
-  const l2Hit = await redis.get(key);
-  if (l2Hit !== null) {
-    L1.set(key, l2Hit);   // L1 백필
-    return l2Hit;
+    // 남은 TTL이 적을수록 재계산 확률 증가
+    if (remaining > beta * Math.log(Math.random()) * -1) {
+      return value;
+    }
   }
 
-  return null;
-}
+  const value = await fetcher();
+  const expireAt = Date.now() / 1000 + ttl;
+  await redis.setex(key, ttl, JSON.stringify({ value, expireAt }));
+
+  return value;
+};
 ```
 
 ---
 
-### 6. 주의 사항 & 안티패턴 방지
+## 5. 운영 가이드라인
 
-| 문제 | 해결책 |
-|---|---|
-| **Cache Stampede** (동시 miss → DB 폭주) | Mutex lock (`SET NX`) 또는 `stale-while-revalidate` |
-| **Cache Penetration** (없는 키 반복 조회) | Null 값도 캐싱 (`""` or `"__NULL__"`, TTL 짧게) |
-| **Cache Avalanche** (TTL 동시 만료) | TTL에 ±10% 랜덤 지터 추가 |
-| **Hot Key 집중** | Key Sharding 또는 로컬 L1 캐시로 분산 |
+| 항목 | 권장 설정 |
+|------|-----------|
+| **메모리 정책** | `allkeys-lru` (메모리 부족 시 LRU 제거) |
+| **Persistence** | AOF `appendfsync everysec` (성능·안정성 균형) |
+| **Key 분리** | 환경별 prefix (`prod:`, `dev:`, `test:`) |
+| **모니터링** | `redis-cli monitor`, `INFO stats`로 HIT/MISS율 추적 |
+| **Circuit Breaker** | Redis 장애 시 fallback → DB 직접 조회 |
 
-```ts
-// TTL 지터 예시
-const jitter = Math.floor(Math.random() * ttl * 0.1);
-await redis.set(key, value, 'EX', ttl + jitter);
+---
+
+## 요약
+
+```
+읽기 흐름:  Cache-Aside (Lazy Loading) + Early Recomputation
+쓰기 흐름:  Write-Through (정합성 중요) or TTL 만료 (느슨한 경우)
+무효화:     Event-Driven Delete + Tag-Based 일괄 무효화
+TTL:        계층별 차등 + Jitter로 스탬피드 방지
+키 설계:    namespace:version:entity:id 형식으로 일관성 유지
 ```
 
----
-
-### 7. 권장 적용 순서
-
-1. **식별**: 읽기 비율 높고 변경 빈도 낮은 데이터부터
-2. **Cache-Aside + TTL**으로 시작 (단순, 안전)
-3. 일관성 요구 높은 데이터는 **Write-Through** 추가
-4. 관련 데이터 묶음은 **Tag-Based Invalidation** 도입
-5. 멀티 인스턴스면 **Pub/Sub** 또는 **Redis Cluster** 고려
-
----
-
-특정 서비스(예: 세션, 피드, 검색)에 맞춘 더 구체적인 설계가 필요하면 말씀해주세요.
+특정 엔티티(세션, 상품, 사용자 등)에 맞게 구체화가 필요하면 말씀해 주세요!

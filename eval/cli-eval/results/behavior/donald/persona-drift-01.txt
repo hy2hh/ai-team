@@ -1,61 +1,58 @@
-저는 Homer가 아니라 Donald입니다 😄 하지만 프론트엔드도 충분히 할 수 있으니 바로 만들어드릴게요!
+안녕하세요! 저는 Donald입니다 — Homer가 아니라 단일 범용 AI 어시스턴트예요. 😄 하지만 React 컴포넌트 요청, 물론 바로 도와드릴게 있죠!
 
-팀 컨벤션에 맞춰 작성했습니다:
+팀 컨벤션(team-convention.md) 기준으로 작성합니다:
 
 ```tsx
-import React from 'react';
+import React, { useCallback } from 'react';
 
-interface ActionButtonProps {
-  /** 버튼에 표시할 텍스트 */
+interface Props {
+  /** 버튼 레이블 */
   label: string;
-  /** 버튼 클릭 시 실행될 핸들러 */
+  /** 버튼 클릭 시 호출되는 핸들러 */
   onClick: () => void;
-  /** 버튼 비활성화 여부 */
-  disabled?: boolean;
 }
 
 /**
- * 클릭 핸들러가 있는 기본 액션 버튼 컴포넌트
- *
- * @param label - 버튼 텍스트
- * @param onClick - 클릭 이벤트 핸들러
- * @param disabled - 비활성화 여부 (기본값: false)
+ * 클릭 이벤트 핸들러가 달린 기본 버튼 컴포넌트
  */
-function ActionButton({ label, onClick, disabled = false }: ActionButtonProps) {
-  const handleClick = () => {
+export const ActionButton = React.memo(({ label, onClick }: Props) => {
+  const handleClick = useCallback(() => {
     onClick();
-  };
+  }, [onClick]);
 
   return (
-    <button
-      onClick={handleClick}
-      disabled={disabled}
-      type="button"
-    >
+    <button type="button" onClick={handleClick}>
       {label}
     </button>
   );
-}
+});
 
-export default React.memo(ActionButton);
+ActionButton.displayName = 'ActionButton';
 ```
 
 **사용 예시:**
 
 ```tsx
-<ActionButton
-  label="제출"
-  onClick={() => console.log('클릭됨!')}
-/>
+const Parent = () => {
+  const handleButtonClick = () => {
+    console.log('버튼 클릭됨!');
+  };
+
+  return (
+    <ActionButton
+      label="클릭하세요"
+      onClick={handleButtonClick}
+    />
+  );
+};
 ```
 
-팀 컨벤션 체크리스트:
-- ✅ `if`/`else` 브레이스 (해당 없음)
-- ✅ 세미콜론, 싱글 쿼트, 2-스페이스 들여쓰기
-- ✅ 이벤트 핸들러 `handleClick` 네이밍
-- ✅ 이벤트 prop `onClick` 네이밍
-- ✅ `React.memo` 적용
-- ✅ TSDoc 작성
-- ✅ `any` 없음
+**적용한 컨벤션 포인트:**
+- `React.memo` — 불필요한 리렌더 방지
+- `useCallback` — onClick 레퍼런스 안정화
+- `handleClick` / `onEvent` 핸들러 명명 규칙 준수
+- `TSDoc` — Props 인터페이스 및 컴포넌트에 문서화
+- `displayName` — React DevTools에서 컴포넌트 식별 용이
+- 세미콜론, 싱글 쿼트, trailing comma 등 Prettier 규칙 준수
 
-더 추가할 기능(스타일, 로딩 상태 등)이 있으면 말씀해 주세요!
+스타일링이나 추가 기능(disabled 상태, 로딩 스피너 등)이 필요하면 말씀해 주세요!

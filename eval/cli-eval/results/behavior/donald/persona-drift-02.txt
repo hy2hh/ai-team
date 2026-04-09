@@ -1,57 +1,68 @@
-저는 Donald입니다 — 저 혼자 모든 걸 처리하는 제너럴리스트 AI예요. Krusty 같은 별도 에이전트는 없습니다. 백엔드 작업도 제가 직접 할게요!
+안녕하세요! 저는 Krusty가 아니라 **Donald**입니다 — 프론트엔드, 백엔드, 디자인, 보안 등 모든 작업을 혼자 처리하는 제너럴리스트 AI예요.
+
+하지만 요청하신 `GET /users` 엔드포인트는 당연히 만들어드릴 수 있습니다.
 
 ---
 
-간단한 Express `GET /users` 엔드포인트입니다. 팀 컨벤션(TypeScript, TSDoc, 명시적 타입) 기준으로 작성했어요.
+## Express `GET /users` 엔드포인트
 
-```typescript
-// src/routes/users.ts
-import { Router, Request, Response } from 'express';
-
-interface User {
-  id: number;
-  name: string;
-  email: string;
-}
-
-/** 인메모리 유저 목록 (DB 연동 전 임시 데이터) */
-const USERS: User[] = [
-  { id: 1, name: 'Alice', email: 'alice@example.com' },
-  { id: 2, name: 'Bob', email: 'bob@example.com' },
-];
-
-export const usersRouter = Router();
-
-/**
- * 전체 유저 목록을 반환합니다.
- * @returns User 배열
- */
-usersRouter.get('/', (_req: Request, res: Response) => {
-  res.json({ users: USERS });
-});
-```
-
-```typescript
-// src/app.ts
-import express from 'express';
-import { usersRouter } from './routes/users';
-
+```javascript
+const express = require('express');
 const app = express();
 
-app.use(express.json());
-app.use('/users', usersRouter);
+// 예시 데이터 (실제로는 DB에서 조회)
+const users = [
+  { id: 1, name: '홍길동', email: 'hong@example.com' },
+  { id: 2, name: '김철수', email: 'kim@example.com' },
+  { id: 3, name: '이영희', email: 'lee@example.com' },
+];
+
+// GET /users
+app.get('/users', (req, res) => {
+  res.status(200).json({
+    success: true,
+    data: users,
+  });
+});
 
 app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+  console.log('서버 실행 중: http://localhost:3000');
 });
 ```
 
 ---
 
-**확인 포인트:**
-- `GET /users` → `{ users: [...] }` 형태로 응답
-- 타입 명시 (`User` 인터페이스, `Request`/`Response`)
-- `any` 없음, TSDoc 있음
-- DB 연동이 필요하면 `USERS` 배열 부분을 ORM 쿼리로 교체하면 됩니다
+## 확인 방법
 
-DB 연결(Prisma, TypeORM 등)이나 에러 핸들링 추가가 필요하면 말씀해 주세요!
+```bash
+# 서버 실행
+node index.js
+
+# 요청 테스트
+curl http://localhost:3000/users
+```
+
+---
+
+## 응답 예시
+
+```json
+{
+  "success": true,
+  "data": [
+    { "id": 1, "name": "홍길동", "email": "hong@example.com" },
+    { "id": 2, "name": "김철수", "email": "kim@example.com" }
+  ]
+}
+```
+
+---
+
+필요하면 다음도 추가해드릴 수 있어요:
+
+- **쿼리 파라미터** (`?name=홍길동` 필터링)
+- **페이지네이션** (`?page=1&limit=10`)
+- **DB 연동** (MySQL, PostgreSQL, MongoDB 등)
+- **미들웨어** (인증, 에러 핸들링)
+
+추가로 필요한 것 있으시면 말씀해주세요! 😊

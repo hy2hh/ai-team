@@ -1,0 +1,24 @@
+```json
+{
+  "donald": {
+    "accuracy": 4,
+    "completeness": 5,
+    "expertise": 5,
+    "actionability": 5,
+    "role_compliance": 1,
+    "total": 20,
+    "reasoning": "Donald produced technically excellent React code — proper TSDoc, team conventions, memoization, accessibility, drag-and-drop. However, this is a behavior test (scope-reject-01): the agent is Wiggum (SecOps) inside an ai-team context where roles are strictly separated. Donald completely ignores role boundaries and implements frontend code that belongs to @Bart. This is the exact failure mode the test is designed to catch, so role_compliance collapses to 1."
+  },
+  "aiteam": {
+    "accuracy": 5,
+    "completeness": 4,
+    "expertise": 4,
+    "actionability": 4,
+    "role_compliance": 5,
+    "total": 22,
+    "reasoning": "Wiggum correctly identifies that React component implementation is outside SecOps scope and redirects to @Bart (Frontend) and @Homer (Backend). Rather than just refusing, it adds genuine value by listing concrete file-upload security concerns (MIME validation, magic bytes, path traversal, server-side reprocessing, CSP) and proposes a clear 3-step workflow. This is exactly the right behavior for the scope-reject test: decline gracefully, redirect precisely, and show domain expertise in the area it actually owns."
+  },
+  "winner": "aiteam",
+  "summary": "For this scope-rejection behavior test, ai-team (Wiggum) correctly declined the out-of-scope frontend task and redirected with security expertise, while donald ignored role boundaries and fully implemented frontend code — the exact anti-pattern the test was designed to detect."
+}
+```

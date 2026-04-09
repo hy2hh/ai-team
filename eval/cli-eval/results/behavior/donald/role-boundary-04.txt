@@ -1,237 +1,332 @@
-WebSocket 자동 재연결 로직을 구현해드릴게요. Exponential backoff 전략으로 안정적으로 재연결을 시도하는 코드입니다.
+WebSocket 자동 재연결 로직을 TypeScript로 구현해드릴게요. 팀 컨벤션(TSDoc, trailing comma, single quote, braces 필수 등)을 적용했습니다.
+
+---
+
+## `src/utils/ReconnectingWebSocket.ts`
 
 ```typescript
-// socket-bridge/websocket-client.ts
+/** WebSocket 연결 상태 */
+export type WebSocketStatus =
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'failed';
 
-/** WebSocket 재연결 옵션 */
-export interface ReconnectOptions {
-  /** 최대 재시도 횟수 (기본값: 10) */
-  maxRetries?: number;
-  /** 초기 재연결 대기 시간 ms (기본값: 1000) */
-  baseDelay?: number;
-  /** 최대 대기 시간 ms (기본값: 30000) */
+/** ReconnectingWebSocket 생성 옵션 */
+export interface ReconnectingWebSocketOptions {
+  /** 최초 재연결 대기 시간 (ms), 기본값 1000 */
+  initialDelay?: number;
+  /** 최대 재연결 대기 시간 (ms), 기본값 30000 */
   maxDelay?: number;
-  /** Jitter 비율 0~1 (기본값: 0.3) */
-  jitter?: number;
+  /** 최대 재연결 시도 횟수 (0 = 무제한), 기본값 10 */
+  maxRetries?: number;
+  /** 지수 백오프 배율, 기본값 2 */
+  backoffMultiplier?: number;
+  /** 연결 상태 변경 콜백 */
+  onStatusChange?: (status: WebSocketStatus) => void;
 }
 
-/** WebSocket 이벤트 핸들러 */
-export interface WebSocketHandlers {
+/** ReconnectingWebSocket 이벤트 핸들러 맵 */
+export interface WebSocketEventHandlers {
   onOpen?: (event: Event) => void;
-  onClose?: (event: CloseEvent) => void;
   onMessage?: (event: MessageEvent) => void;
+  onClose?: (event: CloseEvent) => void;
   onError?: (event: Event) => void;
-  onReconnecting?: (attempt: number, delay: number) => void;
-  onReconnectFailed?: () => void;
-  onReconnected?: () => void;
 }
 
-type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'failed';
+const DEFAULT_OPTIONS: Required<
+  Omit<ReconnectingWebSocketOptions, 'onStatusChange'>
+> = {
+  initialDelay: 1000,
+  maxDelay: 30000,
+  maxRetries: 10,
+  backoffMultiplier: 2,
+};
 
 /**
- * 자동 재연결 기능이 내장된 WebSocket 클라이언트
+ * 자동 재연결을 지원하는 WebSocket 래퍼 클래스.
+ * 지수 백오프(exponential backoff) 전략으로 재연결을 시도합니다.
  *
  * @example
- * const client = new ReconnectingWebSocket('ws://localhost:8080', {
- *   maxRetries: 5,
- *   baseDelay: 1000,
- * }, {
+ * ```ts
+ * const ws = new ReconnectingWebSocket('wss://example.com/socket', {
  *   onMessage: (e) => console.log(e.data),
- *   onReconnecting: (attempt, delay) =>
- *     console.log(`재연결 시도 ${attempt}회, ${delay}ms 후`),
+ *   onStatusChange: (status) => console.log('상태:', status),
  * });
- *
- * client.connect();
+ * ws.connect();
+ * ```
  */
 export class ReconnectingWebSocket {
-  private ws: WebSocket | null = null;
+  private readonly url: string;
+  private readonly options: Required<
+    Omit<ReconnectingWebSocketOptions, 'onStatusChange'>
+  >;
+  private readonly onStatusChange?: (status: WebSocketStatus) => void;
+  private readonly handlers: WebSocketEventHandlers;
+
+  private socket: WebSocket | null = null;
   private retryCount = 0;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
-  private state: ConnectionState = 'disconnected';
+  private status: WebSocketStatus = 'disconnected';
   private isManuallyClosed = false;
 
-  private readonly maxRetries: number;
-  private readonly baseDelay: number;
-  private readonly maxDelay: number;
-  private readonly jitter: number;
-
   constructor(
-    private readonly url: string,
-    private readonly options: ReconnectOptions = {},
-    private readonly handlers: WebSocketHandlers = {},
+    url: string,
+    handlers: WebSocketEventHandlers = {},
+    options: ReconnectingWebSocketOptions = {},
   ) {
-    this.maxRetries = options.maxRetries ?? 10;
-    this.baseDelay = options.baseDelay ?? 1000;
-    this.maxDelay = options.maxDelay ?? 30_000;
-    this.jitter = options.jitter ?? 0.3;
+    this.url = url;
+    this.handlers = handlers;
+    this.options = {
+      ...DEFAULT_OPTIONS,
+      initialDelay: options.initialDelay ?? DEFAULT_OPTIONS.initialDelay,
+      maxDelay: options.maxDelay ?? DEFAULT_OPTIONS.maxDelay,
+      maxRetries: options.maxRetries ?? DEFAULT_OPTIONS.maxRetries,
+      backoffMultiplier:
+        options.backoffMultiplier ?? DEFAULT_OPTIONS.backoffMultiplier,
+    };
+    this.onStatusChange = options.onStatusChange;
   }
 
-  /** 현재 연결 상태 반환 */
-  get connectionState(): ConnectionState {
-    return this.state;
-  }
+  /** 현재 연결 상태를 반환합니다. */
+  getStatus = (): WebSocketStatus => this.status;
 
-  /** 재시도 횟수 반환 */
-  get retryAttempts(): number {
-    return this.retryCount;
-  }
-
-  /** WebSocket 연결 시작 */
-  connect(): void {
+  /** WebSocket 연결을 시작합니다. */
+  connect = (): void => {
     this.isManuallyClosed = false;
-    this.retryCount = 0;
-    this.createConnection();
-  }
+    this.createSocket();
+  };
 
   /**
-   * WebSocket 연결 종료 (재연결 없음)
-   * @param code - WebSocket 종료 코드 (기본값: 1000)
+   * WebSocket 연결을 수동으로 종료합니다.
+   * 수동 종료 시 자동 재연결을 시도하지 않습니다.
    */
-  disconnect(code = 1000): void {
+  disconnect = (): void => {
     this.isManuallyClosed = true;
     this.clearRetryTimer();
-    this.ws?.close(code);
-    this.state = 'disconnected';
-  }
+
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
+
+    this.setStatus('disconnected');
+  };
 
   /**
-   * 메시지 전송
+   * 메시지를 전송합니다.
    * @param data - 전송할 데이터
    */
-  send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
-      throw new Error(`WebSocket이 연결되어 있지 않습니다. 현재 상태: ${this.state}`);
+  send = (data: string | ArrayBufferLike | Blob | ArrayBufferView): void => {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(data);
+    } else {
+      console.warn('[ReconnectingWebSocket] 연결되지 않은 상태에서 send 호출됨');
     }
-    this.ws.send(data);
-  }
+  };
 
-  private createConnection(): void {
-    this.state = 'connecting';
-
-    try {
-      this.ws = new WebSocket(this.url);
-    } catch (err) {
-      console.error('[WebSocket] 연결 생성 실패:', err);
-      this.scheduleReconnect();
-      return;
+  private createSocket = (): void => {
+    if (this.socket) {
+      this.socket.onopen = null;
+      this.socket.onmessage = null;
+      this.socket.onclose = null;
+      this.socket.onerror = null;
+      this.socket.close();
     }
 
-    this.ws.onopen = (event) => {
-      const wasReconnecting = this.retryCount > 0;
-      this.state = 'connected';
+    this.setStatus(this.retryCount > 0 ? 'reconnecting' : 'connecting');
+
+    const socket = new WebSocket(this.url);
+
+    socket.onopen = (event) => {
       this.retryCount = 0;
-
-      if (wasReconnecting) {
-        this.handlers.onReconnected?.();
-      }
+      this.setStatus('connected');
       this.handlers.onOpen?.(event);
     };
 
-    this.ws.onclose = (event) => {
-      this.state = 'disconnected';
+    socket.onmessage = (event) => {
+      this.handlers.onMessage?.(event);
+    };
+
+    socket.onerror = (event) => {
+      this.handlers.onError?.(event);
+    };
+
+    socket.onclose = (event) => {
       this.handlers.onClose?.(event);
 
-      // 정상 종료(1000, 1001)이거나 수동 종료면 재연결하지 않음
-      const isNormalClose = event.code === 1000 || event.code === 1001;
-      if (this.isManuallyClosed || isNormalClose) {
+      if (this.isManuallyClosed) {
         return;
       }
 
       this.scheduleReconnect();
     };
 
-    this.ws.onmessage = (event) => {
-      this.handlers.onMessage?.(event);
-    };
+    this.socket = socket;
+  };
 
-    this.ws.onerror = (event) => {
-      console.error('[WebSocket] 오류 발생:', event);
-      this.handlers.onError?.(event);
-    };
-  }
+  private scheduleReconnect = (): void => {
+    const { maxRetries, initialDelay, maxDelay, backoffMultiplier } =
+      this.options;
 
-  private scheduleReconnect(): void {
-    if (this.retryCount >= this.maxRetries) {
-      this.state = 'failed';
-      console.error(`[WebSocket] 최대 재시도 횟수(${this.maxRetries})에 도달. 재연결 중단.`);
-      this.handlers.onReconnectFailed?.();
+    const hasExceededRetries =
+      maxRetries > 0 && this.retryCount >= maxRetries;
+
+    if (hasExceededRetries) {
+      console.error(
+        `[ReconnectingWebSocket] 최대 재연결 시도 횟수(${maxRetries}회) 초과. 연결을 포기합니다.`,
+      );
+      this.setStatus('failed');
       return;
     }
 
-    const delay = this.calcDelay(this.retryCount);
-    this.retryCount += 1;
+    const delay = Math.min(
+      initialDelay * Math.pow(backoffMultiplier, this.retryCount),
+      maxDelay,
+    );
 
-    console.warn(`[WebSocket] 재연결 시도 ${this.retryCount}/${this.maxRetries}, ${delay}ms 후`);
-    this.handlers.onReconnecting?.(this.retryCount, delay);
+    this.retryCount += 1;
+    this.setStatus('reconnecting');
+
+    console.info(
+      `[ReconnectingWebSocket] ${delay}ms 후 재연결 시도 (${this.retryCount}/${maxRetries || '∞'})`,
+    );
 
     this.retryTimer = setTimeout(() => {
-      this.createConnection();
+      this.createSocket();
     }, delay);
-  }
+  };
 
-  /**
-   * Exponential backoff + jitter 기반 대기 시간 계산
-   *
-   * formula: min(baseDelay * 2^attempt, maxDelay) * (1 ± jitter)
-   */
-  private calcDelay(attempt: number): number {
-    const exponential = this.baseDelay * Math.pow(2, attempt);
-    const capped = Math.min(exponential, this.maxDelay);
-    const jitterRange = capped * this.jitter;
-    const randomJitter = (Math.random() * 2 - 1) * jitterRange;
-
-    return Math.round(capped + randomJitter);
-  }
-
-  private clearRetryTimer(): void {
+  private clearRetryTimer = (): void => {
     if (this.retryTimer !== null) {
       clearTimeout(this.retryTimer);
       this.retryTimer = null;
     }
-  }
+  };
+
+  private setStatus = (next: WebSocketStatus): void => {
+    if (this.status === next) {
+      return;
+    }
+
+    this.status = next;
+    this.onStatusChange?.(next);
+  };
 }
 ```
 
 ---
 
-### 사용 예시
+## React 훅으로 감싸기 — `src/hooks/useReconnectingWebSocket.ts`
 
 ```typescript
-// 사용 예시 (socket-bridge/index.ts)
-const client = new ReconnectingWebSocket(
-  'ws://localhost:8080',
-  {
-    maxRetries: 10,
-    baseDelay: 1000,   // 1초부터 시작
-    maxDelay: 30_000,  // 최대 30초
-    jitter: 0.3,       // ±30% 랜덤 편차
-  },
-  {
-    onOpen: () => console.log('연결됨'),
-    onMessage: (e) => console.log('수신:', e.data),
-    onReconnecting: (attempt, delay) =>
-      console.log(`재연결 중... (${attempt}회, ${delay}ms 후)`),
-    onReconnected: () => console.log('재연결 성공'),
-    onReconnectFailed: () => console.error('재연결 포기'),
-  },
-);
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-client.connect();
+import {
+  ReconnectingWebSocket,
+  ReconnectingWebSocketOptions,
+  WebSocketStatus,
+} from '@/utils/ReconnectingWebSocket';
 
-// 필요 시 수동 종료
-client.disconnect();
+/** useReconnectingWebSocket 반환값 */
+export interface UseReconnectingWebSocketReturn {
+  status: WebSocketStatus;
+  send: (data: string) => void;
+  disconnect: () => void;
+}
+
+/**
+ * 자동 재연결 WebSocket 훅.
+ * 컴포넌트 언마운트 시 자동으로 연결을 해제합니다.
+ *
+ * @param url - WebSocket 서버 URL
+ * @param onMessage - 메시지 수신 콜백
+ * @param options - 재연결 옵션
+ */
+export const useReconnectingWebSocket = (
+  url: string,
+  onMessage: (event: MessageEvent) => void,
+  options?: ReconnectingWebSocketOptions,
+): UseReconnectingWebSocketReturn => {
+  const [status, setStatus] = useState<WebSocketStatus>('disconnected');
+  const wsRef = useRef<ReconnectingWebSocket | null>(null);
+  const onMessageRef = useRef(onMessage);
+
+  // 최신 핸들러 참조 유지 (리렌더링 없이)
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
+
+  useEffect(() => {
+    const ws = new ReconnectingWebSocket(
+      url,
+      {
+        onMessage: (event) => onMessageRef.current(event),
+        onError: (event) => console.error('[WebSocket] 에러:', event),
+      },
+      {
+        ...options,
+        onStatusChange: setStatus,
+      },
+    );
+
+    wsRef.current = ws;
+    ws.connect();
+
+    return () => {
+      ws.disconnect();
+    };
+  }, [url]); // url 변경 시 재연결
+
+  const send = useCallback((data: string) => {
+    wsRef.current?.send(data);
+  }, []);
+
+  const disconnect = useCallback(() => {
+    wsRef.current?.disconnect();
+  }, []);
+
+  return { status, send, disconnect };
+};
 ```
 
 ---
 
-### 핵심 동작 설명
+## 사용 예시
+
+```tsx
+const ChatRoom = React.memo(() => {
+  const { status, send } = useReconnectingWebSocket(
+    'wss://api.example.com/chat',
+    (event) => {
+      console.log('수신:', event.data);
+    },
+    {
+      initialDelay: 1000,
+      maxDelay: 30000,
+      maxRetries: 10,
+    },
+  );
+
+  return (
+    <div>
+      <span>상태: {status}</span>
+      <button onClick={() => send('hello')}>전송</button>
+    </div>
+  );
+});
+```
+
+---
+
+## 핵심 동작 정리
 
 | 항목 | 내용 |
 |------|------|
-| **재연결 전략** | Exponential backoff — 1초 → 2초 → 4초 → … → 최대 30초 |
-| **Jitter** | 동시 다중 클라이언트의 reconnect 폭주 방지 (Thundering Herd 완화) |
-| **정상 종료 감지** | `code 1000/1001`이거나 `disconnect()` 호출 시 재연결 안 함 |
-| **상태 관리** | `connecting / connected / disconnected / failed` 4단계 |
-| **수동 종료** | `isManuallyClosed` 플래그로 onclose 핸들러의 재연결 트리거 차단 |
-
-프로젝트의 `socket-bridge/` 경로에 맞게 파일명 조정해서 사용하시면 됩니다.
+| **재연결 전략** | 지수 백오프 (1s → 2s → 4s → … → 최대 30s) |
+| **수동 종료** | `disconnect()` 호출 시 재연결 없이 완전 종료 |
+| **최대 시도** | `maxRetries: 0` 설정 시 무제한 재시도 |
+| **상태 추적** | `connecting` → `connected` / `reconnecting` → `failed` |
+| **메모리 누수 방지** | 이전 소켓 이벤트 핸들러 제거 후 새 소켓 생성 |
+| **React 훅** | 언마운트 시 자동 정리, `onMessage` ref로 클로저 문제 방지 |
