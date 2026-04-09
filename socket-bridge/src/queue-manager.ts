@@ -378,6 +378,20 @@ export const cancelQueueByThread = (threadTs: string): { count: number; kanbanCa
 };
 
 /**
+ * 특정 스레드에서 현재 running 상태인 태스크 ID 목록 반환
+ *
+ * ⛔ 이모지로 전체 중단 시 각 task.id로 cancelAgent()를 호출해야
+ * 큐 태스크 에이전트(activeAgents key = task.id)가 실제로 중단됨
+ */
+export const getRunningTaskIdsByThread = (threadTs: string): string[] => {
+  const db = getDb();
+  const rows = db
+    .prepare(`SELECT id FROM task_queue WHERE thread_ts = ? AND status = 'running'`)
+    .all(threadTs) as Array<{ id: string }>;
+  return rows.map((r) => r.id);
+};
+
+/**
  * 특정 큐 ID의 모든 queued 상태 태스크를 skipped 처리
  */
 export const cancelQueue = (parentQueueId: string): number => {

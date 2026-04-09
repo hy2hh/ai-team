@@ -73,7 +73,7 @@ import {
   stopQueueProcessor,
   agentDisplayName,
 } from './queue-processor.js';
-import { cancelQueueByThread } from './queue-manager.js';
+import { cancelQueueByThread, getRunningTaskIdsByThread } from './queue-manager.js';
 import { moveToDone, moveToBlocked, updateCard } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
 import {
@@ -3002,17 +3002,44 @@ const main = async () => {
             } catch {
               // 이미 제거됨 무시
             }
+            // reactions.get으로 실제 thread_ts 확보
+            // 이모지를 단 메시지가 스레드 루트가 아닌 답글일 수 있으므로
+            // re.item.ts만으로는 thread_ts 매칭이 안 될 수 있음
+            let threadTs = re.item.ts;
+            try {
+              const reactionInfo = await apps[0].client.reactions.get({
+                channel: re.item.channel,
+                timestamp: re.item.ts,
+              });
+              const msg = reactionInfo.message as { thread_ts?: string } | undefined;
+              if (msg?.thread_ts) {
+                threadTs = msg.thread_ts;
+              }
+            } catch {
+              // API 실패 시 re.item.ts로 폴백
+            }
+
+            // 직접 실행 중인 단일 에이전트 중단 (원본 메시지 ts 기준)
             const cancelled = cancelAgent(re.item.ts);
             if (cancelled) {
               console.log(
                 `[control] ⛔ 사용자 리액션으로 에이전트 중단: ${re.item.ts}`,
               );
             }
-            // 큐에 등록된 태스크도 취소 (스레드 기준)
-            const queueResult = cancelQueueByThread(re.item.ts);
+
+            // 큐 태스크 에이전트 중단 — 큐 task.id로 activeAgents에 등록되므로
+            // re.item.ts로는 찾지 못함 → DB에서 running task.id를 조회해 직접 중단
+            const runningTaskIds = getRunningTaskIdsByThread(threadTs);
+            for (const taskId of runningTaskIds) {
+              cancelAgent(taskId);
+              console.log(`[control] ⛔ 큐 태스크 에이전트 중단: ${taskId}`);
+            }
+
+            // 큐에 등록된 태스크 취소 (queued/running → skipped)
+            const queueResult = cancelQueueByThread(threadTs);
             if (queueResult.count > 0) {
               console.log(
-                `[control] ⛔ 큐 태스크 ${queueResult.count}개 취소: ${re.item.ts}`,
+                `[control] ⛔ 큐 태스크 ${queueResult.count}개 취소: thread=${threadTs}`,
               );
               // 취소된 태스크의 칸반 카드 → Blocked 이동
               for (const cardId of queueResult.kanbanCardIds) {
