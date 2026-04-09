@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: design-system
+roles: [designer, frontend, backend]
+summary: 토스 디자이너 업그레이드 잔여 갭 6종 분석 및 구현 계획 — 3계층 토큰·TDS 컴포넌트 반영
+status: accepted
+---
+
 # 회의 결정: Krusty 토스 스타일 디자이너 업그레이드 — 잔여 갭 분석 및 구현 계획
 > 회의 ID: 9
 > 유형: planning

@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: design-system
+roles: [designer, frontend, backend]
+summary: 토스 디자인 시스템 잔여 갭 해소 — 3계층 토큰·TDS 11종·Closed Token Layer 도입
+status: accepted
+---
+
 # 결정: 토스 디자인 시스템 잔여 갭 해소 (회의 #9)
 
 **날짜**: 2026-04-09

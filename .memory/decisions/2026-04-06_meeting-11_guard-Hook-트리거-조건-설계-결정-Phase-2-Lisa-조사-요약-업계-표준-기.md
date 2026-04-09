@@ -3,6 +3,7 @@ date: 2026-04-06
 topic: architecture
 roles: [backend, secops]
 summary: guard Hook 트리거 조건 설계 — PreToolUse warn→deny 단계적 접근 채택
+status: accepted
 ---
 
 # 회의 결정: guard Hook 트리거 조건 설계 결정 (Phase 2)

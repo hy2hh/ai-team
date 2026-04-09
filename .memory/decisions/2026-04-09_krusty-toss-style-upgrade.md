@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: design-system
+roles: [designer, frontend, backend]
+summary: Krusty 에이전트 Apple→토스 디자인 시스템 전면 전환 결정 — 회의 #8·#9 종합
+status: accepted
+---
+
 # 결정: Krusty 에이전트 토스(Toss) 디자인 시스템으로 전면 전환
 
 **날짜**: 2026-04-09

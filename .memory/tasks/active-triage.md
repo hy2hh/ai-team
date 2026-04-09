@@ -1,4 +1,5 @@
 # Active Tasks — Triage Agent
 
-## Current Tasks
+<!-- Format: - [ ] task description | created | priority -->
+
 (없음)

@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: design-system
+roles: [designer, frontend, backend]
+summary: Krusty 에이전트 토스 스타일 디자이너 업그레이드 — Apple→토스 전면 교체 전략 합의
+status: accepted
+---
+
 # 회의 결정: Krusty 에이전트 토스(Toss) 스타일 디자이너로 업그레이드 — 디자인 시스템 전환 전략
 > 회의 ID: 8
 > 유형: architecture

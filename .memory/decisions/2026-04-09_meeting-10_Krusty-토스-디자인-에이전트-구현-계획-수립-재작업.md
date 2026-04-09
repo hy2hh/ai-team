@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: design-system
+roles: [designer, frontend, backend]
+summary: 토스 디자인 에이전트 파일 구조 재설계 — SSOT 적용·중복 제거·참조 오류 수정
+status: accepted
+---
+
 # 회의 결정: Krusty 토스 디자인 에이전트 구현 계획 수립 (재작업)
 > 회의 ID: 10
 > 유형: planning

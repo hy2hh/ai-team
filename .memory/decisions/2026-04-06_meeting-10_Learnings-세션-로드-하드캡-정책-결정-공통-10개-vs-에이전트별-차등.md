@@ -3,6 +3,7 @@ date: 2026-04-06
 topic: memory
 roles: [all]
 summary: Learnings 세션 로드 하드캡 — 공통 10개 정책 채택 (에이전트별 차등 방식 보류)
+status: accepted
 ---
 
 # 회의 결정: Learnings 세션 로드 하드캡 정책 결정 — 공통 10개 vs 에이전트별 차등

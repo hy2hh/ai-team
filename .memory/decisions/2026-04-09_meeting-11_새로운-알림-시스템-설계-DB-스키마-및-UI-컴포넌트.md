@@ -1,3 +1,11 @@
+---
+date: 2026-04-09
+topic: architecture
+roles: [backend, designer]
+summary: 알림 시스템 DB 스키마(2-테이블·Partial Index) + UI 컴포넌트(Toast·Badge·알림 리스트) 설계 합의
+status: accepted
+---
+
 # 회의 결정: 새로운 알림 시스템 설계 — DB 스키마 및 UI 컴포넌트
 > 회의 ID: 11
 > 유형: architecture

@@ -305,3 +305,9 @@ specs/
 - [Toss Product Sans - 나무위키](https://namu.wiki/w/Toss%20Product%20Sans) — 폰트 배경 정보
 
 > ⚠️ 이 보고서의 수치는 2026-04-09 기준입니다. 현재와 다를 수 있습니다.
+
+---
+
+## Archive
+
+<!-- 300줄 초과 시 구버전 내용을 여기로 이동. 현재 없음 -->

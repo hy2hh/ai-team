@@ -3,6 +3,7 @@ date: 2026-04-04
 topic: process
 roles: [frontend, backend, designer]
 summary: 전 직군 React 프로세스 도입 + 평가 편향 수정 + 중복 제거
+status: accepted
 ---
 
 # Decision: 전 직군 React 프로세스 도입 + 평가 편향 수정 + 중복 제거
