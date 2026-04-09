@@ -93,6 +93,7 @@ import {
   runRalphLoop,
   runDirectQA,
 } from './qa-loop.js';
+import { setApps as setMeetingApps } from './meeting.js';
 import {
   startContextCleanupScheduler,
   formatCleanupReport,
@@ -3230,6 +3231,7 @@ const main = async () => {
     }
   }
   console.log('[start] 전체 에이전트 Socket Mode 연결 완료');
+  setMeetingApps(apps);
   console.log(
     '[start] Agent SDK 런타임 활성 — 병렬 실행 + mention 기반 에이전트 간 위임 지원',
   );

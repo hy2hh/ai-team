@@ -19,6 +19,26 @@ import type { SlackEvent } from './types.js';
 
 const PROJECT_DIR = join(import.meta.dirname, '..', '..');
 
+// ─── 에이전트별 Slack 앱 레지스트리 ─────────────────────────
+// index.ts 초기화 시 setApps()로 주입 — 회의 의견 수집 시 각 에이전트의 봇 토큰으로 포스팅
+const AGENT_ORDER = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'];
+let _apps: App[] = [];
+
+/**
+ * 전체 에이전트 앱 배열 등록 (index.ts 초기화 완료 후 호출)
+ */
+export const setApps = (apps: App[]): void => {
+  _apps = apps;
+};
+
+/**
+ * 에이전트 이름으로 해당 Slack 앱 조회 (없으면 첫 번째 앱 fallback)
+ */
+const findMeetingApp = (agentName: string): App | undefined => {
+  const idx = AGENT_ORDER.indexOf(agentName);
+  return idx >= 0 ? _apps[idx] : _apps[0];
+};
+
 const MEETING_OPINION_LIMIT = Number(
   process.env.MEETING_OPINION_LIMIT ?? 3000,
 );
@@ -145,13 +165,14 @@ export const collectOpinions = async (
     };
 
     try {
+      const agentApp = findMeetingApp(agent) ?? slackApp;
       const response = await handleMessage(
         agent,
         opinionEvent,
         'delegation',
-        slackApp,
+        agentApp,
         true,
-        true,
+        false,
         'high',
       );
 
