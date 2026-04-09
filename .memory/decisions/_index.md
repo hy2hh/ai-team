@@ -20,6 +20,8 @@
 | 04-06 | `2026-04-06_meeting-12_AI-엔지니어-에이전트Frink…` | all | team | Frink 신설 필요성 평가 회의 의견 (보류 결론) |
 | 04-07 | `2026-04-07_meeting-13_Chalmers-QA…` | qa,backend,frontend | testing | Chalmers e2e: Playwright CLI 채택, MCP 미채택 |
 | 04-07 | `2026-04-07_read-cost-optimization` | all | memory | 메모리 Read 비용 56K→12K 토큰 절감 — 파일시스템 3단계 전략 |
+| 04-09 | `2026-04-09_krusty-toss-style-upgrade` | designer,frontend,backend | design-system | Krusty 에이전트 Apple→토스 디자인 시스템 전면 전환 (회의 #8) |
+| 04-09 | `2026-04-09_meeting-9_toss-design-gap-analysis` | designer,frontend,backend | design-system | 토스 디자인 3계층 토큰·TDS 11종·Closed Token Layer 도입 (회의 #9) |
 
 ## 2026-03 결정사항 (아카이브)
 

@@ -8,7 +8,7 @@
 | Agent | Role | Slack Bot | Expertise |
 |-------|------|-----------|-----------|
 | Marge | Product Manager | @Marge | Requirements, prioritization, task delegation, roadmap |
-| Krusty | UI Designer | @Krusty | Design systems, UI/UX, accessibility, Figma |
+| Krusty | UI Designer (Toss-style) | @Krusty | Toss design system, UI/UX, card-based layout, motion design, accessibility |
 | Bart | Frontend Developer | @Bart | React, TypeScript, performance, responsive design |
 | Homer | Backend Architect | @Homer | System design, APIs, databases, cloud infrastructure |
 | Lisa | Trend Researcher | @Lisa | Market research, competitive analysis, trend detection |

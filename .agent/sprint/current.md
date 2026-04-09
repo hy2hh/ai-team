@@ -1,6 +1,6 @@
 # Sprint Log
 
-### [2026-03-26] Session: PM/Backend 보고 이슈 일괄 수정
+### [2026-03-26] [stale] Session: PM/Backend 보고 이슈 일괄 수정
 
 **Fixed:**
 1. 라우팅 텍스트에서 sender prefix 제거 → mention/패턴 매칭 오염 방지
@@ -13,14 +13,14 @@
 - 5개 에이전트 병렬 = 15개 MCP 서버 spawn → 리소스 고갈. 동시성 제한 필수
 - Slack Socket Mode에서 봇 메시지는 이벤트로 수신 안 됨 → 자동 테스트 불가
 
-### [2026-03-26] Session: 공유 메모리 주입 + 모델 업그레이드 + Hub 패턴
+### [2026-03-26] [stale] Session: 공유 메모리 주입 + 모델 업그레이드 + Hub 패턴
 
 **Learned:**
 - LLM에게 "파일을 읽어라" 지시는 보장 불가 → 코드가 직접 주입해야 구조적 보장
 - permissionMode와 allowedTools는 별개 레이어
 - Hub/Orchestrator 패턴 채택 (업계 70% 사용)
 
-### [2026-03-27] Session: 리액션 → Block Kit + 에이전트 이름 변경 + 안정화
+### [2026-03-27] [stale] Session: 리액션 → Block Kit + 에이전트 이름 변경 + 안정화
 
 **Tried:**
 - PM 위임 메시지에 리액션 추적 추가 → 성공
@@ -132,3 +132,22 @@
 **Next:**
 - enqueue 경로 개선: `syncEnqueuedTasksToKanban` 제거, queue-processor가 result.kanbanCardId 사용
 - 변경 파일: queue-manager.ts, agent-runtime.ts, queue-processor.ts
+
+### [2026-04-09] Session: cli-eval Judge 채점 + Bloom 평가 실행
+
+**Tried:**
+- cli-eval `--judge-only` 실행 → 14개 채점 성공, report 생성 실패 (grep이 markdown code block 파싱 못함)
+- Python으로 report.md 직접 생성 → 성공
+- Bloom 셋업: Python 3.9 → 3.11 venv 재생성, tenacity 추가 설치, behaviors.json trailing comma 수정, SEED_FILE 경로 디렉토리로 수정
+- Bloom self-preferential-bias 3 시나리오 실행 → 4단계(Understanding→Ideation→Rollout→Judgment) 전부 완료
+
+**Learned:**
+- claude -p 출력에 ```json code block이 포함됨 → grep/sed 파싱 불안정, Python json 파싱 권장
+- Bloom 프록시 BrokenPipeError는 litellm 클라이언트 타임아웃 → bloom이 자동 재시도하므로 치명적이지 않음
+- Bloom 프록시 경유 실행 시 시나리오당 10-20분 (32K+ chars 프롬프트)
+- bloom run은 디렉토리 경로를 인자로 받음 (seed.yaml 아님)
+
+**Next:**
+- 결과 커밋
+- Bloom 커스텀 behavior (role-boundary, persona-drift, scope-rejection) 평가
+- cost-quality 평가 (API 키 필요)
