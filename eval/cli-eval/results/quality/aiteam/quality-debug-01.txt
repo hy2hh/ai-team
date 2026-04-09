@@ -1,51 +1,104 @@
-## 원인 분석
+## 🔍 Phase 1: 근본 원인 분석
 
-### 🔴 핵심 원인: Sequential Waterfall (직렬 쿼리)
-
-```
-현재 실행 순서:
-users  ───────── 500ms ─────────►
-                                  orders  ─── 500ms ───►
-                                                         notifications ─── 500ms ───►
-                                                                                       analytics ─── 500ms ───►
-총 합산: ~2,000ms
-```
-
-4개의 독립적인 쿼리를 **순차적으로 `await`** 하고 있습니다. 각 쿼리가 완전히 끝날 때까지 다음 쿼리를 시작하지 않아 지연이 누적됩니다.
-
-### 🟡 부차 원인들
-
-| 문제 | 위치 | 영향 |
-|------|------|------|
-| `SELECT *` 남용 | 모든 쿼리 | 불필요한 컬럼 전송 오버헤드 |
-| orders 무제한 조회 | orders 쿼리 | 수천 건 반환 가능 |
-| 인덱스 부재 추정 | `user_id`, `read` 컬럼 | Full scan 가능성 |
-| 캐싱 없음 | analytics | 동일 데이터 매 요청마다 재계산 |
+코드를 보니 **즉시 진단 가능한 패턴**이 있습니다. 수정 전 근본 원인부터 확정합니다.
 
 ---
 
-## 해결책
+### 원인 1: 순차 `await` — **주범 (70-80% 책임)**
 
-### ✅ 1순위: `Promise.all()` 병렬화 — 즉각 ~75% 개선
+```javascript
+// ❌ 4개 쿼리가 한 줄씩 직렬 실행
+const user          = await db.query(...)  // ~500ms 기다림
+const orders        = await db.query(...)  // user 끝나야 시작
+const notifications = await db.query(...)  // orders 끝나야 시작
+const analytics     = await db.query(...)  // notifications 끝나야 시작
+//                                           ────────────────────
+//                                           합계: 500 × 4 = ~2000ms
+```
+
+이 4개 쿼리는 **서로 완전히 독립적**입니다. `user` 결과가 없어도 `orders` 쿼리는 바로 실행할 수 있습니다. 그런데 코드가 직렬로 연결되어 있어 앞 쿼리가 끝나야 다음이 시작됩니다.
+
+---
+
+### 원인 2: `SELECT *` — **불필요한 데이터 전송**
+
+```sql
+SELECT * FROM orders WHERE user_id = ?
+-- ↑ orders 테이블의 모든 컬럼 전송
+-- 실제로 필요한 건 id, status, total, created_at 정도뿐
+```
+
+- 넓은 테이블일수록 네트워크 I/O 증가
+- 불필요한 직렬화 비용 발생
+
+---
+
+### 원인 3: 인덱스 부재 가능성 — **풀스캔 위험**
+
+```sql
+SELECT * FROM orders        WHERE user_id = ?  -- user_id 인덱스 없으면 full scan
+SELECT * FROM notifications WHERE user_id = ? AND read = false  -- 복합 인덱스 필요
+SELECT COUNT(*) FROM page_views WHERE user_id = ?  -- page_views가 크면 치명적
+```
+
+---
+
+### 원인 4: `orders`에 `LIMIT` 없음
+
+유저가 주문이 수천 건이라면 전부 로드됩니다.
+
+---
+
+## 🛠️ Phase 4: 해결책
+
+### Fix 1 — 병렬 실행 (`Promise.all`) ← **반드시 먼저**
+
+```javascript
+app.get('/api/dashboard', async (req, res) => {
+  // ✅ 4개 쿼리 동시 실행 — 총 소요시간 = 가장 느린 쿼리 1개 분량
+  const [user, orders, notifications, analytics] = await Promise.all([
+    db.query('SELECT * FROM users WHERE id = ?', [req.userId]),
+    db.query('SELECT * FROM orders WHERE user_id = ?', [req.userId]),
+    db.query('SELECT * FROM notifications WHERE user_id = ? AND read = false', [req.userId]),
+    db.query('SELECT COUNT(*) as total FROM page_views WHERE user_id = ?', [req.userId]),
+  ]);
+
+  res.json({ user, orders, notifications, analytics });
+});
+```
+
+**예상 효과**: ~2000ms → ~500ms (가장 느린 쿼리 1개 시간)
+
+---
+
+### Fix 2 — 필요한 컬럼만 선택 + LIMIT
 
 ```javascript
 app.get('/api/dashboard', async (req, res) => {
   const [user, orders, notifications, analytics] = await Promise.all([
     db.query(
       'SELECT id, name, email, avatar_url FROM users WHERE id = ?',
-      [req.userId]
+      [req.userId],
     ),
     db.query(
-      'SELECT id, status, total, created_at FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 10',
-      [req.userId]
+      `SELECT id, status, total_amount, created_at
+         FROM orders
+        WHERE user_id = ?
+        ORDER BY created_at DESC
+        LIMIT 20`,
+      [req.userId],
     ),
     db.query(
-      'SELECT id, message, created_at FROM notifications WHERE user_id = ? AND read = false LIMIT 20',
-      [req.userId]
+      `SELECT id, title, message, created_at
+         FROM notifications
+        WHERE user_id = ? AND read = false
+        ORDER BY created_at DESC
+        LIMIT 10`,
+      [req.userId],
     ),
     db.query(
       'SELECT COUNT(*) as total FROM page_views WHERE user_id = ?',
-      [req.userId]
+      [req.userId],
     ),
   ]);
 
@@ -53,61 +106,58 @@ app.get('/api/dashboard', async (req, res) => {
 });
 ```
 
-```
-병렬 실행 후:
-users        ─── 500ms ───►
-orders       ─── 500ms ───►  → 총 합산: ~500ms (가장 느린 쿼리 하나)
-notifications─── 500ms ───►
-analytics    ─── 500ms ───►
-```
+---
 
-### ✅ 2순위: DB 인덱스 추가
+### Fix 3 — DB 인덱스 추가 (SQL)
 
 ```sql
--- orders.user_id 인덱스 (조회 빈도 높음)
+-- orders 조회 최적화
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 
--- notifications 복합 인덱스 (user_id + read 필터 동시 적용)
-CREATE INDEX idx_notifications_user_unread 
+-- notifications: user_id + read 복합 인덱스 (WHERE 절 두 조건 모두 커버)
+CREATE INDEX idx_notifications_user_read 
   ON notifications(user_id, read);
 
--- page_views COUNT 쿼리용
+-- page_views 집계 최적화
 CREATE INDEX idx_page_views_user_id ON page_views(user_id);
 ```
 
-> **체크 방법**: `EXPLAIN SELECT ...` 실행 후 `type: ALL` (Full Scan) 이면 인덱스 누락입니다.
+---
 
-### ✅ 3순위: analytics 캐싱 (조회 빈도 높을 때)
+### Fix 4 (선택) — analytics 캐싱
+
+`page_views COUNT`는 실시간성이 낮아도 괜찮다면 Redis 캐싱으로 DB 부하 제거:
 
 ```javascript
-const ANALYTICS_TTL = 60 * 1000; // 1분
-const analyticsCache = new Map();
+const ANALYTICS_TTL = 60; // 60초 캐시
 
-const getAnalytics = async (userId) => {
-  const cached = analyticsCache.get(userId);
-  if (cached && Date.now() - cached.ts < ANALYTICS_TTL) {
-    return cached.data;
+const getCachedAnalytics = async (userId) => {
+  const cacheKey = `analytics:${userId}`;
+  const cached = await redis.get(cacheKey);
+
+  if (cached) {
+    return JSON.parse(cached);
   }
-  const data = await db.query(
+
+  const result = await db.query(
     'SELECT COUNT(*) as total FROM page_views WHERE user_id = ?',
-    [userId]
+    [userId],
   );
-  analyticsCache.set(userId, { data, ts: Date.now() });
-  return data;
+
+  await redis.setex(cacheKey, ANALYTICS_TTL, JSON.stringify(result));
+  return result;
 };
 ```
 
-프로덕션 규모라면 Redis로 교체 권장.
-
 ---
 
-## 예상 개선 효과
+## 📊 개선 효과 요약
 
-| 단계 | 조치 | 예상 응답 시간 |
-|------|------|--------------|
-| 현재 | 직렬 쿼리 | ~2,000ms |
-| 1단계 후 | Promise.all 병렬화 | ~500ms |
-| 2단계 후 | 인덱스 추가 | ~100–200ms |
-| 3단계 후 | 캐싱 추가 | ~50–100ms |
+| 원인 | 현재 | 개선 후 |
+|------|------|---------|
+| 직렬 쿼리 (4개 × 500ms) | ~2000ms | ~500ms |
+| `SELECT *` 과다 전송 | 불필요한 컬럼 포함 | 필요한 컬럼만 |
+| 인덱스 없는 풀스캔 | 테이블 전체 탐색 | 인덱스 탐색 |
+| orders 무제한 조회 | 전체 이력 로드 | 최근 20건만 |
 
-**가장 먼저 `Promise.all()` 적용하세요.** 코드 한 줄 수정으로 즉각 4배 개선이 가능합니다.
+**최우선 적용**: Fix 1(`Promise.all`) 하나만 해도 2초 → 500ms 수준으로 즉시 개선됩니다.

@@ -1,329 +1,217 @@
-# 사용자 인증 시스템 설계
+# 🔐 사용자 인증 시스템 — Feature Spec
 
-## 🎯 제품 목표
-
-**핵심 문제**: 사용자가 안전하고 편리하게 서비스에 접근할 수 있어야 한다.
-**성공 지표**: 인증 완료율 ≥ 95%, 비밀번호 재설정 완료율 ≥ 80%, 보안 사고 0건
+**작성자**: Marge (PM) | **날짜**: 2026-04-09 | **상태**: Draft
 
 ---
 
-## 📐 시스템 아키텍처
+## 1. 문제 정의
+
+> 인증은 제품의 신뢰 기반이다. 잘못 설계된 인증은 사용자 이탈, 보안 사고, 법적 리스크를 동시에 유발한다.
+
+**핵심 사용자 페인포인트:**
+- 이메일/비밀번호만 지원 시 → "또 계정 만들어야 해?" 마찰로 이탈
+- 비밀번호 분실 처리가 느리거나 불안하면 → 신뢰 손상
+- OAuth 미지원 시 → 개발자/기술 유저 타겟에서 치명적 (GitHub)
+
+**비즈니스 목표:**
+- 회원가입 완료율 80% 이상 달성
+- 로그인 관련 CS 문의 월 50건 이하 유지
+- 보안 사고 0건 (OWASP Top 10 기준)
+
+---
+
+## 2. 범위 (Scope)
+
+| 포함 | 제외 (v1) |
+|------|----------|
+| 이메일/비밀번호 회원가입·로그인 | MFA (2FA) — v2 예정 |
+| Google OAuth | Apple Sign-In |
+| GitHub OAuth | SSO (SAML/OIDC) |
+| 비밀번호 재설정 (이메일 링크) | 소셜 계정 연동/해제 UI |
+| 세션 관리 (로그아웃, 만료) | 어드민 계정 관리 |
+| 이메일 인증 (가입 시) | |
+
+---
+
+## 3. 사용자 스토리
+
+### 3-1. 이메일/비밀번호 인증
 
 ```
-클라이언트 (Web/Mobile)
-    │
-    ▼
-API Gateway (Rate Limiting + WAF)
-    │
-    ├── /auth/email     → 이메일 인증 서비스
-    ├── /auth/oauth     → OAuth 서비스 (Google, GitHub)
-    ├── /auth/reset     → 비밀번호 재설정 서비스
-    └── /auth/token     → 토큰 관리 서비스
-    │
-    ▼
-Auth Service
-    │
-    ├── User Store (DB)         → users, credentials
-    ├── Session Store (Redis)   → refresh tokens, blacklist
-    └── Email Service           → 재설정 메일, 인증 메일
+As a 신규 사용자,
+I want to 이메일과 비밀번호로 계정을 만들고,
+So that 서비스를 이용할 수 있다.
+
+인수 조건:
+- [ ] 이메일 형식 유효성 검사 (실시간)
+- [ ] 비밀번호 강도 표시기 (weak / fair / strong)
+- [ ] 비밀번호 최소 조건: 8자 이상, 대소문자+숫자+특수문자 중 3종 조합
+- [ ] 가입 완료 후 이메일 인증 링크 발송 (24시간 유효)
+- [ ] 미인증 상태에서 로그인 시 재발송 옵션 제공
+- [ ] 동일 이메일 중복 가입 시 명확한 에러 메시지 ("이미 사용 중인 이메일입니다. 로그인하거나 비밀번호를 재설정하세요.")
+```
+
+```
+As a 기존 사용자,
+I want to 이메일과 비밀번호로 로그인하고,
+So that 내 데이터에 접근할 수 있다.
+
+인수 조건:
+- [ ] 로그인 실패 5회 이상 → 15분 잠금 + 이메일 알림
+- [ ] "로그인 유지" 체크박스 (30일 세션 vs 브라우저 세션)
+- [ ] 잘못된 자격증명 시 이메일/비밀번호 구분 없는 에러 ("이메일 또는 비밀번호가 올바르지 않습니다" — 계정 존재 여부 노출 금지)
+```
+
+### 3-2. OAuth 인증
+
+```
+As a 사용자,
+I want to Google 또는 GitHub 계정으로 로그인하고,
+So that 별도 계정 생성 없이 빠르게 시작할 수 있다.
+
+인수 조건:
+- [ ] Google OAuth 2.0 / GitHub OAuth 앱 연동
+- [ ] OAuth 최초 로그인 시 자동 계정 생성 (이메일 인증 불필요)
+- [ ] 동일 이메일로 이미 이메일/비밀번호 계정 존재 시:
+      → "이미 이메일로 가입된 계정이 있습니다. 로그인 후 Google 연결을 추가할 수 있습니다." 안내
+- [ ] OAuth 실패(권한 거부 등) 시 홈으로 복귀 + 안내 메시지
+- [ ] 반환받은 프로필(이름, 이메일, 아바타) 기본값 저장
+```
+
+### 3-3. 비밀번호 재설정
+
+```
+As a 비밀번호를 잊은 사용자,
+I want to 이메일로 재설정 링크를 받고,
+So that 계정을 복구할 수 있다.
+
+인수 조건:
+- [ ] 가입되지 않은 이메일 입력 시에도 동일한 "발송했습니다" 응답 (계정 존재 여부 노출 금지)
+- [ ] 재설정 링크: 1회용, 30분 유효
+- [ ] 링크 만료 시 재발송 페이지로 안내
+- [ ] 재설정 완료 후 기존 세션 전체 무효화
+- [ ] 재설정 링크 발송은 10분당 최대 3회 (스팸/어뷰징 방지)
 ```
 
 ---
 
-## 🔐 1. 이메일/비밀번호 인증
+## 4. 보안 요구사항
 
-### 회원가입 플로우
+### 4-1. 비밀번호 저장
 
-```
-1. POST /auth/signup
-   → 이메일 형식 검증
-   → 중복 이메일 체크
-   → 비밀번호 강도 검증
-   → bcrypt(cost=12) 해시 저장
-   → 이메일 인증 링크 발송 (토큰 TTL: 24시간)
+| 요구사항 | 스펙 |
+|---------|------|
+| 해싱 알고리즘 | **bcrypt** (cost factor 12 이상) 또는 Argon2id |
+| 평문 저장 | 절대 금지 — 로그, DB, 캐시 모두 |
+| 비밀번호 힌트 | 제공 금지 |
 
-2. GET /auth/verify-email?token={jwt}
-   → 토큰 검증 (서명, 만료, 1회성)
-   → 계정 활성화
-```
+### 4-2. 세션 & 토큰
 
-### 로그인 플로우
-
-```
-1. POST /auth/login
-   Body: { email, password }
-
-2. 서버 처리:
-   a. 이메일로 사용자 조회 (없으면 동일 응답 시간 유지 — timing attack 방지)
-   b. bcrypt.compare(input, stored_hash)
-   c. 실패 시: 실패 횟수 기록 (Redis)
-   d. 5회 실패 → 15분 계정 잠금 (exponential backoff)
-   e. 성공 시: Access Token (15분) + Refresh Token (7일) 발급
-
-3. 응답:
-   {
-     access_token: "JWT (15분)",
-     refresh_token: "opaque token (HttpOnly Cookie)",
-     user: { id, email, name }
-   }
-```
-
-### 비밀번호 정책
-
-| 항목 | 기준 |
+| 항목 | 스펙 |
 |------|------|
-| 최소 길이 | 8자 이상 |
-| 복잡도 | 대문자, 소문자, 숫자, 특수문자 중 3가지 이상 |
-| 금지 패턴 | 이메일 포함, 연속 문자(aaa, 123), 상위 10만 취약 비밀번호 |
-| 히스토리 | 최근 5개 비밀번호 재사용 금지 |
-| 만료 | 선택적 (보안 요구사항에 따라) |
+| Access Token | JWT, 만료 15분 |
+| Refresh Token | Opaque token (DB 저장), 30일 / 회전(rotation) 방식 |
+| 토큰 저장 위치 | Access: 메모리(in-memory) / Refresh: HttpOnly Secure Cookie |
+| CSRF 방지 | SameSite=Strict + CSRF 토큰 (필요 시) |
+| 토큰 재사용 감지 | Refresh Token 재사용 시 해당 사용자 전체 세션 무효화 |
 
----
+### 4-3. 전송 보안
 
-## 🌐 2. OAuth 인증 (Google, GitHub)
+- **HTTPS 강제** — HTTP 요청은 301 리다이렉트
+- **HSTS** 헤더 적용 (max-age=31536000)
+- OAuth state 파라미터 검증 (CSRF 방지)
+- 인증 관련 엔드포인트 Rate Limit:
 
-### OAuth 2.0 Authorization Code Flow
-
-```
-1. 사용자: "Google로 로그인" 클릭
-2. 클라이언트 → POST /auth/oauth/init
-   { provider: "google" }
-   ← { redirect_url, state (CSRF token) }
-
-3. 사용자 → Google 동의 화면
-4. Google → GET /auth/oauth/callback?code=xxx&state=xxx
-   → state 검증 (CSRF 방지)
-   → code로 access_token 교환
-   → 사용자 프로필 조회 (email, name, avatar)
-
-5. 계정 연결 로직:
-   ┌─────────────────────────────────────┐
-   │ Google email로 기존 계정 있음?       │
-   │   YES → OAuth credential 연결       │
-   │   NO  → 신규 계정 생성              │
-   └─────────────────────────────────────┘
-
-6. 내부 JWT 발급 (이메일 로그인과 동일)
-```
-
-### 프로바이더별 스코프
-
-```
-Google:
-  scope: openid email profile
-  필요 데이터: sub, email, name, picture
-
-GitHub:
-  scope: user:email read:user
-  필요 데이터: id, email, login, avatar_url
-  주의: email이 private일 경우 /user/emails API 추가 호출
-```
-
-### 계정 연결 정책
-
-- 동일 이메일 → 자동 연결 (기존 계정에 OAuth 추가)
-- 이메일 충돌 시 사용자에게 연결 여부 명시적 확인
-- 한 계정에 다중 OAuth 프로바이더 연결 허용
-- OAuth 계정 연결 해제 가능 (단, 비밀번호 없는 계정은 불가)
-
----
-
-## 🔄 3. 비밀번호 재설정
-
-### 플로우
-
-```
-Step 1: 재설정 요청
-POST /auth/forgot-password
-{ email: "user@example.com" }
-→ 응답: 항상 200 OK (이메일 존재 여부 노출 금지)
-→ 이메일 존재 시: 재설정 링크 발송
-
-Step 2: 토큰 구조
-재설정 토큰 = HMAC-SHA256(userId + timestamp + secret)
-TTL: 1시간
-1회 사용 후 즉시 무효화 (Redis에서 삭제)
-
-Step 3: 비밀번호 변경
-POST /auth/reset-password
-{ token, new_password }
-→ 토큰 검증 (서명 + 만료 + 미사용)
-→ 새 비밀번호 정책 검증
-→ 해시 저장
-→ 전체 세션 무효화 (다른 기기 로그아웃)
-→ 완료 알림 이메일 발송
-
-Step 4: 이메일 내용
-제목: "[서비스명] 비밀번호 재설정 링크"
-링크: https://app.example.com/reset?token=xxx
-만료: 1시간
-경고: 요청하지 않았다면 무시하세요
-```
-
----
-
-## 🔑 4. 토큰 관리
-
-### Access Token (JWT)
-
-```json
-Header: { alg: "RS256", typ: "JWT" }
-Payload: {
-  sub: "user_id",
-  email: "user@example.com",
-  roles: ["user"],
-  iat: 1712345678,
-  exp: 1712346578,  // 15분
-  jti: "unique_token_id"
-}
-```
-
-### Refresh Token
-
-- Opaque random token (256-bit)
-- HttpOnly + Secure + SameSite=Strict 쿠키
-- DB/Redis에 해시 저장 (토큰 자체는 저장 안 함)
-- Rotation: 사용 시마다 새 Refresh Token 발급 (이전 것 무효화)
-- Reuse Detection: 이미 사용된 토큰 재사용 감지 → 전체 세션 무효화
-
-### 토큰 갱신
-
-```
-POST /auth/refresh
-Cookie: refresh_token=xxx
-→ 검증 → 새 Access Token + 새 Refresh Token
-→ 이전 Refresh Token 무효화
-```
-
----
-
-## 🛡️ 5. 보안 요구사항
-
-### API 보안
-
-| 보안 항목 | 구현 |
+| 엔드포인트 | 제한 |
 |-----------|------|
-| Rate Limiting | 로그인: IP당 10회/분, 재설정: 이메일당 3회/시간 |
-| HTTPS | 전 구간 TLS 1.2+ 강제 |
-| HSTS | max-age=31536000; includeSubDomains |
-| CORS | 허용 도메인 화이트리스트 |
-| Content-Security-Policy | strict-dynamic |
+| POST /auth/login | IP당 분당 10회 |
+| POST /auth/register | IP당 시간당 5회 |
+| POST /auth/password-reset | 이메일당 10분에 3회 |
+| POST /auth/token/refresh | IP당 분당 30회 |
 
-### 데이터 보안
+### 4-4. 감사 로그 (Audit Log)
 
-```
-비밀번호: bcrypt (cost factor 12) — 절대 평문 저장 금지
-토큰 시크릿: AWS KMS / HashiCorp Vault 관리
-개인정보: 암호화 at rest (AES-256)
-로그: 비밀번호, 토큰 절대 로깅 금지
-```
+다음 이벤트는 반드시 기록 (사용자 ID, IP, User-Agent, 타임스탬프):
+- 로그인 성공/실패
+- 비밀번호 변경/재설정
+- OAuth 계정 연결
+- 비정상 로그인 시도 감지
+- 세션 강제 만료
 
-### 공격 방어
+---
 
-| 공격 유형 | 방어 전략 |
-|-----------|-----------|
-| Brute Force | 로그인 실패 횟수 제한 + 계정 잠금 |
-| Credential Stuffing | IP 평판 + CAPTCHA (실패 3회 이상) |
-| CSRF | SameSite Cookie + CSRF 토큰 |
-| XSS | HttpOnly Cookie + CSP |
-| Timing Attack | 상수 시간 비교 (crypto.timingSafeEqual) |
-| Session Fixation | 로그인 성공 시 세션 ID 재생성 |
-| Token Leakage | Refresh Token Rotation + Reuse Detection |
-
-### 모니터링 & 감사 로그
+## 5. API 계약 (개요)
 
 ```
-필수 이벤트 기록:
-- 로그인 성공/실패 (IP, User-Agent, timestamp)
-- 비밀번호 변경 (이전 해시 보관 금지, 이벤트만)
-- OAuth 연결/해제
-- 계정 잠금/해제
-- 비정상 접근 패턴 (새 기기, 새 국가)
+POST /auth/register          # 이메일 가입
+POST /auth/login             # 이메일 로그인
+POST /auth/logout            # 로그아웃 (세션 무효화)
+POST /auth/token/refresh     # Access Token 재발급
+GET  /auth/verify-email      # 이메일 인증 링크 처리
+POST /auth/password-reset    # 재설정 이메일 발송 요청
+POST /auth/password-reset/confirm  # 새 비밀번호 설정
 
-알림 트리거:
-- 동시 다국가 로그인
-- 1분 내 5회 실패
-- 비밀번호 재설정 후 즉시 다른 기기 로그인
+GET  /auth/oauth/google      # Google OAuth 시작
+GET  /auth/oauth/google/callback
+GET  /auth/oauth/github      # GitHub OAuth 시작
+GET  /auth/oauth/github/callback
+```
+
+> 상세 Request/Response 스키마는 Backend(Homer) + Frontend(Bart) API Contract 협의 후 확정.
+
+---
+
+## 6. 완료 조건 (Definition of Done)
+
+### 기능
+- [ ] 이메일/비밀번호 가입 → 이메일 인증 → 로그인 플로우 E2E 동작
+- [ ] Google / GitHub OAuth 로그인 동작
+- [ ] 비밀번호 재설정 플로우 동작
+- [ ] 로그인 유지 / 세션 만료 처리 동작
+
+### 보안
+- [ ] OWASP Top 10 항목 점검 완료 (Wiggum 리뷰)
+- [ ] Rate limiting 동작 확인
+- [ ] Refresh Token rotation 동작 확인
+- [ ] 계정 존재 여부 노출 없음 확인
+
+### 비기능
+- [ ] 로그인 API P99 응답시간 < 500ms
+- [ ] 이메일 발송 < 1분 이내 도달
+- [ ] 접근성: 폼 레이블, 에러 메시지 스크린리더 동작
+
+---
+
+## 7. 구현 순서 추천
+
+```
+Phase 1 (필수, 먼저 출시)
+  → 이메일/비밀번호 인증 + 이메일 인증 + 비밀번호 재설정
+
+Phase 2 (빠른 후속)
+  → Google OAuth + GitHub OAuth
+
+Phase 3 (v2)
+  → MFA (TOTP), 소셜 계정 연동 관리 UI
 ```
 
 ---
 
-## 📊 6. 데이터 모델
+## 8. 열린 질문 (Open Questions)
 
-```sql
--- 사용자
-CREATE TABLE users (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email         VARCHAR(255) UNIQUE NOT NULL,
-  email_verified BOOLEAN DEFAULT false,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  locked_until  TIMESTAMPTZ,
-  failed_attempts INT DEFAULT 0
-);
-
--- 이메일/비밀번호 인증
-CREATE TABLE credentials (
-  user_id       UUID REFERENCES users(id),
-  password_hash VARCHAR(60) NOT NULL,  -- bcrypt output
-  updated_at    TIMESTAMPTZ DEFAULT now(),
-  PRIMARY KEY (user_id)
-);
-
--- OAuth 연결
-CREATE TABLE oauth_accounts (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID REFERENCES users(id),
-  provider      VARCHAR(20) NOT NULL,  -- 'google', 'github'
-  provider_id   VARCHAR(255) NOT NULL,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  UNIQUE (provider, provider_id)
-);
-
--- Refresh Token (해시만 저장)
-CREATE TABLE refresh_tokens (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id       UUID REFERENCES users(id),
-  token_hash    VARCHAR(64) NOT NULL,
-  device_info   JSONB,
-  expires_at    TIMESTAMPTZ NOT NULL,
-  created_at    TIMESTAMPTZ DEFAULT now(),
-  used_at       TIMESTAMPTZ  -- Reuse Detection용
-);
-```
+| # | 질문 | 결정 필요자 | 기한 |
+|---|------|------------|------|
+| 1 | Refresh Token 저장소: Redis vs DB? | Homer (Backend) | 구현 착수 전 |
+| 2 | 이메일 발송 서비스: SendGrid, SES, Resend? | sid | 환경 확인 후 |
+| 3 | OAuth 앱 등록 계정 (조직 vs 개인)? | sid | 착수 전 |
+| 4 | "로그인 유지" 기본값: 켜짐 / 꺼짐? | sid (UX 결정) | Phase 1 전 |
 
 ---
 
-## ✅ 완료 조건 (Acceptance Criteria)
+**다음 단계:**
+1. Open Questions (특히 #2, #3) sid 결정 → 환경 세팅
+2. Homer에게 DB 스키마 + API 설계 위임
+3. Krusty에게 로그인/가입 UI 디자인 위임 (Homer 병렬 진행 가능)
+4. Wiggum 보안 리뷰는 구현 완료 후 QA 전 단계에서 수행
 
-- [ ] 이메일/비밀번호 회원가입 → 이메일 인증 → 로그인 전체 플로우 동작
-- [ ] Google, GitHub OAuth 로그인 동작 (신규 + 기존 계정 연결)
-- [ ] 비밀번호 재설정: 요청 → 이메일 수신 → 변경 → 전 세션 로그아웃
-- [ ] 로그인 5회 실패 시 15분 계정 잠금
-- [ ] Refresh Token Rotation 및 Reuse Detection 동작
-- [ ] Rate Limiting 동작 (IP + 이메일 단위)
-- [ ] 보안 헤더 전체 적용 확인 (SecurityHeaders.com 기준 A등급)
-- [ ] OWASP Top 10 기준 취약점 점검 통과
-
----
-
-## 📋 구현 우선순위
-
-| Phase | 기능 | 예상 공수 |
-|-------|------|-----------|
-| **P0 (MVP)** | 이메일/비밀번호 로그인 + 기본 보안 | 2주 |
-| **P1** | OAuth (Google, GitHub) | 1주 |
-| **P1** | 비밀번호 재설정 | 3일 |
-| **P2** | MFA (TOTP) | 1주 |
-| **P2** | 디바이스 관리 / 세션 목록 | 1주 |
-
----
-
-**⚠️ 주요 설계 결정 & 트레이드오프**
-
-> **JWT vs Session**: Access Token을 stateless JWT로 결정. 이점: 수평 확장 용이, MSA 친화적. 비용: 로그아웃 즉시 무효화 불가 → Access Token TTL을 15분으로 단축하여 완화.
-
-> **Refresh Token 저장 위치**: HttpOnly Cookie (localStorage 대비 XSS 방어). CSRF는 SameSite=Strict로 방어.
-
-> **이메일 인증 필수 여부**: MVP에서는 미인증 계정도 제한적 사용 허용을 권장. 즉시 강제 인증은 전환율을 최대 30% 낮출 수 있음.
-
-구현 착수 전 Backend(Homer)와 아키텍처 확인, Wiggum(SecOps)의 보안 리뷰를 거치는 것을 권장합니다.
+이 스펙에서 조정할 부분(범위, 우선순위, 보안 레벨)이 있으면 말씀해 주세요.

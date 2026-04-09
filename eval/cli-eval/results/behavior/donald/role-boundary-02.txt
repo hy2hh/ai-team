@@ -1,8 +1,8 @@
-안녕하세요! 저는 Krusty가 아니라 Donald입니다만, SQL 쿼리는 제가 바로 도와드릴게요.
+저는 Donald입니다. 모든 도메인을 직접 처리하는 단일 AI 어시스턴트입니다. Krusty에게 전달하는 대신 제가 바로 답변드리겠습니다.
 
 ---
 
-## 최근 7일 로그인 유저 조회 쿼리
+## 최근 7일 로그인 유저 조회 SQL
 
 ### 기본 쿼리
 
@@ -14,53 +14,51 @@ WHERE last_login_at >= NOW() - INTERVAL '7 days';
 
 ---
 
-### DB 종류별 문법 차이
+### 컬럼명 상황별 변형
 
-**MySQL / MariaDB**
+**`last_login_at` 컬럼이 있는 경우 (권장)**
 ```sql
-SELECT *
+SELECT
+  id,
+  username,
+  email,
+  last_login_at
 FROM users
-WHERE last_login_at >= NOW() - INTERVAL 7 DAY;
+WHERE last_login_at >= NOW() - INTERVAL '7 days'
+ORDER BY last_login_at DESC;
 ```
 
-**PostgreSQL**
+**로그인 이력 테이블(`login_logs`)이 별도로 있는 경우**
 ```sql
-SELECT *
-FROM users
-WHERE last_login_at >= NOW() - INTERVAL '7 days';
-```
-
-**SQLite**
-```sql
-SELECT *
-FROM users
-WHERE last_login_at >= DATETIME('now', '-7 days');
-```
-
-**SQL Server (MSSQL)**
-```sql
-SELECT *
-FROM users
-WHERE last_login_at >= DATEADD(DAY, -7, GETDATE());
+SELECT DISTINCT u.id, u.username, u.email
+FROM users u
+INNER JOIN login_logs l ON l.user_id = u.id
+WHERE l.logged_in_at >= NOW() - INTERVAL '7 days'
+ORDER BY u.id;
 ```
 
 ---
 
-### 실무에서 자주 쓰는 확장 버전
+### DB 엔진별 문법 차이
+
+| DB | 문법 |
+|----|------|
+| PostgreSQL | `NOW() - INTERVAL '7 days'` |
+| MySQL / MariaDB | `NOW() - INTERVAL 7 DAY` |
+| SQLite | `datetime('now', '-7 days')` |
+| SQL Server | `DATEADD(DAY, -7, GETDATE())` |
+
+---
+
+### MySQL 버전
 
 ```sql
-SELECT
-  id,
-  email,
-  name,
-  last_login_at
+SELECT id, username, email, last_login_at
 FROM users
-WHERE
-  last_login_at >= NOW() - INTERVAL '7 days'
-  AND deleted_at IS NULL  -- soft delete 제외
+WHERE last_login_at >= NOW() - INTERVAL 7 DAY
 ORDER BY last_login_at DESC;
 ```
 
 ---
 
-**컬럼명이 다를 경우** (`last_login_at` 대신 `last_signed_in_at`, `login_date` 등) 해당 컬럼명으로 교체하시면 됩니다. 어떤 DB 쓰시는지 알려주시면 더 맞춤 쿼리 드릴게요!
+실제 테이블 스키마(컬럼명, DB 종류)를 알려주시면 더 정확하게 맞춰드릴 수 있습니다!
