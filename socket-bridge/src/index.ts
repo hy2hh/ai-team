@@ -155,6 +155,12 @@ const downloadSlackImage = async (
       console.error(`[file] 이미지 다운로드 실패 (${resp.status}): ${urlPrivate}`);
       return null;
     }
+    // content-type 검증 — Slack URL 만료 시 HTML 페이지가 반환되므로 이미지만 허용
+    const contentType = resp.headers.get('content-type') ?? '';
+    if (!contentType.startsWith('image/')) {
+      console.error(`[file] 이미지 다운로드 실패: 예상치 못한 content-type="${contentType}" (URL 만료 가능성)`);
+      return null;
+    }
     const buffer = await resp.arrayBuffer();
     await mkdir(SLACK_FILES_TMP_DIR, { recursive: true });
     const tmpPath = join(SLACK_FILES_TMP_DIR, filename);

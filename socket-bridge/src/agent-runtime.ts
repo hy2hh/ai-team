@@ -2402,12 +2402,17 @@ export const handleMessage = async (
           }
         } else {
           // 마지막 메시지: ⚒️ → ✅/❌
+          // remove와 add를 분리 — remove 실패해도 완료 리액션은 반드시 추가
           try {
             await slackApp.client.reactions.remove({
               channel: event.channel,
               timestamp: ts,
               name: 'writing_hand',
             });
+          } catch {
+            // ⚒️ 없을 수도 있음 — 무시
+          }
+          try {
             await slackApp.client.reactions.add({
               channel: event.channel,
               timestamp: ts,
@@ -2415,7 +2420,7 @@ export const handleMessage = async (
             });
           } catch (err) {
             console.error(
-              `[reaction] ${sdkFailed ? '❌' : '✅'} 완료 리액션 전환 실패:`,
+              `[reaction] ${sdkFailed ? '❌' : '✅'} 완료 리액션 추가 실패:`,
               err,
             );
           }
@@ -2763,6 +2768,7 @@ export const handleMessage = async (
     );
 
     // ⚒️ → ❌ 에러 리액션 전환 — 디바운스 배치 시 모든 원본 메시지
+    // remove와 add를 분리 — remove 실패해도 ❌ add는 반드시 시도
     if (canReact) {
       const timestamps = event.batchTs ?? [event.ts];
       for (const ts of timestamps) {
@@ -2772,6 +2778,10 @@ export const handleMessage = async (
             timestamp: ts,
             name: 'writing_hand',
           });
+        } catch {
+          // ⚒️ 없을 수도 있음 — 무시
+        }
+        try {
           await slackApp.client.reactions.add({
             channel: event.channel,
             timestamp: ts,
@@ -2779,7 +2789,7 @@ export const handleMessage = async (
           });
         } catch (err) {
           console.error(
-            `[reaction] ❌ 에러 리액션 전환 실패:`,
+            `[reaction] ❌ 에러 리액션 추가 실패:`,
             err,
           );
         }
