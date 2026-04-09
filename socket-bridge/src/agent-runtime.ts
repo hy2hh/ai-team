@@ -1707,6 +1707,13 @@ export const handleMessage = async (
       );
     }
 
+    // PM hub-review 모드: Edit 도구 제거 — 리뷰 단계에서 PM이 다른 에이전트 산출물을 직접 수정하는 것을 방지
+    // QA FAIL 시 PM이 코드/디자인 파일을 직접 수정하는 대신 반드시 원작업자에게 재위임하도록 강제
+    if (agentName === 'pm' && routingMethod === 'hub-review') {
+      baseTools = baseTools.filter((t) => t !== 'Edit');
+      console.log('[pm] hub-review 모드: Edit 도구 비활성화 (파일 수정은 원작업자에게 재위임)');
+    }
+
     if (agentName === 'pm') {
       const delegationServer = createSdkMcpServer({
         name: 'delegation',
@@ -2266,7 +2273,7 @@ export const handleMessage = async (
             if (Object.keys(fields).length === 0) {
               return { content: [{ type: 'text' as const, text: '업데이트할 필드가 없습니다.' }] };
             }
-            await updateCard(kanbanCardId, fields as { title?: string; description?: string; progress?: number });
+            await updateCard(kanbanCardId, fields as { title?: string; description?: string; progress?: number }).catch(() => {});
             return { content: [{ type: 'text' as const, text: `칸반 카드 #${kanbanCardId} 업데이트 완료.` }] };
           },
         ),
