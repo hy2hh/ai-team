@@ -457,6 +457,16 @@ const isResearchRequest = (event: SlackEvent): boolean => {
   if (text.includes('depth=academic') || text.includes('depth=practical')) {
     return false;
   }
+  // 코드 분석/확인/설명 패턴은 리서치가 아닌 즉시 답변 대상
+  const nonResearchPatterns = [
+    '코드 분석', '코드 확인', '코드 설명', '코드 리뷰',
+    'code 분석', 'code 확인', 'code 설명',
+    '버그 분석', '오류 분석', '에러 분석',
+    '분석해줘', '분석해 줘', '확인해줘', '확인해 줘', '설명해줘', '설명해 줘',
+  ];
+  if (nonResearchPatterns.some((p) => text.includes(p))) {
+    return false;
+  }
   // 리서치 관련 키워드 포함 여부
   const researchKeywords = ['리서치', '조사', '분석', '시장', '트렌드', 'research', 'analyze', 'survey'];
   return researchKeywords.some((kw) => text.includes(kw));

@@ -158,7 +158,7 @@
 - [ ] max_turns 도달 시 Slack에 "🔄 재시도 중 [N/3]" 알림 게시
 - [ ] 재시도 시 기존 세션 ID로 resume (새 세션 생성 안 함) — 로그에서 `세션 재사용` 확인
 - [ ] 최대 3회 재시도 후도 실패 시 Blocked 상태로 종료
-- [ ] SESSION_TTL(72시간) 초과 세션 자동 정리 — `~/.claude-sessions/` 또는 `thread-sessions.json` 확인
+- [ ] SESSION_TTL(30일) 초과 세션 자동 정리 — `~/.claude-sessions/` 또는 `thread-sessions.json` 확인
 - [ ] 세션 저장소 JSON 손상 시 백업 후 초기화 — 로그에서 백업 파일명 확인
 
 ---
