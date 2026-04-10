@@ -10,9 +10,12 @@
  * 삭제 대상:
  *   conversations/ — 7일+ 경과 (actionable outcome 미포함 시)
  *   handoff/       — 7일+ 경과
+ *
+ * 감사 대상 (삭제 없음, Slack 경고만):
+ *   decisions/, docs/specs/ — frontmatter 5필드 누락 파일
  */
 
-import { readdir, stat, rename, unlink, mkdir, readFile } from 'fs/promises';
+import { readdir, stat, rename, unlink, mkdir, readFile, writeFile } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, basename } from 'path';
 import { MEMORY_DIR } from './db.js';
@@ -62,6 +65,8 @@ export interface CleanupResult {
   deletedCount: number;
   skippedCount: number;
   actions: CleanupAction[];
+  /** frontmatter 5필드 누락 파일 목록 (삭제 없음, 경고만) */
+  frontmatterWarnings: string[];
   durationMs: number;
   runAt: string;
 }
@@ -211,7 +216,24 @@ const cleanupConversations = async (): Promise<CleanupAction[]> => {
 };
 
 /**
- * handoff/ 정리: HANDOFF_EXPIRE_DAYS 초과 파일 삭제
+ * handoff/index.md에서 특정 파일명이 포함된 행을 제거한다.
+ */
+const removeFromHandoffIndex = async (filename: string): Promise<void> => {
+  const indexPath = join(MEMORY_DIR, 'handoff', 'index.md');
+  try {
+    const content = await readFile(indexPath, 'utf-8');
+    const updated = content
+      .split('\n')
+      .filter((line) => !line.includes(`\`${filename}\``))
+      .join('\n');
+    await writeFile(indexPath, updated, 'utf-8');
+  } catch {
+    // index.md 없으면 무시
+  }
+};
+
+/**
+ * handoff/ 정리: HANDOFF_EXPIRE_DAYS 초과 파일 삭제 + index.md 자동 갱신
  * index.md는 보존
  */
 const cleanupHandoffs = async (): Promise<CleanupAction[]> => {
@@ -231,6 +253,7 @@ const cleanupHandoffs = async (): Promise<CleanupAction[]> => {
 
     if (age >= CLEANUP_HANDOFF_EXPIRE_DAYS) {
       await unlink(filePath);
+      await removeFromHandoffIndex(file); // index.md 자동 갱신
       actions.push({
         type: 'deleted',
         file: `handoff/${file}`,
@@ -248,6 +271,53 @@ const cleanupHandoffs = async (): Promise<CleanupAction[]> => {
   }
 
   return actions;
+};
+
+// ─── Frontmatter 감사 ─────────────────────────────────────
+
+/** frontmatter 필수 5필드 */
+const REQUIRED_FM_FIELDS = ['date:', 'topic:', 'roles:', 'summary:', 'status:'];
+
+/**
+ * 지정된 디렉토리에서 frontmatter 5필드가 누락된 .md 파일 목록을 반환한다.
+ * _index.md / index.md / README.md / *.gitkeep은 제외
+ */
+const auditFrontmatter = async (
+  dir: string,
+  prefix: string,
+): Promise<string[]> => {
+  if (!existsSync(dir)) return [];
+
+  const files = await readdir(dir);
+  const warnings: string[] = [];
+
+  for (const file of files) {
+    if (!file.endsWith('.md')) continue;
+    if (['_index.md', 'index.md', 'README.md'].includes(file)) continue;
+
+    const filePath = join(dir, file);
+    try {
+      const content = await readFile(filePath, 'utf-8');
+      if (!content.startsWith('---')) {
+        warnings.push(`${prefix}/${file} (frontmatter 없음)`);
+        continue;
+      }
+      const fmEnd = content.indexOf('---', 3);
+      if (fmEnd === -1) {
+        warnings.push(`${prefix}/${file} (frontmatter 종료 태그 없음)`);
+        continue;
+      }
+      const fm = content.slice(0, fmEnd);
+      const missing = REQUIRED_FM_FIELDS.filter((f) => !fm.includes(f));
+      if (missing.length > 0) {
+        warnings.push(`${prefix}/${file} (누락: ${missing.join(', ')})`);
+      }
+    } catch {
+      // 읽기 실패 무시
+    }
+  }
+
+  return warnings;
 };
 
 // ─── 메인 정리 실행 ───────────────────────────────────────
@@ -269,21 +339,30 @@ export const runContextCleanup = async (): Promise<CleanupResult> => {
       deletedCount: 0,
       skippedCount: 0,
       actions: [],
+      frontmatterWarnings: [],
       durationMs: Date.now() - startMs,
       runAt,
     };
   }
 
   const allActions: CleanupAction[] = [];
+  let frontmatterWarnings: string[] = [];
 
   try {
-    const [decisionActions, convActions, handoffActions] = await Promise.all([
-      cleanupDecisions(),
-      cleanupConversations(),
-      cleanupHandoffs(),
-    ]);
+    const [decisionActions, convActions, handoffActions, fmDecisions, fmSpecs] =
+      await Promise.all([
+        cleanupDecisions(),
+        cleanupConversations(),
+        cleanupHandoffs(),
+        auditFrontmatter(join(MEMORY_DIR, 'decisions'), '.memory/decisions'),
+        auditFrontmatter(
+          join(import.meta.dirname, '..', '..', '..', 'docs', 'specs'),
+          'docs/specs',
+        ),
+      ]);
 
     allActions.push(...decisionActions, ...convActions, ...handoffActions);
+    frontmatterWarnings = [...fmDecisions, ...fmSpecs];
   } catch (err) {
     console.error('[context-cleanup] 정리 중 오류 발생:', err);
   }
@@ -294,10 +373,18 @@ export const runContextCleanup = async (): Promise<CleanupResult> => {
   const durationMs = Date.now() - startMs;
 
   console.log(
-    `[context-cleanup] 완료: 아카이브=${archivedCount}, 삭제=${deletedCount}, 유지=${skippedCount} (${durationMs}ms)`,
+    `[context-cleanup] 완료: 아카이브=${archivedCount}, 삭제=${deletedCount}, 유지=${skippedCount}, frontmatter경고=${frontmatterWarnings.length} (${durationMs}ms)`,
   );
 
-  return { archivedCount, deletedCount, skippedCount, actions: allActions, durationMs, runAt };
+  return {
+    archivedCount,
+    deletedCount,
+    skippedCount,
+    actions: allActions,
+    frontmatterWarnings,
+    durationMs,
+    runAt,
+  };
 };
 
 // ─── 자정 스케줄러 ─────────────────────────────────────────
@@ -379,6 +466,16 @@ export const formatCleanupReport = (result: CleanupResult): string => {
     lines.push('*🗑️ 삭제된 파일:*');
     for (const a of deleted) {
       lines.push(`• \`${a.file}\` — ${a.reason}`);
+    }
+  }
+
+  if (result.frontmatterWarnings.length > 0) {
+    lines.push('');
+    lines.push(
+      `*⚠️ Frontmatter 누락 파일 (${result.frontmatterWarnings.length}개):*`,
+    );
+    for (const w of result.frontmatterWarnings) {
+      lines.push(`• \`${w}\``);
     }
   }
 
