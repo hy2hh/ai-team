@@ -1,3 +1,11 @@
+---
+date: 2026-04-01
+topic: team
+roles: [all]
+summary: 팀 프로필 — sid(리드), 7 AI 에이전트 구성 및 역할
+status: accepted
+---
+
 # Team Profile
 
 ## Human Members

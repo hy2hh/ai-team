@@ -1,3 +1,11 @@
+---
+date: 2026-03-27
+topic: design-system
+roles: [designer, frontend]
+summary: 칸반보드 UI 디자인 스펙 핸드오프 — 디자인 토큰, 컴포넌트 명세 (⚠️ 만료 +15일, facts/ 승격 또는 삭제 필요)
+status: deprecated
+---
+
 # 칸반보드 UI 디자인 스펙
 > Designer → Frontend 핸드오프
 > 작성: 2026-03-27

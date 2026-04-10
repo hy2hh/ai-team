@@ -1,3 +1,11 @@
+---
+date: 2026-04-05
+topic: design-system
+roles: [designer, frontend]
+summary: AI 법률 서비스 MVP UI 스펙 — 컴포넌트 설계, 화면 흐름, 디자인 토큰 (Krusty → Bart 핸드오프)
+status: accepted
+---
+
 # AI 법률 서비스 MVP — UI 스펙
 > 작성일: 2026-04-05
 > 작성자: Krusty (Designer)

@@ -1,3 +1,11 @@
+---
+date: 2026-04-01
+topic: operations
+roles: [all]
+summary: 프로젝트 컨텍스트 — AI 에이전트 팀 설정, Slack 협업 시스템, 현재 진행 상황
+status: accepted
+---
+
 # Project Context
 
 ## Current Focus

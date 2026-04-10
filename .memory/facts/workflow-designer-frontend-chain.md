@@ -1,3 +1,11 @@
+---
+date: 2026-04-08
+topic: process
+roles: [designer, frontend]
+summary: Designer → Frontend 위임 체인 규칙 — Krusty 없이 Bart에게 직접 위임 금지
+status: accepted
+---
+
 # 워크플로 규칙: Designer → Frontend 위임 체인
 
 > 등록일: 2026-04-08

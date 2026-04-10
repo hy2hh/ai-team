@@ -1,3 +1,11 @@
+---
+date: 2026-04-01
+topic: operations
+roles: [all]
+summary: 외부 서비스 레지스트리 — Slack, Claude API 등 식별자 (인증정보는 .env 관리)
+status: accepted
+---
+
 # External Services Registry
 
 > 프로젝트별 외부 서비스 식별자. 인증 정보(토큰, API 키)는 .env에 관리.
