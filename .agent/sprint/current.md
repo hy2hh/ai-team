@@ -1,5 +1,47 @@
 # Sprint Log
 
+### [2026-04-11] Session: API 문서화 작업
+
+**Tried:**
+- Socket-bridge 프로젝트 구조 분석 (src/ 디렉토리 — 30+ 모듈)
+- Kanban-backend API 엔드포인트 조사 (routes/cards.ts, routes/boards.ts)
+- docs/api 디렉토리 신규 생성 및 3개 문서 작성:
+  1. socket-bridge-architecture.md (551줄) — 라우팅 & 런타임 시스템
+  2. kanban-backend-api.md (673줄) — REST API 완전 명세
+  3. README.md (84줄) — API 문서 인덱스
+
+**Learned:**
+- Socket-bridge는 6단계 라우팅 우선순위 적용: QA → @mention → conversational → keyword → LLM → default
+- Kanban 카드는 tags를 JSON 문자열로 DB 저장 → 클라이언트에서 파싱/직렬화 필요
+- WIP 검증 로직이 카드 이동(PATCH /cards/:id/move)에 적용됨
+- 칸반 GET /boards/:id는 단일 LEFT JOIN으로 모든 컬럼/카드 조회 (N+1 방지)
+- Circuit Breaker 패턴이 LLM 라우팅에 적용: 5회 연속 실패 시 회로 열림 → 60초 후 재시작
+
+**Next:**
+- kanban-frontend, kanban/backend의 추가 모듈 문서화 (웹소켓, DB 마이그레이션)
+- API 문서와 코드 예제를 Storybook 또는 문서 사이트에 통합
+- TypeScript 제네릭 타입 및 higher-order 함수 문서화
+- 성능 벤치마크 결과 추가 (쿼리 latency, 카드 이동 시간 등)
+
+**Commit:** fd793756 "Add comprehensive API documentation"
+
+---
+
+### [2026-04-11] Session: Button 컴포넌트 구현
+
+**Tried:**
+- `kanban-frontend/src/components/ui/button.tsx` 신규 작성
+- 기존 레거시(`Button.tsx`) 및 `mobile-button.tsx` 패턴 분석 후 통합
+
+**Learned:**
+- kanban-frontend는 kanban/frontend와 별개 프로젝트 — ui/ 디렉토리 없어 신규 생성 필요
+- 기존 test-button.tsx가 이미 유사 구현 존재 → 정식 컴포넌트로 승격하는 방식 채택
+- `aria-busy`/`aria-disabled`는 `true` 강제 대신 `undefined`로 falsy 처리해야 불필요한 attr 제거
+
+**Next:**
+- Button 컴포넌트를 실제 페이지/화면에서 import하여 사용 확인
+- Storybook 스토리 파일(`button.stories.tsx`) 작성 권장
+
 ### [2026-03-26] [stale] Session: PM/Backend 보고 이슈 일괄 수정
 
 **Fixed:**
@@ -151,3 +193,57 @@
 - 결과 커밋
 - Bloom 커스텀 behavior (role-boundary, persona-drift, scope-rejection) 평가
 - cost-quality 평가 (API 키 필요)
+
+### [2026-04-10] Session: pockie-wallet-extension AI Agent 기능 설계 + 구현 위임
+
+**Tried:**
+- Lisa 리서치 (경쟁사 분석 + 8개 후보 기능 평가) → 완료
+- 회의 #14/#15: Homer·Bart·Krusty·Wiggum 의견 종합, Tier 1(F1 자연어 tx·F2 리스크 시뮬레이션·F3 가스 최적화) 확정
+- Feature Spec 작성 (`docs/specs/2026-04-10_pockie-wallet-ai-agent.md`)
+- delegate_sequential 5단계 체인으로 Homer→Krusty→Bart/Homer→Chalmers 순차 위임
+
+**Learned:**
+- **런타임 테스트 미실시**: 에이전트들이 코드 작성 후 실제 익스텐션을 로드하여 동작 확인하는 E2E 테스트를 전혀 하지 않음. Chrome Extension 특성상 빌드 후 `chrome://extensions`에 로드, 팝업 실제 조작까지 해야 진짜 완료. 타입 체크 통과 ≠ 동작 보장
+- **Sprint log 미업데이트**: 에이전트 완료 후 `.agent/sprint/current.md` 업데이트 없음 → 시행착오가 다음 세션에 전달되지 않음
+- Chrome Extension E2E 테스트 하네스 미비가 근본 원인 — 에이전트가 테스트할 도구 자체가 없음
+
+**Next:**
+- Chrome Extension E2E 테스트 하네스 설계 및 구축 (Playwright + chrome extension 지원)
+- pockie-wallet AI agent 실제 런타임 검증 후 재완료 선언
+- Sprint log 강제 업데이트 메커니즘 도입 (queue-processor mtime 체크 + 자동 재주입)
+
+### [2026-04-11] Session: ai-team 보안 위협 모델링 검토 (Wiggum — queue task)
+
+**Tried:**
+- STRIDE 기반 위협 모델링: socket-bridge, 에이전트 실행 환경, 메모리 파일시스템, 라우팅 시스템, Hook 시스템 전수 분석
+- .env git 추적 상태, guard-check.sh 구조, ALLOWED_USER_IDS 게이트웨이, rate-limiter 존재 여부 직접 검증
+- 기존 보안 결정사항(guard Hook #11, pockie-wallet #14/#15) 교차 확인
+
+**Learned:**
+- .env 파일이 git-tracked 상태 — 토큰 노출 위험 (Critical). 단 git log에 커밋 이력 없어 초기 상태일 가능성
+- guard-check.sh 195줄 — fail-closed 설계 + 2-tier(deny/warn) 구조는 견고. 자기 수정 방지(CWE-284) 포함
+- 메모리 파일시스템(.memory/)에 에이전트 간 접근 제어 없음 — 모든 에이전트가 전체 읽기/쓰기 가능
+- rate-limiter.ts 존재 확인 — sliding window 50 req/min 구현됨
+- pockie-wallet 4-layer prompt injection 방어 설계는 우수 (L1 입력정규화→L2 구조분리→L3 출력검증→L4 의미검증)
+
+**Next:**
+- .env gitignore 적용 + .env.example 패턴 전환 (Homer 협업)
+- 토큰 로테이션 정책 수립
+- 에이전트별 메모리 접근 범위 제한 방안 검토
+
+### [2026-04-11] Session: 프로젝트 아키텍처 분석 (Lisa — queue task)
+
+**Tried:**
+- 프로젝트 루트, .claude/, .memory/, socket-bridge/src/ 전체 구조 탐색
+- 7개 에이전트 페르소나, 18개 스킬, 28개 socket-bridge 모듈 식별
+- 서브 프로젝트 5개(kanban, legal-rag, memory-viewer, eval, plant-care) 매핑
+
+**Learned:**
+- 아키텍처 핵심: socket-bridge(TS)가 Slack↔에이전트 허브 역할. @slack/bolt + claude-agent-sdk + better-sqlite3 기반
+- 메모리 3계층: .memory/(파일 공유) + memory.db(SQLite 칸반/세션) + thread-sessions.json(스레드 상태)
+- 코드 강제 > 프롬프트 지시 철학이 guard-check.sh Hook, auto-proceed.ts, cross-verify.ts 등에 구현됨
+- .claude/settings.json의 PreToolUse Hook이 모든 Bash/Write/Edit에 가드 체크 강제
+
+**Next:**
+- 아키텍처 다이어그램 시각화 (필요 시)
+- socket-bridge 모듈 간 의존성 심층 분석 (필요 시)
