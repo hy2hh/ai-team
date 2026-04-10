@@ -93,6 +93,7 @@ import {
   cleanupOldLoopStates,
   runRalphLoop,
   runDirectQA,
+  getLoopState,
 } from './qa-loop.js';
 import { setApps as setMeetingApps } from './meeting.js';
 import {
@@ -1082,12 +1083,18 @@ const executeSingle = async (
     if (seqAllPassed) {
       const specPath = extractSpecPath(event.text);
       if (specPath) {
-        console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-        try {
-          const qaApp = findAgentApp('qa', apps);
-          await runDirectQA(specPath, event, qaApp);
-        } catch (qaErr) {
-          console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+        // BUG-6: 동일 스레드에서 이미 QA PASS/WARN인 경우 재트리거 skip
+        const existingQaState = getLoopState(event.ts, 'chalmers');
+        if (existingQaState?.lastResult === 'PASS' || existingQaState?.lastResult === 'WARN') {
+          console.log(`[qa-loop] QA 재트리거 skip — 이미 ${existingQaState.lastResult} (thread: ${event.ts})`);
+        } else {
+          console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+          try {
+            const qaApp = findAgentApp('qa', apps);
+            await runDirectQA(specPath, event, qaApp);
+          } catch (qaErr) {
+            console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+          }
         }
       }
     }
@@ -1447,12 +1454,18 @@ const executeSingle = async (
       if (hubAllPassed) {
         const specPath = extractSpecPath(event.text);
         if (specPath) {
-          console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
-          try {
-            const qaApp = findAgentApp('qa', apps);
-            await runDirectQA(specPath, event, qaApp);
-          } catch (qaErr) {
-            console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+          // BUG-6: 동일 스레드에서 이미 QA PASS/WARN인 경우 재트리거 skip
+          const existingQaState = getLoopState(event.ts, 'chalmers');
+          if (existingQaState?.lastResult === 'PASS' || existingQaState?.lastResult === 'WARN') {
+            console.log(`[qa-loop] QA 재트리거 skip — 이미 ${existingQaState.lastResult} (thread: ${event.ts})`);
+          } else {
+            console.log(`[qa-loop] cross-verify 전체 PASS + specPath 감지 → QA 자동 실행: ${specPath}`);
+            try {
+              const qaApp = findAgentApp('qa', apps);
+              await runDirectQA(specPath, event, qaApp);
+            } catch (qaErr) {
+              console.error('[qa-loop] QA 자동 실행 실패:', qaErr);
+            }
           }
         }
       }
