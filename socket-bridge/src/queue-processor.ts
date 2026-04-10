@@ -175,6 +175,11 @@ const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null, agentNam
       '*이전 진행 상태 (대화 한도 도달로 중단됨):*',
       truncate(task.checkpoint, 3000),
     ];
+    // Bug fix: 재시도 경로에서도 선행 태스크 결과를 포함해야 함
+    // 이전에는 prevResult가 재시도 경로에서 누락되어 의존성 결과가 유실됨
+    if (prevResult) {
+      parts.push('', `*선행 태스크 결과:*\n${truncate(prevResult, 3000)}`);
+    }
     if (task.context) {
       parts.push('', `*추가 컨텍스트:*\n${task.context}`);
     }
@@ -327,6 +332,13 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
         // 알림 실패 무시
       }
       return;
+    }
+
+    // Bug fix: max_turns 도달 + 재시도 한도 소진 → 에러로 throw하여 catch 블록에서 markFailed 처리
+    // 이전에는 markCompleted(task.id, result.text)를 호출했는데 result.text가 에러 메시지 문자열이므로
+    // 의존 태스크가 에러 메시지를 "이전 태스크 결과"로 수신하는 버그가 있었음
+    if (result.isMaxTurns) {
+      throw new Error(`error_max_turns (재시도 ${task.max_retries}회 소진)`);
     }
 
     // 완료 처리
