@@ -831,6 +831,21 @@ const SLACK_TOOLS = [
   'mcp__slack__slack_list_channels',
 ];
 
+/**
+ * Slack MCP 쓰기 도구 — 비회의 모드에서 명시적 차단 대상
+ *
+ * allowedTools만으로는 permissionMode='bypassPermissions' 환경에서 MCP 쓰기 도구가
+ * 우회될 수 있음 (BUG-3). disallowedTools는 모델 컨텍스트에서 아예 제거되므로
+ * bypassPermissions 영향을 받지 않음.
+ *
+ * 회의 모드(event.user === 'meeting')에서는 에이전트가 자기 봇으로 의견을 게시하므로 허용.
+ */
+const MCP_SLACK_WRITE_TOOLS = [
+  'mcp__slack__slack_post_message',
+  'mcp__slack__slack_reply_to_thread',
+  'mcp__slack__slack_add_reaction',
+];
+
 /** Atlassian 읽기 도구 (모든 에이전트 공통) */
 const ATLASSIAN_READ_TOOLS = [
   'mcp__atlassian__getJiraIssue',
@@ -2343,12 +2358,25 @@ export const handleMessage = async (
         : MODEL_STANDARD;
     console.log(`[runtime] ${agentName} 모델 선택: ${selectedModel} (tier=${modelTier})`);
 
+    // 회의 모드 감지: meeting.ts가 collectOpinions/synthesizeAndDecide 호출 시 user='meeting'으로 마킹
+    // 회의 모드에서는 에이전트가 자기 봇으로 직접 의견을 게시할 수 있도록 MCP 쓰기 허용
+    const isMeetingContext = event.user === 'meeting';
+    if (!isMeetingContext) {
+      console.log(
+        `[runtime] ${agentName}: Slack MCP 쓰기 도구 차단 (BUG-3 — bypassPermissions 우회 방지)`,
+      );
+    }
+
     const queryOptions: Parameters<typeof query>[0]['options'] = {
       ...getClaudeSdkQueryAuthOptions(agentName),
       cwd: PROJECT_DIR,
       systemPrompt: session.systemPrompt,
       model: selectedModel,
       allowedTools: baseTools,
+      // MCP Slack 쓰기 도구 명시적 차단:
+      // permissionMode='bypassPermissions'가 allowedTools 필터를 우회하므로
+      // disallowedTools를 추가 사용. 회의 모드에서만 허용 (각 에이전트 봇으로 의견 게시).
+      ...(isMeetingContext ? {} : { disallowedTools: MCP_SLACK_WRITE_TOOLS }),
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       maxTurns: MAX_TURNS,
