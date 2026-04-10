@@ -270,6 +270,20 @@ const MIGRATIONS: Array<{ version: number; sql: string }> = [
       );
     `,
   },
+  {
+    version: 10,
+    sql: `
+      -- heartbeats 테이블에 에이전트 버전 컬럼 추가
+      ALTER TABLE heartbeats ADD COLUMN agent_version TEXT;
+    `,
+  },
+  {
+    version: 11,
+    sql: `
+      -- task_queue 우선순위 컬럼 추가 (1=긴급 ~ 10=낮음, 기본값 5)
+      ALTER TABLE task_queue ADD COLUMN priority INTEGER NOT NULL DEFAULT 5;
+    `,
+  },
 ];
 
 /**

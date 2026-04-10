@@ -13,6 +13,7 @@ export interface QueueTask {
   task: string;
   tier?: 'high' | 'standard' | 'fast';
   dependsOn?: number; // 선행 sequence index (0-based)
+  priority?: number;  // 1(긴급) ~ 10(낮음), 기본값 5. 낮을수록 먼저 실행
 }
 
 export interface EnqueueResult {
@@ -42,6 +43,7 @@ export interface TaskQueueRow {
   max_retries: number;
   kanban_card_id: number | null;
   checkpoint: string | null;
+  priority: number;
 }
 
 export interface QueueStatusSummary {
@@ -90,8 +92,8 @@ export const enqueue = (
   const insertStmt = db.prepare(`
     INSERT INTO task_queue (
       id, parent_queue_id, sequence, depends_on, agent, task, tier,
-      status, thread_ts, channel, created_at, retry_count, max_retries
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, 0, 1)
+      status, thread_ts, channel, created_at, retry_count, max_retries, priority
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, 0, 1, ?)
   `);
 
   const result: EnqueueResult = {
@@ -115,6 +117,7 @@ export const enqueue = (
         threadTs,
         channel,
         now,
+        Math.min(10, Math.max(1, t.priority ?? 5)), // priority 1~10 범위 강제
       );
       result.tasks.push({
         id: taskId,
@@ -162,12 +165,12 @@ export const getNextTasks = (maxCount = 3): TaskQueueRow[] => {
     .all() as Array<{ thread_ts: string }>;
   const runningThreadSet = new Set(runningThreads.map((r) => r.thread_ts));
 
-  // queued 상태 중 가장 오래된 것부터 조회
+  // queued 상태 중 priority 높은(숫자 낮은) 것 → 오래된 것 순으로 조회
   const candidates = db
     .prepare(`
       SELECT * FROM task_queue
       WHERE status = 'queued'
-      ORDER BY created_at ASC, sequence ASC
+      ORDER BY priority ASC, created_at ASC, sequence ASC
       LIMIT 20
     `)
     .all() as TaskQueueRow[];

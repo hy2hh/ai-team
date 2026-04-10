@@ -1882,6 +1882,7 @@ export const handleMessage = async (
                 task: z.string().describe('태스크 설명 (구체적일수록 좋음)'),
                 tier: z.enum(['high', 'standard', 'fast']).optional().describe('모델 tier. high=Opus(설계/분석), standard=Sonnet(구현), fast=Haiku(단순 조회). 기본값: standard'),
                 dependsOn: z.number().optional().describe('선행 태스크의 인덱스 (0-based). 해당 태스크 완료 후 실행됨'),
+                priority: z.number().min(1).max(10).optional().describe('실행 우선순위. 1=긴급(가장 먼저 실행) ~ 10=낮음. 기본값: 5'),
               })).describe('순차 실행할 태스크 배열'),
               reason: z.string().describe('큐 등록 이유'),
             },
@@ -1889,11 +1890,12 @@ export const handleMessage = async (
               const validAgents = ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'];
               const validTasks: QueueTask[] = tasks
                 .filter((t: { agent: string }) => validAgents.includes(t.agent))
-                .map((t: { agent: string; task: string; tier?: 'high' | 'standard' | 'fast'; dependsOn?: number }) => ({
+                .map((t: { agent: string; task: string; tier?: 'high' | 'standard' | 'fast'; dependsOn?: number; priority?: number }) => ({
                   agent: t.agent,
                   task: t.task,
                   tier: t.tier,
                   dependsOn: t.dependsOn,
+                  priority: t.priority,
                 }));
 
               if (validTasks.length === 0) {
