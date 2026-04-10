@@ -6,7 +6,6 @@
 
 | 파일 | from | to | topic | 날짜 | 상태 |
 |------|------|----|-------|------|------|
-| `designer-to-frontend_kanban-design-spec.md` | designer | frontend | 칸반 디자인 스펙 핸드오프 | 2026-03-27 | ⚠️ 만료 (7일 초과 — Bart 검토 후 삭제 또는 facts/ 승격 필요) |
 
 ## 파일 형식
 `{from}-to-{to}_{topic}.md`

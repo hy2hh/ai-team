@@ -34,7 +34,10 @@
 6. Scan `.memory/facts/agents/{role}/` → 역할별 operational 지식 있으면 Read
 7. Check `handoff/index.md` → 본인 role 포함 파일만 Read
 
-> decisions 조회·작성 → `/decision-ops` 스킬 호출
+> ⛔ **HARD RULE — decisions 조회·작성 시 `/decision-ops` 스킬 반드시 호출**
+> - decisions 파일 작성 시 5필드 frontmatter(`date`, `topic`, `roles`, `summary`, `status`) 없으면 **규칙 위반**
+> - frontmatter 없는 decisions 파일 커밋 = 금지. 스킬 호출 없이 직접 파일 생성 = 금지
+> - `_index.md` 테이블 미갱신 = 금지
 
 ## Session End Protocol
 1. **Operational 지식 저장** — 아래 중 하나라도 해당하면 `facts/agents/{role}/` 즉시 업데이트:
