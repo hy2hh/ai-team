@@ -1,3 +1,11 @@
+---
+date: 2026-04-02
+topic: design-system
+roles: [frontend, designer]
+summary: 칸반 보드 포인트컬러 디자인 개선 완료 스펙
+status: accepted
+---
+
 # 칸반 보드 UI — 포인트컬러 중심 디자인 개선 스펙
 > 작성일: 2026-04-02
 > 작성자: Marge (PM)

@@ -1,3 +1,11 @@
+---
+date: 2026-03-30
+topic: architecture
+roles: [backend]
+summary: Task Queue System — 에이전트 병렬 작업 큐 시스템 완료 스펙
+status: accepted
+---
+
 # Feature Spec: Task Queue System
 Date: 2026-03-30
 Author: Marge (PM)

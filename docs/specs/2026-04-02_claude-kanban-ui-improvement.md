@@ -1,3 +1,11 @@
+---
+date: 2026-04-02
+topic: design-system
+roles: [frontend, designer]
+summary: claude-kanban UI 디자인 시스템 토큰 적용 완료 스펙
+status: accepted
+---
+
 # claude-kanban UI 개선 — 디자인 시스템 토큰 적용
 > 작성일: 2026-04-02
 > 작성자: Marge (PM)

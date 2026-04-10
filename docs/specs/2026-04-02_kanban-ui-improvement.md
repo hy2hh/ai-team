@@ -1,3 +1,11 @@
+---
+date: 2026-04-02
+topic: design-system
+roles: [frontend, designer]
+summary: 칸반 보드 UI 종합 디자인 스펙 — 토스 디자인 시스템 v3 완료
+status: accepted
+---
+
 # 칸반 보드 UI 개선 — 종합 디자인 스펙
 > 작성일: 2026-04-02
 > 작성자: Krusty (Designer)

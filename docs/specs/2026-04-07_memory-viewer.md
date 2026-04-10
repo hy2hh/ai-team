@@ -1,3 +1,11 @@
+---
+date: 2026-04-07
+topic: tooling
+roles: [frontend, designer]
+summary: .memory/ 뷰어 앱 (Obsidian 스타일) — 파일 탐색·검색·미리보기 구현 완료
+status: accepted
+---
+
 # Feature Spec: .memory/ 뷰어 앱 (Obsidian 스타일)
 
 **상태**: implemented

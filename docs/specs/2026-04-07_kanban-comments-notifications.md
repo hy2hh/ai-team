@@ -1,3 +1,11 @@
+---
+date: 2026-04-07
+topic: kanban
+roles: [backend, frontend]
+summary: 칸반 코멘트 + 알림 시스템 Phase 1 — mention 알림·코멘트 CRUD (2026-04-10 알림 스펙 v2로 대체)
+status: superseded
+---
+
 # Feature Spec: 칸반 코멘트 + 알림 시스템 (Clawe 이식 Phase 1)
 
 **상태**: approved

@@ -1,3 +1,11 @@
+---
+date: 2026-04-07
+topic: tooling
+roles: [frontend, designer]
+summary: Memory Viewer 로그인·파일 편집 기능 추가 스펙
+status: accepted
+---
+
 # Feature Spec: Memory Viewer 로그인 & 파일 편집 기능
 
 **작성일**: 2026-04-07

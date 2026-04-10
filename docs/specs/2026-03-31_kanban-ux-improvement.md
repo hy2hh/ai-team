@@ -1,3 +1,11 @@
+---
+date: 2026-03-31
+topic: design-system
+roles: [frontend, designer]
+summary: 칸반보드 UI/UX 전면 개선 — 토스 디자인 시스템 1차 적용 완료
+status: accepted
+---
+
 # 칸반보드 UI/UX 전면 개선 스펙
 > 작성일: 2026-03-31
 > 작성자: Marge (PM)

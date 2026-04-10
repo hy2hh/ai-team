@@ -1,3 +1,11 @@
+---
+date: 2026-04-04
+topic: product
+roles: [backend, frontend, designer]
+summary: AI 법률 서비스 MVP Feature Spec — 계약서 검토·법률 Q&A 핵심 기능
+status: accepted
+---
+
 # AI 법률 서비스 MVP — Feature Spec
 > 작성일: 2026-04-04
 > 작성자: Marge (PM)
