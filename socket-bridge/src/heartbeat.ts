@@ -9,6 +9,7 @@ interface HeartbeatData {
   status: 'active' | 'idle';
   current_task?: string;
   pid: number;
+  agent_version?: string;
 }
 
 interface HeartbeatRow {
@@ -17,6 +18,7 @@ interface HeartbeatRow {
   status: 'active' | 'idle';
   current_task: string | null;
   pid: number;
+  agent_version: string | null;
 }
 
 /**
@@ -24,25 +26,28 @@ interface HeartbeatRow {
  * @param role - 에이전트 역할 (e.g., 'bridge', 'pm', 'backend')
  * @param status - 현재 상태
  * @param currentTask - 현재 처리 중인 태스크 (선택)
+ * @param agentVersion - 에이전트 버전 (선택, 예: '1.2.3')
  */
 export const writeHeartbeat = (
   role: string,
   status: 'active' | 'idle',
   currentTask?: string,
+  agentVersion?: string,
 ): void => {
   const db = getDb();
   const now = Date.now();
 
   try {
     db.prepare(`
-      INSERT INTO heartbeats (role, last_seen, status, current_task, pid)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO heartbeats (role, last_seen, status, current_task, pid, agent_version)
+      VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(role) DO UPDATE SET
-        last_seen    = excluded.last_seen,
-        status       = excluded.status,
-        current_task = excluded.current_task,
-        pid          = excluded.pid
-    `).run(role, now, status, currentTask ?? null, process.pid);
+        last_seen     = excluded.last_seen,
+        status        = excluded.status,
+        current_task  = excluded.current_task,
+        pid           = excluded.pid,
+        agent_version = excluded.agent_version
+    `).run(role, now, status, currentTask ?? null, process.pid, agentVersion ?? null);
   } catch (err) {
     console.error(`[heartbeat] 쓰기 실패: ${role}`, err);
   }
@@ -86,6 +91,7 @@ export const getActiveAgents = (): HeartbeatData[] => {
       status: row.status,
       pid: row.pid,
       ...(row.current_task !== null && { current_task: row.current_task }),
+      ...(row.agent_version !== null && { agent_version: row.agent_version }),
     }));
   } catch (err) {
     console.error('[heartbeat] 활성 에이전트 조회 실패:', err);
