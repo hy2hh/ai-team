@@ -67,6 +67,37 @@ export interface QueueStatusSummary {
 /** 동일 스레드에서 동시에 실행 가능한 큐 수 제한 */
 const MAX_CONCURRENT_QUEUES_PER_THREAD = 1;
 
+/** 태스크 내용에서 high(Opus) tier가 필요한 키워드 */
+const TIER_HIGH_PATTERN =
+  /설계|아키텍처|리뷰|검증|분석|평가|회의|검토|보안|취약점|위협|모델링|의사결정|판단|계획/i;
+
+/** 태스크 내용에서 fast(Haiku) tier로 충분한 키워드 */
+const TIER_FAST_PATTERN =
+  /요약|정리|기록|업데이트|조회|목록|확인|문서화|주석|인덱스|로그|sprint.log/i;
+
+/**
+ * 에이전트 이름과 태스크 설명에서 적절한 모델 tier를 자동 추론한다.
+ *
+ * 우선순위:
+ * 1. QA/SecOps 에이전트 → 항상 high (정밀 분석 필요)
+ * 2. 태스크 내용에 설계/분석/검토 키워드 → high
+ * 3. 태스크 내용에 단순 조회/문서화 키워드 → fast
+ * 4. 그 외 → standard (일반 구현)
+ *
+ * @param agent - 에이전트 이름
+ * @param task - 태스크 설명
+ * @returns 추론된 ModelTier
+ */
+export const inferTier = (
+  agent: string,
+  task: string,
+): 'high' | 'standard' | 'fast' => {
+  if (agent === 'qa' || agent === 'secops') { return 'high'; }
+  if (TIER_HIGH_PATTERN.test(task)) { return 'high'; }
+  if (TIER_FAST_PATTERN.test(task)) { return 'fast'; }
+  return 'standard';
+};
+
 /** 결과 저장 최대 길이 (truncation) */
 const MAX_RESULT_LENGTH = 5000;
 
@@ -113,7 +144,7 @@ export const enqueue = (
         t.dependsOn ?? null,
         t.agent,
         t.task,
-        t.tier ?? 'standard',
+        t.tier ?? inferTier(t.agent, t.task),
         threadTs,
         channel,
         now,

@@ -27,7 +27,7 @@ import {
 import { classifyRisk } from './risk-matrix.js';
 import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
-import { enqueue, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
+import { enqueue, inferTier, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
 import { buildMessageBlocks } from './slack-table.js';
 import {
@@ -1802,7 +1802,7 @@ export const handleMessage = async (
               const targets: DelegationTarget[] = [];
               for (const agent of valid) {
                 const cardId = await createCard(reason.slice(0, 200), agent).catch(() => null);
-                targets.push({ agent, tier, kanbanCardId: cardId ?? undefined });
+                targets.push({ agent, tier: tier ?? inferTier(agent, reason), kanbanCardId: cardId ?? undefined });
               }
               delegationQueue.push(...targets);
 
@@ -1833,7 +1833,7 @@ export const handleMessage = async (
                   ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
                 ),
                 task: step.task,
-                tier: step.tier,
+                tier: step.tier ?? inferTier(step.agents[0] ?? '', step.task),
               })).filter((step) => step.agents.length > 0);
 
               // 전체 step에서 구현 에이전트 2+ 참여 시 스펙 파일 검증
