@@ -52,6 +52,7 @@ import {
   cleanupExpiredApprovals,
   onApproved,
   cancelAllPendingTimers,
+  resolveApprovalById,
 } from './auto-proceed.js';
 import {
   shouldVerify,
@@ -2289,6 +2290,94 @@ const main = async () => {
           }
         } catch (err) {
           console.error('[permission] permission_deny 핸들러 오류:', err);
+        }
+      },
+    );
+
+    // ─── AUTO-PROCEED HIGH 리스크 승인/거부 버튼 핸들러 ────────────
+    // pending_approvals 테이블의 특정 항목을 버튼 클릭으로 직접 처리
+    app.action(
+      'approval_approve',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const clickerId = (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(`[approval] 미인가 사용자 승인 시도: ${clickerId}`);
+            return;
+          }
+          const approvalId = parseInt((action as { value?: string }).value ?? '', 10);
+          if (isNaN(approvalId)) { return; }
+          const resolved = await resolveApprovalById(approvalId, true, app);
+          if (resolved) {
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '✅ 승인됨 — 에이전트가 작업을 계속 진행합니다.',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.' },
+                  },
+                ],
+              });
+            }
+            console.log(`[approval] ✅ 승인: approvalId=${approvalId}`);
+          }
+        } catch (err) {
+          console.error('[approval] approval_approve 핸들러 오류:', err);
+        }
+      },
+    );
+
+    app.action(
+      'approval_reject',
+      async ({ ack, body, action }) => {
+        try {
+          await ack();
+          const clickerId = (body as { user?: { id?: string } }).user?.id ?? '';
+          const authorizedUserId = process.env.SID_USER_ID ?? 'U0AJ3T423RU';
+          if (clickerId !== authorizedUserId) {
+            console.warn(`[approval] 미인가 사용자 거부 시도: ${clickerId}`);
+            return;
+          }
+          const approvalId = parseInt((action as { value?: string }).value ?? '', 10);
+          if (isNaN(approvalId)) { return; }
+          const resolved = await resolveApprovalById(approvalId, false, app);
+          if (resolved) {
+            const b = body as {
+              message?: { ts?: string };
+              channel?: { id?: string };
+              container?: { message_ts?: string; channel_id?: string };
+            };
+            const channel = b.channel?.id ?? b.container?.channel_id ?? '';
+            const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            if (channel && ts) {
+              await app.client.chat.update({
+                channel,
+                ts,
+                text: '❌ 거부됨 — 에이전트가 작업을 중단합니다.',
+                blocks: [
+                  {
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.' },
+                  },
+                ],
+              });
+            }
+            console.log(`[approval] ❌ 거부: approvalId=${approvalId}`);
+          }
+        } catch (err) {
+          console.error('[approval] approval_reject 핸들러 오류:', err);
         }
       },
     );

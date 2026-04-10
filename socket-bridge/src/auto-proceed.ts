@@ -95,15 +95,41 @@ export const registerAutoProceed = async (
     await slackApp.client.chat.postMessage({
       channel: req.channel,
       thread_ts: req.messageTs,
-      text: [
-        `🔴 *[HIGH 리스크] sid 승인 필요 — 무기한 대기 중*`,
-        `*다음 단계:* ${agentList}`,
-        `*이유:* ${req.reason}`,
-        `*요약:* ${req.actionSummary}`,
-        '',
-        `이 스레드에 *승인* 또는 *거부* 로 답장하세요.`,
-        `(또는 ✅ / ❌ 리액션)`,
-      ].join('\n'),
+      text: `🔴 [HIGH 리스크] sid 승인 필요 — ${req.reason}`,
+      blocks: [
+        {
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: [
+              `🔴 *[HIGH 리스크] sid 승인 필요*`,
+              `*다음 단계:* ${agentList}`,
+              `*이유:* ${req.reason}`,
+              `*요약:* ${req.actionSummary}`,
+            ].join('\n'),
+          },
+        },
+        {
+          type: 'actions',
+          block_id: `approval_block_${approvalId}`,
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '✅ 승인', emoji: true },
+              style: 'primary',
+              action_id: 'approval_approve',
+              value: String(approvalId),
+            },
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '❌ 거부', emoji: true },
+              style: 'danger',
+              action_id: 'approval_reject',
+              value: String(approvalId),
+            },
+          ],
+        },
+      ],
     });
   } else {
     const emoji = req.riskLevel === 'LOW' ? '🟢' : '🟡';
@@ -232,6 +258,31 @@ const resolveApproval = async (
   if (status !== 'cancelled' && status !== 'rejected' && onApprovedCallback) {
     onApprovedCallback(approvalId, agents, row.reason, row.channel, row.message_ts);
   }
+};
+
+/**
+ * 버튼 클릭으로 특정 approvalId를 직접 승인/거부
+ * @returns 처리 성공 여부
+ */
+export const resolveApprovalById = async (
+  approvalId: number,
+  approved: boolean,
+  slackApp: App,
+): Promise<boolean> => {
+  const db = getDb();
+  const row = db.prepare(
+    'SELECT 1 FROM pending_approvals WHERE id = ? AND status = ?',
+  ).get(approvalId, 'pending');
+  if (!row) {
+    console.warn(`[auto-proceed] resolveApprovalById: 알 수 없거나 이미 처리된 approvalId ${approvalId}`);
+    return false;
+  }
+  await resolveApproval(
+    approvalId,
+    approved ? 'manually_approved' : 'rejected',
+    slackApp,
+  );
+  return true;
 };
 
 /**

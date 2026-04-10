@@ -1408,6 +1408,7 @@ export const handleMessage = async (
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
   existingKanbanCardId?: number | null,
   _stepInfo?: { current: number; total: number },
+  _antiPatternRetry = false,
 ): Promise<HandleMessageResult> => {
   // ─── Lisa 리서치 모드 선택 가로채기 ─────────────────────
   // 사람이 보낸 리서치 요청이면 A/B 버튼을 먼저 보내고 선택 대기
@@ -2138,6 +2139,42 @@ export const handleMessage = async (
               }
             },
           ),
+          tool(
+            'request_approval',
+            'HIGH 리스크 작업에 대해 sid에게 Slack Block Kit 버튼(✅ 승인 / ❌ 거부)으로 승인을 요청합니다. 프로덕션 배포, 대규모 DB 변경, 외부 API 과금 등 되돌리기 어려운 작업 전에 호출하세요. 승인은 비동기로 처리되며 sid가 버튼을 클릭하면 다음 단계가 자동 진행됩니다.',
+            {
+              agents: z.array(z.string()).describe('승인 후 실행할 에이전트 목록'),
+              reason: z.string().describe('승인이 필요한 이유'),
+              actionSummary: z.string().describe('승인 후 수행할 작업 요약'),
+            },
+            async ({ agents, reason, actionSummary }) => {
+              const valid = agents.filter((a: string) =>
+                ['pm', 'designer', 'frontend', 'backend', 'researcher', 'secops', 'qa'].includes(a),
+              );
+              const approvalId = await registerAutoProceed(
+                {
+                  messageTs: event.thread_ts ?? event.ts,
+                  channel: event.channel,
+                  agents: valid,
+                  reason,
+                  actionSummary,
+                  riskLevel: 'HIGH',
+                },
+                slackApp,
+              );
+              console.log(
+                `[request_approval] PM HIGH 승인 요청 등록: #${approvalId} — ${reason}`,
+              );
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: `✅ 승인 요청 전송됨 (approvalId=#${approvalId}). sid가 버튼을 클릭하면 [${valid.join(', ')}]에게 자동 위임됩니다.`,
+                  },
+                ],
+              };
+            },
+          ),
         ],
       });
       baseMcpServers.delegation = delegationServer;
@@ -2147,6 +2184,7 @@ export const handleMessage = async (
         'mcp__delegation__run_qa',
         'mcp__delegation__recommend_next_phase',
         'mcp__delegation__convene_meeting',
+        'mcp__delegation__request_approval',
       );
     } else {
       // 비PM 에이전트: 범위 초과 시 PM에게 에스컬레이션 신호 도구
@@ -2458,6 +2496,8 @@ export const handleMessage = async (
 
     // ── "진행할까요?" 안티패턴 감지 ──────────────────────────
     // 프롬프트 규칙으로 금지해도 반복 위반 → 코드로 강제 차단
+    // 1차 감지: 응답을 차단하고 에이전트에게 즉시 실행 재요청 (1회 한정)
+    // 2차 감지(재시도): 경고만 추가하여 포스팅 (무한 루프 방지)
     const ASK_PERMISSION_PATTERNS = [
       /진행할까요\??/,
       /시작할까요\??/,
@@ -2479,7 +2519,34 @@ export const handleMessage = async (
         console.warn(
           `[enforcement] ${agentName} "진행할까요?" 안티패턴 감지: ${matched}`,
         );
-        resultText += '\n\n> ⚠️ _[bridge 자동 경고] 위 응답에 승인 요청 패턴이 감지되었습니다. 에이전트는 즉시 실행해야 합니다._';
+        if (!_antiPatternRetry) {
+          // 1차 감지: 응답 차단 + 재실행 (즉시 실행 강제)
+          console.warn(
+            `[enforcement] ${agentName} 안티패턴 1차 감지 → 응답 차단 후 즉시 실행 재요청`,
+          );
+          const retryEvent: SlackEvent = {
+            ...event,
+            text: `${event.text}\n\n[bridge 강제 재실행] 이전 응답에서 "진행할까요?" 패턴이 감지되었습니다. 승인을 묻지 말고 즉시 실행하세요. HIGH 리스크 작업은 request_approval 도구를 사용하세요.`,
+          };
+          return await handleMessage(
+            agentName,
+            retryEvent,
+            routingMethod,
+            slackApp,
+            skipReaction,
+            skipPosting,
+            modelTier,
+            kanbanCardId,
+            _stepInfo,
+            true, // _antiPatternRetry = true → 재감지 시 경고만
+          );
+        } else {
+          // 2차 감지: 경고 추가 후 포스팅 (무한 루프 방지)
+          console.warn(
+            `[enforcement] ${agentName} 안티패턴 재시도 후에도 감지 → 경고 추가 후 포스팅`,
+          );
+          resultText += '\n\n> ⚠️ _[bridge 자동 경고] 재실행 후에도 승인 요청 패턴이 감지됩니다. 에이전트는 즉시 실행해야 합니다._';
+        }
       }
     }
 
