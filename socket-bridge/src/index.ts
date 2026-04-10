@@ -739,6 +739,151 @@ const buildPmReviewEvent = (
   return { ...originalEvent, text: parts.join('\n') };
 };
 
+// ─── 순차 위임 실행 헬퍼 ─────────────────────────────────
+/**
+ * 순차 위임 단계를 실행하고 결과를 results 배열에 누적.
+ * 초기 순차 위임과 PM 리뷰 후 추가 순차 위임 모두에서 사용.
+ *
+ * C-1-4 fix: Hub 루프가 PM 리뷰 후 delegationSteps를 무시하는 버그 수정을 위해
+ * 기존 인라인 for 루프를 재사용 가능한 헬퍼로 추출.
+ */
+const runSequentialSteps = async (
+  steps: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast'; kanbanCardIds?: Record<string, number> }[],
+  event: SlackEvent,
+  apps: App[],
+  pmApp: App,
+  pmTs: string | undefined,
+  results: Array<{ agent: string; text: string; changedFiles: string[] }>,
+): Promise<void> => {
+  for (let si = 0; si < steps.length; si++) {
+    const step = steps[si];
+    console.log(
+      `[hub] 순차 위임: step ${si + 1}/${steps.length} [${step.agents.join(', ')}] — ${step.task}`,
+    );
+
+    const beforeSnapshot = snapshotChangedFiles();
+
+    const firstTargetApp = findAgentApp(step.agents[0], apps);
+    if (pmTs) {
+      await safeSwapReaction(firstTargetApp, event.channel, pmTs, 'white_check_mark', 'writing_hand');
+      console.log(`[reaction] ⚒️ 순차 위임 step ${si + 1} 시작 → PM 메시지: ${pmTs}`);
+    }
+
+    const stepResults = await Promise.allSettled(
+      step.agents.map((target) => {
+        const targetApp = findAgentApp(target, apps);
+        const stepEvent: SlackEvent = {
+          ...event,
+          text: [
+            `[순차 위임 step ${si + 1}] ${step.task}`,
+            '',
+            results.length > 0
+              ? `*이전 단계 결과:*\n${results.map((r) => `[${r.agent}] ${r.text.slice(0, 1000)}`).join('\n\n')}`
+              : '',
+            '',
+            '[원본 요청]',
+            event.text,
+          ].filter(Boolean).join('\n'),
+        };
+        const existingCardId = step.kanbanCardIds?.[target] ?? null;
+        return handleMessage(
+          target,
+          stepEvent,
+          'delegation',
+          targetApp,
+          true,
+          false,
+          step.tier ?? 'standard',
+          existingCardId,
+          { current: si + 1, total: steps.length },
+        );
+      }),
+    );
+
+    const afterSnapshot = snapshotChangedFiles();
+    const stepChangedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
+
+    let stepHasFailure = false;
+    for (let i = 0; i < step.agents.length; i++) {
+      const r = stepResults[i];
+      const isFailed = r.status === 'rejected';
+      if (isFailed) {
+        stepHasFailure = true;
+      }
+      results.push({
+        agent: step.agents[i],
+        text: r.status === 'fulfilled'
+          ? r.value.text
+          : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+        changedFiles: stepChangedFiles,
+      });
+
+      if (r.status === 'fulfilled' && r.value.kanbanCardId) {
+        moveToDone(r.value.kanbanCardId).catch((err) =>
+          console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
+        );
+      }
+    }
+
+    // ✅ 각 에이전트 완료 메시지에 체크 리액션
+    for (let i = 0; i < step.agents.length; i++) {
+      const r = stepResults[i];
+      if (r.status === 'fulfilled' && r.value.postedTs) {
+        try {
+          await pmApp.client.reactions.add({
+            channel: event.channel,
+            timestamp: r.value.postedTs,
+            name: 'white_check_mark',
+          });
+          console.log(`[reaction] ✅ step ${si + 1} [${step.agents[i]}] 완료: ${r.value.postedTs}`);
+        } catch {
+          // 리액션 실패 무시
+        }
+      }
+    }
+
+    // ✅ PM 메시지 ⚒️ → ✅ 교체
+    if (pmTs && !stepHasFailure) {
+      await safeSwapReaction(firstTargetApp, event.channel, pmTs, 'writing_hand', 'white_check_mark');
+      console.log(`[reaction] ✅ 순차 위임 step ${si + 1} 완료 → PM 메시지: ${pmTs}`);
+    }
+
+    if (stepHasFailure) {
+      const failedAgents = step.agents.filter(
+        (_, i) => stepResults[i].status === 'rejected',
+      );
+      console.warn(
+        `[hub] 순차 위임 중단: step ${si + 1} 실패 [${failedAgents.join(', ')}] — 후속 ${steps.length - si - 1}개 step 스킵`,
+      );
+      try {
+        await pmApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `❌ *Step ${si + 1} 실패* — [${failedAgents.join(', ')}]\n후속 step 중단됨. PM 리뷰로 전환합니다.`,
+        });
+      } catch {
+        // 알림 실패 무시
+      }
+      break;
+    }
+
+    // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
+    if (si < steps.length - 1) {
+      const nextStep = steps[si + 1];
+      const prevSummary = results
+        .filter((r) => step.agents.includes(r.agent))
+        .map((r) => r.text.slice(0, 200))
+        .join(' | ');
+      if (nextStep.kanbanCardIds) {
+        for (const [agent, cardId] of Object.entries(nextStep.kanbanCardIds)) {
+          updateCard(cardId, { description: `이전 단계(${step.agents.join(', ')}) 결과: ${prevSummary}`.slice(0, 500) }).catch(() => {});
+          console.log(`[kanban-sync] 다음 step 카드 #${cardId} (${agent}) description 업데이트`);
+        }
+      }
+    }
+  }
+};
+
 // ─── 실행 핸들러 ─────────────────────────────────────────
 
 /**
@@ -888,143 +1033,7 @@ const executeSingle = async (
     // PM 위임 발표 메시지 ts (리액션 대상)
     const seqPmTs = result.postedTs;
 
-    for (let si = 0; si < result.delegationSteps.length; si++) {
-      const step = result.delegationSteps[si];
-      console.log(
-        `[hub] 순차 위임: step ${si + 1}/${result.delegationSteps.length} [${step.agents.join(', ')}] — ${step.task}`,
-      );
-
-      // git diff 스냅샷 (step 전)
-      const beforeSnapshot = snapshotChangedFiles();
-
-      // ⚒️ 첫 번째 에이전트 앱으로 PM 위임 메시지에 작업 중 리액션 추가 (step 시작)
-      const firstTargetApp = findAgentApp(step.agents[0], apps);
-      if (seqPmTs) {
-        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'white_check_mark', 'writing_hand');
-        console.log(`[reaction] ⚒️ 순차 위임 step ${si + 1} 시작 → PM 메시지: ${seqPmTs}`);
-      }
-
-      // step 내 에이전트는 병렬 실행
-      const stepResults = await Promise.allSettled(
-        step.agents.map((target) => {
-          const targetApp = findAgentApp(target, apps);
-          // 이전 step 결과 + 현재 task를 포함한 이벤트
-          const stepEvent: SlackEvent = {
-            ...event,
-            text: [
-              `[순차 위임 step ${si + 1}] ${step.task}`,
-              '',
-              seqResults.length > 0
-                ? `*이전 단계 결과:*\n${seqResults.map((r) => `[${r.agent}] ${r.text.slice(0, 1000)}`).join('\n\n')}`
-                : '',
-              '',
-              '[원본 요청]',
-              event.text,
-            ].filter(Boolean).join('\n'),
-          };
-          // PM이 생성한 Backlog 카드 ID 전달
-          const existingCardId = step.kanbanCardIds?.[target] ?? null;
-          return handleMessage(
-            target,
-            stepEvent,
-            'delegation',
-            targetApp,
-            true,
-            false,
-            step.tier ?? 'standard',
-            existingCardId,
-            { current: si + 1, total: result.delegationSteps!.length },
-          );
-        }),
-      );
-
-      // git diff 스냅샷 (step 후) — step 내 전체 변경 캡처
-      const afterSnapshot = snapshotChangedFiles();
-      const stepChangedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
-
-      let stepHasFailure = false;
-      for (let i = 0; i < step.agents.length; i++) {
-        const r = stepResults[i];
-        const isFailed = r.status === 'rejected';
-        if (isFailed) {
-          stepHasFailure = true;
-        }
-        seqResults.push({
-          agent: step.agents[i],
-          text: r.status === 'fulfilled'
-            ? r.value.text
-            : `[실패: ${(r as PromiseRejectedResult).reason}]`,
-          changedFiles: stepChangedFiles,
-        });
-
-        // 에이전트가 create_kanban_card로 생성한 카드 → Done/Blocked 전환
-        if (r.status === 'fulfilled' && r.value.kanbanCardId) {
-          moveToDone(r.value.kanbanCardId).catch((err) =>
-            console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
-          );
-        }
-      }
-
-      // ✅ 각 에이전트 완료 메시지에 체크 리액션 (step 완료 시)
-      for (let i = 0; i < step.agents.length; i++) {
-        const r = stepResults[i];
-        if (r.status === 'fulfilled' && r.value.postedTs) {
-          try {
-            await pmApp.client.reactions.add({
-              channel: event.channel,
-              timestamp: r.value.postedTs,
-              name: 'white_check_mark',
-            });
-            console.log(`[reaction] ✅ step ${si + 1} 에이전트 [${step.agents[i]}] 완료 메시지 리액션: ${r.value.postedTs}`);
-          } catch {
-            // 리액션 실패 무시 (이미 달린 경우 포함)
-          }
-        }
-      }
-
-      // ✅ PM 위임 메시지 ⚒️ → ✅ 교체 (step 완료, 실패 시 제외)
-      if (seqPmTs && !stepHasFailure) {
-        await safeSwapReaction(firstTargetApp, event.channel, seqPmTs, 'writing_hand', 'white_check_mark');
-        console.log(`[reaction] ✅ 순차 위임 step ${si + 1} 완료 → PM 메시지: ${seqPmTs}`);
-      }
-
-      // step 실패 시 후속 step 중단 — 선행 step 실패한 상태로 후행 step 실행하면
-      // 의존성 없는 결과물이 생성됨 (예: Designer 실패 → Frontend가 디자인 없이 구현)
-      if (stepHasFailure) {
-        const failedAgents = step.agents.filter(
-          (_, i) => stepResults[i].status === 'rejected',
-        );
-        console.warn(
-          `[hub] 순차 위임 중단: step ${si + 1} 실패 [${failedAgents.join(', ')}] — 후속 ${result.delegationSteps!.length - si - 1}개 step 스킵`,
-        );
-        try {
-          await pmApp.client.chat.postMessage({
-            channel: event.channel,
-            thread_ts: event.thread_ts ?? event.ts,
-            text: `❌ *Step ${si + 1} 실패* — [${failedAgents.join(', ')}]\n후속 step 중단됨. PM 리뷰로 전환합니다.`,
-          });
-        } catch {
-          // 알림 실패 무시
-        }
-        break;
-      }
-
-      // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
-      if (si < result.delegationSteps.length - 1) {
-        const nextStep = result.delegationSteps[si + 1];
-        const prevSummary = seqResults
-          .filter((r) => step.agents.includes(r.agent))
-          .map((r) => r.text.slice(0, 200))
-          .join(' | ');
-        if (nextStep.kanbanCardIds) {
-          for (const [agent, cardId] of Object.entries(nextStep.kanbanCardIds)) {
-            updateCard(cardId, { description: `이전 단계(${step.agents.join(', ')}) 결과: ${prevSummary}`.slice(0, 500) }).catch(() => {});
-            console.log(`[kanban-sync] 다음 step 카드 #${cardId} (${agent}) description 업데이트`);
-          }
-        }
-      }
-
-    }
+    await runSequentialSteps(result.delegationSteps!, event, apps, pmApp, seqPmTs, seqResults);
 
     // 전체 순차 위임 완료 → PM 리뷰
     const reviewEvent = buildPmReviewEvent(
@@ -1033,7 +1042,7 @@ const executeSingle = async (
       new Set(seqResults.map((r) => r.agent)),
     );
     console.log('[hub] 순차 위임 전체 완료 → PM 리뷰');
-    await handleMessage(
+    const seqPmReview = await handleMessage(
       'pm',
       reviewEvent,
       'hub-review',
@@ -1042,6 +1051,43 @@ const executeSingle = async (
       false,
       'high',
     );
+
+    // C-1-4 fix: PM 리뷰에서 추가 순차 위임이 발생한 경우 실행 (QA FAIL → 수정 재위임 등)
+    if (seqPmReview.delegationSteps && seqPmReview.delegationSteps.length > 0) {
+      console.log(`[hub] PM 순차 리뷰에서 추가 위임: ${seqPmReview.delegationSteps.length} steps`);
+      await runSequentialSteps(
+        seqPmReview.delegationSteps,
+        event,
+        apps,
+        pmApp,
+        seqPmReview.postedTs ?? seqPmTs,
+        seqResults,
+      );
+    }
+    // C-1-4 fix: PM 리뷰에서 병렬 위임이 발생한 경우 실행
+    const seqReviewTargets = seqPmReview.delegationTargets.filter(
+      (t) => t.agent !== 'pm' && isValidAgent(t.agent),
+    );
+    if (seqReviewTargets.length > 0) {
+      console.log(`[hub] PM 순차 리뷰에서 병렬 위임: [${seqReviewTargets.map((t) => t.agent).join(', ')}]`);
+      const beforeSnapshot = snapshotChangedFiles();
+      const parallelResults = await Promise.allSettled(
+        seqReviewTargets.map((t) => {
+          const targetApp = findAgentApp(t.agent, apps);
+          return handleMessage(t.agent, event, 'delegation', targetApp, true, false, t.tier ?? 'standard', t.kanbanCardId ?? undefined);
+        }),
+      );
+      const afterSnapshot = snapshotChangedFiles();
+      const changedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
+      for (let i = 0; i < seqReviewTargets.length; i++) {
+        const r = parallelResults[i];
+        seqResults.push({
+          agent: seqReviewTargets[i].agent,
+          text: r.status === 'fulfilled' ? r.value.text : `[실패: ${(r as PromiseRejectedResult).reason}]`,
+          changedFiles,
+        });
+      }
+    }
 
     // cross-verify (변경 파일 내용을 코드가 직접 읽어서 주입)
     // 동일 에이전트가 복수 step에 실행된 경우 마지막 결과만 검증 (중복 실행 방지)
@@ -1352,6 +1398,23 @@ const executeSingle = async (
     targets = pmReview.delegationTargets.filter(
       (t) => t.agent !== 'pm' && isValidAgent(t.agent),
     );
+
+    // (d-2) C-1-4 fix: PM 리뷰에서 delegate_sequential 사용 시 순차 위임 실행
+    // 기존 코드는 delegationTargets만 확인하고 delegationSteps를 무시하여
+    // PM이 hub-review 중 순차 위임을 호출해도 실행되지 않는 버그가 있었음
+    if (pmReview.delegationSteps && pmReview.delegationSteps.length > 0) {
+      console.log(`[hub] PM 리뷰에서 순차 위임 전환: ${pmReview.delegationSteps.length} steps`);
+      await runSequentialSteps(
+        pmReview.delegationSteps,
+        event,
+        apps,
+        pmApp,
+        pmReview.postedTs ?? currentPmTs,
+        accumulatedResults,
+      );
+      // 순차 위임 처리 완료 → targets 비워 while 루프 정상 종료
+      targets = [];
+    }
 
     if (targets.length === 0) {
       // PM이 완료 판단 — "작업중" 메시지를 결과로 업데이트 (별도 postMessage 없음)
