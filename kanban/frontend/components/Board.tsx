@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import useSWR from 'swr';
 import {
   DndContext,
@@ -8,13 +8,14 @@ import {
   DragOverlay,
   closestCorners,
   PointerSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
 import { Button } from '@/components/ui/Button';
 import { Card as CardType } from '@/lib/types';
 import { api } from '@/lib/api';
-import { PRIORITY_CONFIG, AGENT_COLORS } from '@/lib/constants';
+import { PRIORITY_CONFIG } from '@/lib/constants';
 import Column from './Column';
 import FilterBar, { FilterState } from './filter-bar';
 
@@ -24,38 +25,39 @@ const FILTER_STORAGE_KEY = 'kanban-filter-v1';
 /** 드래그 중 포탈에 표시되는 카드 미리보기 */
 function DragOverlayCard({ card }: { card: CardType }) {
   const p = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
-  const agentColor = AGENT_COLORS[card.assignee?.toLowerCase() ?? ''] ?? '#7a90b8';
   return (
     <div
-      style={{
-        background: 'var(--color-bg-card)',
-        border: '1px solid var(--color-border-strong)',
-        borderRadius: 12,
-        padding: '14px 16px',
-        width: 260,
-        cursor: 'grabbing',
-        boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
-        transform: 'rotate(1.5deg) scale(1.02)',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
+      aria-hidden="true"
+      className="bg-[var(--color-bg-card)] border border-[var(--color-border-strong)] rounded-xl px-4 py-3.5 w-[260px] cursor-grabbing shadow-[0_16px_48px_rgba(0,0,0,0.5)] rotate-[1.5deg] scale-[1.02] relative overflow-hidden"
     >
       {/* 제목 — 우선순위 점 인라인 */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <span style={{ width: 7, height: 7, borderRadius: '50%', background: p.color, display: 'inline-block', flexShrink: 0, marginTop: 5 }} />
-        <p className="text-text-primary text-[13px] font-medium" style={{ lineHeight: 1.45, margin: 0, flex: 1 }}>
+      <div className="flex items-start gap-2">
+        <span
+          aria-hidden="true"
+          data-priority={card.priority}
+          className="priority-dot flex-shrink-0 mt-[5px]"
+        />
+        <p className="text-text-primary text-[13px] font-medium leading-[1.45] m-0 flex-1">
           {card.title}
         </p>
       </div>
       {/* 하단: 배지 + 담당자 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10, paddingLeft: 15 }}>
-        <span style={{ background: p.bg, color: p.color, border: `1px solid ${p.border}`, padding: '1px 7px', fontSize: 11, borderRadius: 20, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: p.color, display: 'inline-block' }} />
+      <div className="flex items-center gap-1.5 mt-2.5 pl-[15px]">
+        <span className={`badge badge-priority-${card.priority}`}>
+          <span
+            aria-hidden="true"
+            data-priority={card.priority}
+            className="priority-dot-sm"
+          />
           {p.label}
         </span>
         {card.assignee && (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span style={{ width: 20, height: 20, borderRadius: '50%', background: agentColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: '#fff' }}>
+          <div className="ml-auto flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              data-agent={card.assignee.toLowerCase()}
+              className="agent-avatar"
+            >
               {card.assignee.charAt(0).toUpperCase()}
             </span>
             <span className="text-text-muted text-[11px]">{card.assignee}</span>
@@ -66,22 +68,17 @@ function DragOverlayCard({ card }: { card: CardType }) {
   );
 }
 
-const EMPTY_FILTER: FilterState = {
-  assignees: new Set<string>(),
-  priorities: new Set<string>(),
-};
-
 function loadFilter(): FilterState {
   try {
     const raw = localStorage.getItem(FILTER_STORAGE_KEY);
-    if (!raw) return EMPTY_FILTER;
+    if (!raw) return { assignees: new Set<string>(), priorities: new Set<string>() };
     const parsed = JSON.parse(raw) as { assignees?: string[]; priorities?: string[] };
     return {
       assignees: new Set(parsed.assignees ?? []),
       priorities: new Set(parsed.priorities ?? []),
     };
   } catch {
-    return EMPTY_FILTER;
+    return { assignees: new Set<string>(), priorities: new Set<string>() };
   }
 }
 
@@ -110,7 +107,7 @@ export default function Board() {
   const [dragError, setDragError] = useState<string | null>(null);
   const dragErrorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [filter, setFilter] = useState<FilterState>(() => {
-    if (typeof window === 'undefined') { return EMPTY_FILTER; }
+    if (typeof window === 'undefined') { return { assignees: new Set<string>(), priorities: new Set<string>() }; }
     return loadFilter();
   });
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
@@ -123,7 +120,8 @@ export default function Board() {
   }, []);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
   );
 
   // P2: WebSocket — WS 이벤트만 처리 (데이터 페칭은 SWR mutate), debounce 300ms 적용
@@ -185,16 +183,20 @@ export default function Board() {
   }, [board]);
 
   const handleDragEnd = useCallback(async (event: DragEndEvent) => {
+    // activeCard를 클로저에서 먼저 캡처 (setActiveCard(null) 이전)
+    const movingCard = activeCard;
     setActiveCard(null);
     const { active, over } = event;
-    if (!over || !board) return;
+    if (!over || !board || !movingCard) return;
 
     const activeId = String(active.id);
     const overId = String(over.id);
 
     if (!activeId.startsWith('card-')) return;
 
-    const cardId = parseInt(activeId.replace('card-', ''));
+    // activeCard 재활용 — 2차 board.columns 순회 제거
+    const cardId = movingCard.id;
+    const sourceColumnId = movingCard.column_id;
 
     let targetColumnId: number | null = null;
     if (overId.startsWith('col-')) {
@@ -209,20 +211,7 @@ export default function Board() {
       }
     }
 
-    if (targetColumnId === null) return;
-
-    let sourceColumnId: number | null = null;
-    let movingCard: CardType | null = null;
-    for (const col of board.columns) {
-      const found = col.cards.find((c: CardType) => c.id === cardId);
-      if (found) {
-        sourceColumnId = col.id;
-        movingCard = found;
-        break;
-      }
-    }
-
-    if (sourceColumnId === targetColumnId || !movingCard) return;
+    if (targetColumnId === null || sourceColumnId === targetColumnId) return;
 
     const targetCol = board.columns.find(col => col.id === targetColumnId);
     if (targetCol?.wip_limit && targetCol.cards.length >= targetCol.wip_limit) {
@@ -240,7 +229,7 @@ export default function Board() {
           return { ...col, cards: col.cards.filter((c: CardType) => c.id !== cardId) };
         }
         if (col.id === targetColumnId) {
-          return { ...col, cards: [...col.cards, { ...movingCard!, column_id: targetColumnId! }] };
+          return { ...col, cards: [...col.cards, { ...movingCard, column_id: targetColumnId! }] };
         }
         return col;
       }),
@@ -257,7 +246,7 @@ export default function Board() {
       dragErrorTimerRef.current = setTimeout(() => setDragError(null), 3000);
       void mutate();
     }
-  }, [board, mutate]);
+  }, [board, mutate, activeCard]);
 
   // ── 필터 핸들러 ────────────────────────────────────────────────────────────
   const handleToggleAssignee = useCallback((name: string) => {
@@ -278,8 +267,9 @@ export default function Board() {
     });
   }, []);
 
+  // 매번 새 Set 인스턴스 생성 — 모듈 레벨 상수 공유로 인한 불변성 문제 방지
   const handleResetFilter = useCallback(() => {
-    setFilter(EMPTY_FILTER);
+    setFilter({ assignees: new Set<string>(), priorities: new Set<string>() });
   }, []);
 
   // 필터 상태 localStorage 동기화
@@ -287,16 +277,20 @@ export default function Board() {
     saveFilter(filter);
   }, [filter]);
 
-  // ── 필터 통계 ─────────────────────────────────────────────────────────────
+  // ── 필터 통계 — useMemo로 board/filter 변경 시만 재계산 ───────────────────
   const isFiltering = filter.assignees.size > 0 || filter.priorities.size > 0;
-  const totalCards = board?.columns.reduce((acc, col) => acc + col.cards.length, 0) ?? 0;
-  const visibleCards = board?.columns.reduce((acc, col) => {
-    return acc + col.cards.filter((card) => {
-      if (filter.assignees.size > 0 && !filter.assignees.has(card.assignee ?? '')) return false;
-      if (filter.priorities.size > 0 && !filter.priorities.has(card.priority)) return false;
-      return true;
-    }).length;
-  }, 0) ?? 0;
+  const { totalCards, visibleCards } = useMemo(() => {
+    if (!board) return { totalCards: 0, visibleCards: 0 };
+    const totalCards = board.columns.reduce((acc, col) => acc + col.cards.length, 0);
+    const visibleCards = board.columns.reduce((acc, col) => {
+      return acc + col.cards.filter((card) => {
+        if (filter.assignees.size > 0 && !filter.assignees.has(card.assignee ?? '')) return false;
+        if (filter.priorities.size > 0 && !filter.priorities.has(card.priority)) return false;
+        return true;
+      }).length;
+    }, 0);
+    return { totalCards, visibleCards };
+  }, [board, filter]);
 
   // ── 로딩 상태 ─────────────────────────────────────────────────────────────
   if (isLoading) return (
@@ -312,7 +306,7 @@ export default function Board() {
         gap: 16,
       }}
     >
-      <div className="loading-spinner" />
+      <div className="loading-spinner" aria-hidden="true" />
       <p className="text-text-muted text-sm m-0">보드 로딩 중...</p>
     </div>
   );
@@ -337,6 +331,7 @@ export default function Board() {
         variant="primary"
         size="medium"
         onClick={() => void mutate()}
+        aria-label="보드 데이터 다시 불러오기"
         style={{ marginTop: 8 }}
       >
         다시 시도
@@ -347,7 +342,23 @@ export default function Board() {
   if (!board) return null;
 
   return (
-    <main aria-label={`${board.name} 칸반보드`}>
+    <main
+      id="main-content"
+      aria-label={`${board.name} 칸반보드`}
+      aria-roledescription="칸반 보드"
+    >
+      {/* 스크린 리더 전용 — 필터 상태 실시간 알림 */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {isFiltering
+          ? `필터 적용됨: 전체 ${totalCards}개 카드 중 ${visibleCards}개 표시 중`
+          : ''}
+      </div>
+
       {/* 드래그 에러 토스트 */}
       {dragError && (
         <div
@@ -376,18 +387,59 @@ export default function Board() {
       />
 
       {/* Phase 3 — 반응형 보드 컨테이너 */}
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        accessibility={{
+          announcements: {
+            onDragStart({ active }) {
+              const cardId = parseInt(String(active.id).replace('card-', ''));
+              const card = board.columns.flatMap(col => col.cards).find((c: CardType) => c.id === cardId);
+              return `카드 "${card?.title ?? ''}" 드래그 시작. 방향키로 이동하고 Space 또는 Enter로 놓거나 Escape로 취소하세요.`;
+            },
+            onDragOver({ active, over }) {
+              if (!over) return '카드가 드래그 가능한 영역 밖에 있습니다.';
+              const overId = String(over.id);
+              if (overId.startsWith('col-')) {
+                const colId = parseInt(overId.replace('col-', ''));
+                const col = board.columns.find(c => c.id === colId);
+                return `"${col?.name ?? overId}" 컬럼 위에 있습니다.`;
+              }
+              return '카드 위에 있습니다.';
+            },
+            onDragEnd({ active, over }) {
+              if (!over) return '드래그가 취소되었습니다.';
+              const cardId = parseInt(String(active.id).replace('card-', ''));
+              const card = board.columns.flatMap(col => col.cards).find((c: CardType) => c.id === cardId);
+              const overId = String(over.id);
+              if (overId.startsWith('col-')) {
+                const colId = parseInt(overId.replace('col-', ''));
+                const col = board.columns.find(c => c.id === colId);
+                return `카드 "${card?.title ?? ''}"이(가) "${col?.name ?? ''}" 컬럼으로 이동되었습니다.`;
+              }
+              return `카드 "${card?.title ?? ''}"이(가) 이동되었습니다.`;
+            },
+            onDragCancel() {
+              return '드래그가 취소되었습니다. 카드가 원래 위치로 돌아갑니다.';
+            },
+          },
+          screenReaderInstructions: {
+            draggable: '카드를 선택하려면 Space 또는 Enter 키를 누르세요. 드래그 중에는 방향키로 이동하고, Space 또는 Enter로 내려놓거나 Escape로 취소합니다.',
+          },
+        }}
+      >
         <div
           className="board-container"
           role="region"
           aria-label="칸반 컬럼 목록"
         >
-          {board.columns.map((col, idx) => (
+          {board.columns.map((col) => (
             <Column
               key={col.id}
               column={col}
               onRefresh={mutate}
-              columnIndex={idx}
               filter={isFiltering ? filter : null}
             />
           ))}

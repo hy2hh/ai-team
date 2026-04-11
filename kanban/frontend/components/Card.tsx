@@ -3,13 +3,7 @@ import { memo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Card as CardType } from '@/lib/types';
-import { PRIORITY_CONFIG, AGENT_COLORS } from '@/lib/constants';
-
-function getProgressColor(progress: number): string {
-  if (progress >= 67) return 'var(--color-progress-high)';
-  if (progress >= 34) return 'var(--color-progress-medium)';
-  return 'var(--color-progress-low)';
-}
+import { PRIORITY_CONFIG } from '@/lib/constants';
 
 const DUE_SOON_DAYS = 3;
 
@@ -31,27 +25,26 @@ function formatDueDate(dueDate: string): string {
   return d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
 }
 
+function getProgressLevel(progress: number): 'zero' | 'high' | 'medium' | 'low' {
+  if (progress === 0) return 'zero';
+  if (progress >= 67) return 'high';
+  if (progress >= 34) return 'medium';
+  return 'low';
+}
+
+function getProgressColor(progress: number): string {
+  if (progress >= 67) return 'var(--color-progress-high)';
+  if (progress >= 34) return 'var(--color-progress-medium)';
+  return 'var(--color-progress-low)';
+}
+
 function AgentAvatar({ name }: { name: string }) {
-  const key = name.toLowerCase();
-  const color = AGENT_COLORS[key] ?? '#7a90b8';
   return (
     <span
       aria-hidden="true"
       title={name}
-      style={{
-        width: 20,
-        height: 20,
-        borderRadius: '50%',
-        background: color,
-        border: '1.5px solid var(--color-bg-card)',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 9,
-        fontWeight: 700,
-        color: '#ffffff',
-        flexShrink: 0,
-      }}
+      data-agent={name.toLowerCase()}
+      className="agent-avatar"
     >
       {name.charAt(0).toUpperCase()}
     </span>
@@ -78,14 +71,14 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
     data: { type: 'card', card },
   });
 
-  const style = {
+  const dndStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
   const progress = card.progress ?? 0;
   const priorityCfg = PRIORITY_CONFIG[card.priority] ?? PRIORITY_CONFIG.medium;
-  const progressColor = getProgressColor(progress);
+  const progressLevel = getProgressLevel(progress);
   const dueDateStatus = getDueDateStatus(card.due_date ?? null);
   const tags = card.tags ?? [];
 
@@ -96,10 +89,11 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={dndStyle}
       data-testid="card-item"
       {...attributes}
       {...listeners}
+      role="article"
       aria-label={`카드: ${card.title}. 우선순위 ${priorityCfg.label}${card.assignee ? `. 담당자 ${card.assignee}` : ''}${card.due_date ? `. ${dueDateAriaLabel}` : ''}. Enter 키로 상세 보기.`}
       onKeyDown={(e: React.KeyboardEvent) => {
         if (e.key === 'Enter') {
@@ -110,106 +104,59 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
     >
       <div
         onClick={() => onCardClick(card)}
-        className={`card-item${isFiltered ? ' card-base--filtered-out' : ''}${isDragging ? ' card-item--dragging' : ''}`}
+        className={[
+          'card-item card-base',
+          isFiltered ? 'card-base--filtered-out' : '',
+          isDragging ? 'card-item--dragging opacity-60' : '',
+        ].filter(Boolean).join(' ')}
         data-testid="card-edit-btn"
-        style={{
-          background: 'var(--color-bg-card)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 12,
-          padding: '14px 16px',
-          cursor: isDragging ? 'grabbing' : 'grab',
-          opacity: isDragging ? 0.6 : 1,
-          position: 'relative',
-          overflow: 'hidden',
-          boxShadow: isDragging
-            ? '0 8px 32px rgba(0,0,0,0.4)'
-            : '0 1px 3px rgba(0,0,0,0.15)',
-        }}
       >
-        {/* 제목 행 — 우선순위 점 인라인 */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          {/* 우선순위 점 (좌측 바 → 인라인 점으로 교체) */}
+        {/* 제목 행 — 우선순위 점 + 제목 + 삭제 버튼 */}
+        <div className="flex items-start gap-2">
           <span
             aria-hidden="true"
-            style={{
-              width: 7,
-              height: 7,
-              borderRadius: '50%',
-              background: priorityCfg.color,
-              display: 'inline-block',
-              flexShrink: 0,
-              marginTop: 5,
-            }}
+            data-priority={card.priority}
+            className="priority-dot"
           />
-          <p
-            className="text-text-primary text-[13px] font-medium"
-            style={{
-              lineHeight: 1.45,
-              flex: 1,
-              margin: 0,
-            }}
-          >
+          <p className="text-text-primary text-[13px] font-medium leading-[1.45] flex-1 m-0">
             {card.title}
           </p>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(card.id); }}
             aria-label={`${card.title} 카드 삭제`}
-            className="delete-btn text-text-muted text-[11px]"
+            className="delete-btn card-delete-btn"
             data-testid="card-delete-btn"
-            style={{
-              width: 20,
-              height: 20,
-              borderRadius: 4,
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: 0,
-              transition: 'opacity var(--duration-fast), color var(--duration-fast), background var(--duration-fast)',
-              flexShrink: 0,
-            }}
           >
             ✕
           </button>
         </div>
 
-        {/* 설명 — 점 너비(7px) + 간격(8px) = 15px 들여쓰기로 제목 텍스트와 정렬 */}
+        {/* 설명 — 최대 2줄 */}
         {card.description && (
-          <p
-            className="text-text-secondary text-xs"
-            style={{
-              lineHeight: 1.5,
-              margin: '6px 0 0 15px',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-            }}
-          >
+          <p className="text-text-secondary text-xs leading-[1.5] mt-1.5 ml-[15px] line-clamp-2">
             {card.description}
           </p>
         )}
 
         {/* 진행률 바 */}
-        <div style={{ marginTop: 10, paddingLeft: 15 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+        <div className="mt-2.5 pl-[15px]">
+          <div className="flex justify-between mb-[5px]">
             <span className="text-text-muted text-[11px]">진행률</span>
-            <span className="text-[11px] font-semibold" style={{ color: progress === 0 ? 'var(--color-text-muted)' : progressColor }}>
+            <span
+              className="text-[11px] font-semibold"
+              data-progress-level={progressLevel}
+            >
               {progress === 0 ? '시작 전' : `${progress}%`}
             </span>
           </div>
           <div className="progress-bar-track">
             {progress > 0 && (
               <div
+                className="progress-fill"
                 style={{
-                  height: '100%',
-                  width: `${progress}%`,
-                  background: `linear-gradient(90deg, ${progressColor}80 0%, ${progressColor} 100%)`,
-                  borderRadius: 2,
-                  transition: `width var(--duration-slow) ease-out`,
-                }}
+                  '--progress-width': `${progress}%`,
+                  '--progress-color': getProgressColor(progress),
+                } as React.CSSProperties}
               />
             )}
           </div>
@@ -217,13 +164,12 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
 
         {/* 태그 pills */}
         {tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8, paddingLeft: 15 }}>
+          <div className="flex flex-wrap gap-1 mt-2 pl-[15px]">
             {tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
                 className="tag-pill"
                 title={tag}
-                style={{ fontSize: 10, padding: '1px 6px', maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
               >
                 {tag}
               </span>
@@ -231,8 +177,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
             {tags.length > 3 && (
               <span
                 title={tags.slice(3).join(', ')}
-                className="text-text-muted"
-                style={{ fontSize: 10, padding: '1px 4px', cursor: 'default' }}
+                className="text-text-muted text-[10px] px-1 py-px cursor-default"
               >
                 +{tags.length - 3}
               </span>
@@ -241,70 +186,22 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
         )}
 
         {/* 하단: 우선순위 배지 + 마감일 + 담당자 */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            marginTop: 10,
-            paddingLeft: 15,
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="flex items-center gap-1.5 mt-2.5 pl-[15px] flex-wrap">
           {/* 우선순위 배지 */}
-          <span
-            className="badge"
-            style={{
-              background: priorityCfg.bg,
-              color: priorityCfg.color,
-              border: `1px solid ${priorityCfg.border}`,
-              padding: '1px 7px',
-              fontSize: 11,
-            }}
-          >
+          <span className={`badge badge-priority-${card.priority}`}>
             <span
               aria-hidden="true"
-              style={{
-                width: 5,
-                height: 5,
-                borderRadius: '50%',
-                background: priorityCfg.color,
-                display: 'inline-block',
-              }}
+              data-priority={card.priority}
+              className="priority-dot-sm"
             />
             {priorityCfg.label}
           </span>
 
-          {/* 마감일 뱃지 — 이모지 없이 텍스트만 */}
+          {/* 마감일 배지 */}
           {card.due_date && dueDateStatus && (
             <span
               aria-label={dueDateAriaLabel}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 3,
-                fontSize: 11,
-                fontWeight: 500,
-                padding: '1px 7px',
-                borderRadius: 10,
-                background: dueDateStatus === 'overdue'
-                  ? 'var(--color-due-overdue-bg)'
-                  : dueDateStatus === 'soon'
-                    ? 'var(--color-due-warning-bg)'
-                    : 'transparent',
-                color: dueDateStatus === 'overdue'
-                  ? 'var(--color-due-overdue)'
-                  : dueDateStatus === 'soon'
-                    ? 'var(--color-due-warning)'
-                    : 'var(--color-text-muted)',
-                border: `1px solid ${
-                  dueDateStatus === 'overdue'
-                    ? 'var(--color-due-overdue-border)'
-                    : dueDateStatus === 'soon'
-                      ? 'var(--color-due-warning-border)'
-                      : 'var(--color-border)'
-                }`,
-              }}
+              className={`due-badge due-badge--${dueDateStatus}`}
             >
               {formatDueDate(card.due_date)}
             </span>
@@ -312,7 +209,7 @@ const Card = memo(function Card({ card, onDelete, onCardClick, isFiltered = fals
 
           {/* 담당자 */}
           {card.assignee && (
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div className="ml-auto flex items-center gap-1">
               <AgentAvatar name={card.assignee} />
               <span
                 className="text-text-muted text-[11px]"

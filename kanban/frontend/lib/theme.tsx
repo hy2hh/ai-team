@@ -13,6 +13,15 @@ const ThemeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
 });
 
+function applyTheme(theme: Theme) {
+  const root = document.documentElement;
+  // class 기반 (Tailwind v4 dark variant + Toss 토큰)
+  root.classList.remove('dark', 'light');
+  root.classList.add(theme);
+  // data-theme 속성 (기존 Apple 토큰 호환)
+  root.setAttribute('data-theme', theme);
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('dark');
 
@@ -26,13 +35,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       initial = 'light';
     }
     setTheme(initial);
-    document.documentElement.setAttribute('data-theme', initial);
+    applyTheme(initial);
   }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next: Theme = prev === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
+      applyTheme(next);
       localStorage.setItem('kanban-theme', next);
       return next;
     });

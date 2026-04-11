@@ -12,7 +12,6 @@ import { api } from '@/lib/api';
 interface Props {
   column: ColumnWithCards;
   onRefresh: () => void;
-  columnIndex: number;
   filter: FilterState | null;
 }
 
@@ -240,8 +239,25 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
           </SortableContext>
 
           {column.cards.length === 0 && (
-            <div className="empty-state">
-              카드 없음
+            <div
+              className="empty-state empty-state--column"
+              role="status"
+              aria-label={`${column.name} 컬럼에 카드가 없습니다`}
+            >
+              <svg
+                className="empty-state__icon"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M3 9h18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <path d="M9 15h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="empty-state__title">아직 카드가 없어요</span>
+              <span className="empty-state__desc">아래 버튼을 눌러 첫 카드를 추가해보세요</span>
             </div>
           )}
 
@@ -249,10 +265,22 @@ const Column = memo(function Column({ column, onRefresh, filter }: Props) {
             <div
               role="status"
               aria-live="polite"
-              className="empty-state"
-              style={{ marginTop: 8 }}
+              className="empty-state empty-state--column"
             >
-              <span>필터 조건에 맞는 카드 없음</span>
+              <svg
+                className="empty-state__icon"
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M11 8v3l2 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M16.5 16.5L20 20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span className="empty-state__title">필터 결과 없음</span>
+              <span className="empty-state__desc">현재 필터 조건에 맞는 카드가 없어요</span>
             </div>
           )}
         </div>

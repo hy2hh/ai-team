@@ -1,10 +1,73 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4 dark mode — class 기반 ─────────────────────────────────── */
+@variant dark (&:where(.dark, .dark *));
+
+/* =============================================
+   알림 패널 — 토스 디자인 시스템 토큰
+   spec: docs/specs/2026-04-10_notification-panel-design-spec.md
+   ============================================= */
+:root {
+  /* Toss Blue — 강조 */
+  --notif-accent:             #0064FF;
+  --notif-accent-tint:        #E8F3FF;
+  --notif-accent-hover:       #0052CC;
+
+  /* 시맨틱 아이콘 배경 tint */
+  --notif-tint-success:       #E8FAF0;
+  --notif-tint-warning:       #FFF4E0;
+  --notif-tint-error:         #FFEBEE;
+  --notif-tint-social:        #F2F4F6;
+
+  /* 시맨틱 아이콘 색상 */
+  --notif-icon-info:          #0064FF;
+  --notif-icon-success:       #00C471;
+  --notif-icon-warning:       #FF9500;
+  --notif-icon-error:         #F04452;
+  --notif-icon-social:        #4E5968;
+
+  /* 배지 */
+  --notif-badge-bg:           #F04452;
+  --notif-badge-text:         #FFFFFF;
+
+  /* 패널 배경 */
+  --notif-panel-bg:           #FFFFFF;
+  --notif-panel-overlay:      rgba(0, 0, 0, 0.4);
+
+  /* 리스트 아이템 상태 */
+  --notif-row-unread-bg:      #FFFFFF;
+  --notif-row-read-bg:        #F4F4F4;
+  --notif-row-hover-bg:       #F4F4F4;
+  --notif-row-pressed-bg:     #ECECEC;
+  --notif-row-swipe-bg:       #F04452;
+
+  /* 텍스트 */
+  --notif-text-primary:       #191F28;
+  --notif-text-secondary:     #4E5968;
+  --notif-text-tertiary:      #8B95A1;
+  --notif-separator:          #F0F0F0;
+  --notif-separator-thick:    #F4F4F4;
+
+  /* Toast */
+  --notif-toast-bg:           #191F28;
+  --notif-toast-text:         #FFFFFF;
+  --notif-toast-shadow:       0 4px 16px rgba(0, 0, 0, 0.12);
+
+  /* 그림자 */
+  --notif-shadow-panel:       0 4px 16px rgba(0, 0, 0, 0.12);
+
+  /* 모션 타이밍 */
+  --notif-duration-fast:      150ms;
+  --notif-duration-normal:    200ms;
+  --notif-duration-panel:     300ms;
+}
+
 /* =============================================
    Apple 디자인 시스템 — 다크 테마 (기본)
    ============================================= */
 :root,
-[data-theme="dark"] {
+[data-theme="dark"],
+html.dark {
   /* 타이포그래피 토큰 — Apple SF Pro 스케일 */
   --text-h3: 21px;     /* Card Title: 21px / weight 700 */
   --text-h4: 17px;     /* Body: 17px / weight 400 */
@@ -172,9 +235,97 @@
 }
 
 /* =============================================
+   토스 카드 모달 디자인 토큰 (v3 — 2026-04-10)
+   Apple 시스템과 독립적으로 관리. prefix: --toss-modal-*
+   참조: kanban/frontend/design/card-detail-modal-spec.md
+   ============================================= */
+:root {
+  /* 구조 */
+  --toss-modal-bg:              #FFFFFF;
+  --toss-modal-overlay:         rgba(0, 0, 0, 0.4);
+  --toss-modal-shadow:          0 4px 16px rgba(0, 0, 0, 0.12);
+  --toss-modal-radius:          24px;
+  --toss-modal-radius-sheet:    16px 16px 0 0;  /* 모바일 바텀시트 */
+  --toss-modal-separator:       #F0F0F0;
+
+  /* 텍스트 */
+  --toss-modal-text-primary:    #191F28;
+  --toss-modal-text-secondary:  #4E5968;
+  --toss-modal-text-label:      #8B95A1;
+  --toss-modal-text-disabled:   #B0B8C1;
+  --toss-modal-text-inverse:    #FFFFFF;
+
+  /* 입력 필드 */
+  --toss-modal-input-bg:        #F2F4F6;
+  --toss-modal-input-bg-focus:  #FFFFFF;
+  --toss-modal-input-border-focus: #0064FF;
+  --toss-modal-input-radius:    8px;
+  --toss-modal-focus-ring:      0 0 0 3px rgba(0, 100, 255, 0.12);
+
+  /* 강조색 */
+  --toss-blue:                  #0064FF;
+  --toss-blue-hover:            #0052CC;
+  --toss-blue-pressed:          #0041A3;
+
+  /* 시맨틱 */
+  --toss-semantic-error:        #F04452;
+  --toss-semantic-error-bg:     rgba(240, 68, 82, 0.08);
+  --toss-semantic-warning:      #FF9500;
+  --toss-semantic-warning-bg:   rgba(255, 149, 0, 0.08);
+  --toss-semantic-success:      #00C471;
+  --toss-semantic-success-bg:   rgba(0, 196, 113, 0.08);
+
+  /* 우선순위 뱃지 — Toss 시맨틱 기반 */
+  --toss-priority-high-text:    var(--toss-semantic-error);
+  --toss-priority-high-bg:      var(--toss-semantic-error-bg);
+  --toss-priority-medium-text:  var(--toss-semantic-warning);
+  --toss-priority-medium-bg:    var(--toss-semantic-warning-bg);
+  --toss-priority-low-text:     var(--toss-semantic-success);
+  --toss-priority-low-bg:       var(--toss-semantic-success-bg);
+
+  /* 진행률 바 시맨틱 (glow/gradient 없음) */
+  --toss-progress-low:          var(--toss-semantic-error);   /* 0–33% */
+  --toss-progress-medium:       var(--toss-semantic-warning); /* 34–66% */
+  --toss-progress-high:         var(--toss-semantic-success); /* 67–100% */
+  --toss-progress-track:        #F2F4F6;
+  --toss-progress-height:       6px;
+  --toss-progress-radius:       3px;
+
+  /* 태그 pill */
+  --toss-tag-bg:                #E8F3FF;
+  --toss-tag-text:              #0064FF;
+  --toss-tag-radius:            4px;
+
+  /* 토스트 — dark pill */
+  --toss-toast-bg:              #191F28;
+  --toss-toast-text:            #FFFFFF;
+  --toss-toast-radius:          20px;
+  --toss-toast-shadow:          0 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* 버튼 — secondary */
+  --toss-btn-secondary-bg:      #F2F4F6;
+  --toss-btn-secondary-bg-hover: #E4E7EB;
+  --toss-btn-secondary-text:    #4E5968;
+
+  /* 삭제 버튼 */
+  --toss-delete-text:           #8B95A1;
+  --toss-delete-hover-bg:       rgba(240, 68, 82, 0.08);
+  --toss-delete-hover-text:     #F04452;
+  --toss-delete-confirm-bg:     rgba(240, 68, 82, 0.06);
+  --toss-delete-confirm-border: rgba(240, 68, 82, 0.20);
+
+  /* 활동 아이템 */
+  --toss-activity-bg:           #F4F4F4;  /* border 없음, bg만 */
+
+  /* 바텀시트 핸들 */
+  --toss-sheet-handle-color:    #D1D6DB;
+}
+
+/* =============================================
    Apple 디자인 시스템 — 라이트 테마
    ============================================= */
-[data-theme="light"] {
+[data-theme="light"],
+html.light {
   /* 배경 레이어 — Apple light 팔레트 (#f5f5f7 / #ffffff 이진 리듬) */
   --color-bg-base:        #f5f5f7;  /* Apple light gray */
   --color-bg-surface:     #ffffff;  /* Apple white */
@@ -498,13 +649,50 @@ select option {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 80px;
+  min-height: 100px;
   color: var(--color-text-muted);
   font-size: 12px;
   border-radius: 8px;
   border: 1px dashed var(--color-border);
   flex-direction: column;
   gap: 6px;
+}
+
+.empty-state--column {
+  min-height: 120px;
+  gap: 4px;
+  padding: 20px 12px;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+
+.empty-state--column:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-bg-subtle);
+}
+
+.empty-state__icon {
+  color: var(--color-border-strong);
+  margin-bottom: 4px;
+  transition: color var(--duration-fast);
+}
+
+.empty-state--column:hover .empty-state__icon {
+  color: var(--color-text-muted);
+}
+
+.empty-state__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.empty-state__desc {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.4;
 }
 
 /* 배지 */
@@ -600,24 +788,42 @@ select option {
 }
 
 /* =============================================
+   토스(Toss) 카드 디자인 토큰 — 2026-04-10
+   Card.tsx / DragOverlayCard 에서 참조
+   ============================================= */
+
+/* 카드 구조 토큰 */
+:root,
+[data-theme="dark"],
+[data-theme="light"] {
+  --card-radius:         16px;                         /* 토스: radius-card */
+  --card-padding:        20px;                         /* 토스: space-5 */
+  --card-shadow:         0 2px 8px rgba(0,0,0,0.08);  /* 토스: 기본 카드 그림자 */
+  --card-shadow-hover:   0 4px 16px rgba(0,0,0,0.12); /* 토스: hover 상태 */
+  --card-shadow-drag:    0 16px 48px rgba(0,0,0,0.18);/* 토스: 드래그 상태 */
+  --card-gap:            12px;                         /* 토스: 카드 간 간격 */
+  /* 카드 border 없음 — 토스는 shadow로만 구분 */
+}
+
+/* =============================================
    카드 hover/active — CSS custom property 기반
    --card-accent-shadow, --card-accent-border 는 Card.tsx에서 인라인 주입
    ============================================= */
 .card-item {
   transition:
     transform var(--duration-fast),
-    box-shadow var(--duration-fast),
-    border-color var(--duration-fast);
+    box-shadow var(--duration-fast);
+    /* border-color 제거 — 토스 카드는 border 없음 */
 }
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-  border-color: var(--color-border-strong) !important;
+  transform: translateY(-2px);
+  box-shadow: var(--card-shadow-hover);
+  /* border-color 제거 — 토스: shadow로만 구분 */
 }
-/* 카드 클릭(active) 피드백 */
+/* 카드 클릭(active) 피드백 — 토스 micro-interaction */
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):active {
-  transform: scale(0.98);
-  box-shadow: 0 1px 6px rgba(0,0,0,0.25);
+  transform: scale(0.97);  /* 토스: 버튼 프레스 scale(0.97) */
+  box-shadow: var(--card-shadow);
 }
 /* 카드 삭제 버튼 — hover 시 표시 */
 .card-item:not(.card-base--filtered-out):not(.card-item--dragging):hover .delete-btn {
@@ -1090,6 +1296,153 @@ select:focus-visible {
 }
 
 /* =============================================
+   카드 컴포넌트 — 에이전트 아바타
+   ============================================= */
+.agent-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--avatar-color, var(--color-text-muted));
+  border: 1.5px solid var(--color-bg-card);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 700;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.agent-avatar[data-agent="homer"]    { --avatar-color: var(--color-agent-homer); }
+.agent-avatar[data-agent="bart"]     { --avatar-color: var(--color-agent-bart); }
+.agent-avatar[data-agent="marge"]    { --avatar-color: var(--color-agent-marge); }
+.agent-avatar[data-agent="lisa"]     { --avatar-color: var(--color-agent-lisa); }
+.agent-avatar[data-agent="krusty"]   { --avatar-color: var(--color-agent-krusty); }
+.agent-avatar[data-agent="sid"]      { --avatar-color: var(--color-agent-sid); }
+.agent-avatar[data-agent="chalmers"] { --avatar-color: var(--color-agent-chalmers); }
+.agent-avatar[data-agent="wiggum"]   { --avatar-color: var(--color-agent-wiggum); }
+
+/* 카드 컴포넌트 — 우선순위 점 */
+.priority-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  margin-top: 5px;
+  background: var(--priority-dot-color, var(--color-text-muted));
+}
+.priority-dot[data-priority="high"]   { --priority-dot-color: var(--color-priority-high); }
+.priority-dot[data-priority="medium"] { --priority-dot-color: var(--color-priority-medium); }
+.priority-dot[data-priority="low"]    { --priority-dot-color: var(--color-priority-low); }
+
+/* 배지 내 소형 우선순위 점 */
+.priority-dot-sm {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--priority-dot-color, var(--color-text-muted));
+}
+.priority-dot-sm[data-priority="high"]   { --priority-dot-color: var(--color-priority-high); }
+.priority-dot-sm[data-priority="medium"] { --priority-dot-color: var(--color-priority-medium); }
+.priority-dot-sm[data-priority="low"]    { --priority-dot-color: var(--color-priority-low); }
+
+/* 카드 컴포넌트 — 우선순위 배지 변형 */
+.badge-priority-high {
+  background: var(--color-priority-high-bg);
+  color: var(--color-priority-high);
+  border: 1px solid var(--color-priority-high-border);
+  padding: 1px 7px;
+  font-size: 11px;
+}
+.badge-priority-medium {
+  background: var(--color-priority-medium-bg);
+  color: var(--color-priority-medium);
+  border: 1px solid var(--color-priority-medium-border);
+  padding: 1px 7px;
+  font-size: 11px;
+}
+.badge-priority-low {
+  background: var(--color-priority-low-bg);
+  color: var(--color-priority-low);
+  border: 1px solid var(--color-priority-low-border);
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+/* 카드 컴포넌트 — 진행률 fill (CSS var 주입) */
+.progress-fill {
+  height: 100%;
+  width: var(--progress-width, 0%);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--progress-color, var(--color-progress-high)) 50%, transparent) 0%,
+    var(--progress-color, var(--color-progress-high)) 100%
+  );
+  border-radius: 2px;
+  transition: width var(--duration-slow) ease-out;
+}
+
+/* 카드 컴포넌트 — 진행률 퍼센트 텍스트 색상 */
+[data-progress-level="zero"]   { color: var(--color-text-muted); }
+[data-progress-level="high"]   { color: var(--color-progress-high); }
+[data-progress-level="medium"] { color: var(--color-progress-medium); }
+[data-progress-level="low"]    { color: var(--color-progress-low); }
+
+/* 카드 컴포넌트 — 마감일 배지 */
+.due-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.due-badge--overdue {
+  background: var(--color-due-overdue-bg);
+  color: var(--color-due-overdue);
+  border: 1px solid var(--color-due-overdue-border);
+}
+.due-badge--soon {
+  background: var(--color-due-warning-bg);
+  color: var(--color-due-warning);
+  border: 1px solid var(--color-due-warning-border);
+}
+.due-badge--normal {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* 카드 삭제 버튼 — 44×44px 터치 타겟 (pseudo-element hit area) */
+.card-delete-btn {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--duration-fast), color var(--duration-fast), background var(--duration-fast);
+  flex-shrink: 0;
+}
+/* pseudo-element로 44×44px 터치 타겟 확장 — 레이아웃에 영향 없음 */
+.card-delete-btn::before {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* =============================================
    시스템 다크/라이트 모드 폴백
    (JavaScript 비활성 or 초기 렌더 전 flicker 방지용)
    ============================================= */
@@ -1119,4 +1472,225 @@ select:focus-visible {
     --color-point-glow:   rgba(95, 91, 226, 0.15);
     --color-focus-ring: #5F5BE2;
   }
+}
+
+/* =============================================
+   토스 디자인 시스템 — 다크 모드 토큰
+   spec: docs/specs/2026-04-10_dark-mode.md
+   트리거: html.dark 클래스 또는 OS 다크 설정
+   ============================================= */
+
+/* OS 기본값 — prefers-color-scheme (명시 선택 없을 때) */
+@media (prefers-color-scheme: dark) {
+  :root:not(.light) {
+    --bg-page:            #17171C;
+    --bg-card:            #2C2C35;
+    --bg-elevated:        #3C3C45;
+    --bg-input:           #25252E;
+    --bg-input-active:    #2C2C35;
+    --bg-secondary:       #2C2C35;
+    --bg-overlay:         rgba(0, 0, 0, 0.60);
+    --text-primary:       #ECECEC;
+    --text-secondary:     #8B95A1;
+    --text-tertiary:      #6B7684;
+    --text-disabled:      #3C4450;
+    --text-inverse:       #191F28;
+    --text-placeholder:   #6B7684;
+    --border-default:     #2E2E38;
+    --border-strong:      #3C3C45;
+    --border-focus:       #4D9BFF;
+    --border-nav:         #2E2E38;
+    --color-blue:         #4D9BFF;
+    --color-blue-hover:   #6AADFF;
+    --color-blue-pressed: #3A8FF0;
+    --color-blue-tint:    rgba(77, 155, 255, 0.12);
+    --color-blue-border:  rgba(77, 155, 255, 0.28);
+    --color-success-tint:   rgba(0, 196, 113, 0.12);
+    --color-success-border: rgba(0, 196, 113, 0.28);
+    --color-warning-tint:   rgba(255, 149, 0, 0.12);
+    --color-warning-border: rgba(255, 149, 0, 0.28);
+    --color-error-tint:     rgba(240, 68, 82, 0.12);
+    --color-error-border:   rgba(240, 68, 82, 0.28);
+    --col-todo:            #4D9BFF;
+    --col-todo-tint:       rgba(77, 155, 255, 0.10);
+    --col-inprogress:      #FF9500;
+    --col-inprogress-tint: rgba(255, 149, 0, 0.10);
+    --col-review:          #B47AEA;
+    --col-review-tint:     rgba(180, 122, 234, 0.10);
+    --col-done:            #00C471;
+    --col-done-tint:       rgba(0, 196, 113, 0.10);
+    --col-blocked:         #F04452;
+    --col-blocked-tint:    rgba(240, 68, 82, 0.10);
+    --col-backlog:         #6B7684;
+    --col-backlog-tint:    rgba(107, 118, 132, 0.10);
+    --shadow-card:         0 2px 8px rgba(0, 0, 0, 0.32);
+    --shadow-elevated:     0 4px 16px rgba(0, 0, 0, 0.48);
+    --dim-overlay:         rgba(0, 0, 0, 0.60);
+    --nav-bg:              #1F1F28;
+    --nav-border:          #2E2E38;
+    --nav-icon-active:     #4D9BFF;
+    --nav-icon-inactive:   #6B7684;
+    --toast-bg:            #3C3C45;
+    --toast-text:          #ECECEC;
+    --skeleton-base:       #2C2C35;
+    --skeleton-shimmer:    #3C3C45;
+  }
+}
+
+/* 사용자 명시 다크 선택 (html.dark) */
+html.dark {
+  color-scheme: dark;
+
+  /* ── 토스 다크 토큰 ── */
+  --bg-page:            #17171C;
+  --bg-card:            #2C2C35;
+  --bg-elevated:        #3C3C45;
+  --bg-input:           #25252E;
+  --bg-input-active:    #2C2C35;
+  --bg-secondary:       #2C2C35;
+  --bg-overlay:         rgba(0, 0, 0, 0.60);
+
+  --text-primary:       #ECECEC;
+  --text-secondary:     #8B95A1;
+  --text-tertiary:      #6B7684;
+  --text-disabled:      #3C4450;
+  --text-inverse:       #191F28;
+  --text-placeholder:   #6B7684;
+  --text-on-dark:       #FFFFFF;
+
+  --border-default:     #2E2E38;
+  --border-strong:      #3C3C45;
+  --border-focus:       #4D9BFF;
+  --border-nav:         #2E2E38;
+
+  --color-blue:         #4D9BFF;
+  --color-blue-hover:   #6AADFF;
+  --color-blue-pressed: #3A8FF0;
+  --color-blue-tint:    rgba(77, 155, 255, 0.12);
+  --color-blue-border:  rgba(77, 155, 255, 0.28);
+
+  --color-success:        #00C471;
+  --color-success-tint:   rgba(0, 196, 113, 0.12);
+  --color-success-border: rgba(0, 196, 113, 0.28);
+  --color-warning:        #FF9500;
+  --color-warning-tint:   rgba(255, 149, 0, 0.12);
+  --color-warning-border: rgba(255, 149, 0, 0.28);
+  --color-error:          #F04452;
+  --color-error-tint:     rgba(240, 68, 82, 0.12);
+  --color-error-border:   rgba(240, 68, 82, 0.28);
+
+  --col-todo:            #4D9BFF;
+  --col-todo-tint:       rgba(77, 155, 255, 0.10);
+  --col-inprogress:      #FF9500;
+  --col-inprogress-tint: rgba(255, 149, 0, 0.10);
+  --col-review:          #B47AEA;
+  --col-review-tint:     rgba(180, 122, 234, 0.10);
+  --col-done:            #00C471;
+  --col-done-tint:       rgba(0, 196, 113, 0.10);
+  --col-blocked:         #F04452;
+  --col-blocked-tint:    rgba(240, 68, 82, 0.10);
+  --col-backlog:         #6B7684;
+  --col-backlog-tint:    rgba(107, 118, 132, 0.10);
+
+  --agent-homer:         #4D9BFF;
+  --agent-bart:          #5AC8FA;
+  --agent-marge:         #B47AEA;
+  --agent-lisa:          #00C471;
+  --agent-krusty:        #FF9500;
+  --agent-sid:           #F04452;
+  --agent-chalmers:      #FFD60A;
+  --agent-wiggum:        #8B95A1;
+
+  --shadow-card:         0 2px 8px rgba(0, 0, 0, 0.32);
+  --shadow-elevated:     0 4px 16px rgba(0, 0, 0, 0.48);
+  --dim-overlay:         rgba(0, 0, 0, 0.60);
+
+  --nav-bg:              #1F1F28;
+  --nav-border:          #2E2E38;
+  --nav-icon-active:     #4D9BFF;
+  --nav-icon-inactive:   #6B7684;
+
+  --toast-bg:            #3C3C45;
+  --toast-text:          #ECECEC;
+  --skeleton-base:       #2C2C35;
+  --skeleton-shimmer:    #3C3C45;
+}
+
+/* 사용자 명시 라이트 선택 (html.light) — OS 다크여도 라이트 강제 */
+html.light {
+  color-scheme: light;
+
+  /* ── 토스 라이트 토큰 ── */
+  --bg-page:            #F4F4F4;
+  --bg-card:            #FFFFFF;
+  --bg-elevated:        #FFFFFF;
+  --bg-input:           #F2F4F6;
+  --bg-input-active:    #FFFFFF;
+  --bg-secondary:       #F2F4F6;
+  --bg-overlay:         rgba(0, 0, 0, 0.40);
+
+  --text-primary:       #191F28;
+  --text-secondary:     #4E5968;
+  --text-tertiary:      #8B95A1;
+  --text-disabled:      #D1D6DB;
+  --text-inverse:       #FFFFFF;
+  --text-placeholder:   #8B95A1;
+  --text-on-dark:       #FFFFFF;
+
+  --border-default:     #F0F0F0;
+  --border-strong:      #D1D6DB;
+  --border-focus:       #0064FF;
+  --border-nav:         #F0F0F0;
+
+  --color-blue:         #0064FF;
+  --color-blue-hover:   #0052CC;
+  --color-blue-pressed: #0041A3;
+  --color-blue-tint:    #E8F3FF;
+  --color-blue-border:  rgba(0, 100, 255, 0.28);
+
+  --color-success:        #00C471;
+  --color-success-tint:   #E8FAF0;
+  --color-success-border: rgba(0, 196, 113, 0.28);
+  --color-warning:        #FF9500;
+  --color-warning-tint:   #FFF4E0;
+  --color-warning-border: rgba(255, 149, 0, 0.28);
+  --color-error:          #F04452;
+  --color-error-tint:     #FFEBEE;
+  --color-error-border:   rgba(240, 68, 82, 0.28);
+
+  --col-todo:            #0064FF;
+  --col-todo-tint:       #E8F3FF;
+  --col-inprogress:      #FF9500;
+  --col-inprogress-tint: #FFF4E0;
+  --col-review:          #9B59D0;
+  --col-review-tint:     #F3E8FF;
+  --col-done:            #00C471;
+  --col-done-tint:       #E8FAF0;
+  --col-blocked:         #F04452;
+  --col-blocked-tint:    #FFEBEE;
+  --col-backlog:         #8B95A1;
+  --col-backlog-tint:    #F2F4F6;
+
+  --agent-homer:         #0064FF;
+  --agent-bart:          #5AC8FA;
+  --agent-marge:         #9B59D0;
+  --agent-lisa:          #00C471;
+  --agent-krusty:        #FF9500;
+  --agent-sid:           #F04452;
+  --agent-chalmers:      #FFD60A;
+  --agent-wiggum:        #8B95A1;
+
+  --shadow-card:         0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-elevated:     0 4px 16px rgba(0, 0, 0, 0.12);
+  --dim-overlay:         rgba(0, 0, 0, 0.40);
+
+  --nav-bg:              #FFFFFF;
+  --nav-border:          #F0F0F0;
+  --nav-icon-active:     #0064FF;
+  --nav-icon-inactive:   #8B95A1;
+
+  --toast-bg:            #191F28;
+  --toast-text:          #FFFFFF;
+  --skeleton-base:       #F2F4F6;
+  --skeleton-shimmer:    #E5E8EB;
 }
