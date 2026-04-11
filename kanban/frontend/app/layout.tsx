@@ -10,7 +10,32 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko" data-theme="dark" suppressHydrationWarning>
+    <html lang="ko" suppressHydrationWarning>
+      <head>
+        {/* 플리커 방지: localStorage 읽어 class + data-theme 즉시 적용 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+(function() {
+  try {
+    var saved = localStorage.getItem('kanban-theme');
+    var theme = 'dark';
+    if (saved === 'light' || saved === 'dark') {
+      theme = saved;
+    } else if (window.matchMedia('(prefers-color-scheme: light)').matches) {
+      theme = 'light';
+    }
+    document.documentElement.classList.add(theme);
+    document.documentElement.setAttribute('data-theme', theme);
+  } catch(e) {
+    document.documentElement.classList.add('dark');
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+            `,
+          }}
+        />
+      </head>
       <body className="antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>

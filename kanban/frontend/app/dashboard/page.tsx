@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState, useCallback } from 'react';
-import { Board, Card } from '@/lib/types';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import useSWR from 'swr';
+import { Card } from '@/lib/types';
 import { ActivityEvent, Notification } from '@/lib/dashboard-types';
 import { api } from '@/lib/api';
 import DashboardHeader from '@/components/dashboard/dashboard-header';
@@ -18,7 +19,7 @@ const BOARD_ID = Number(process.env.NEXT_PUBLIC_BOARD_ID ?? 1);
 // ──────────────────────────────────────────────
 // 유틸리티: 보드 데이터에서 ActivityEvent[] 파생
 // ──────────────────────────────────────────────
-function deriveActivitiesFromBoard(board: Board): ActivityEvent[] {
+function deriveActivitiesFromBoard(board: Awaited<ReturnType<typeof api.getBoard>>): ActivityEvent[] {
   const allCards = board.columns.flatMap((col) =>
     col.cards.map((card) => ({ ...card, columnName: col.name }))
   );
@@ -46,7 +47,7 @@ function deriveActivitiesFromBoard(board: Board): ActivityEvent[] {
 // ──────────────────────────────────────────────
 // 유틸리티: 대시보드 수치 계산
 // ──────────────────────────────────────────────
-function computeSummary(board: Board) {
+function computeSummary(board: Awaited<ReturnType<typeof api.getBoard>>) {
   const allCards: Card[] = board.columns.flatMap((col) => col.cards);
   const doneCards = board.columns
     .filter((col) => {
@@ -83,7 +84,7 @@ function computeSummary(board: Board) {
 }
 
 // ──────────────────────────────────────────────
-// async helper — notifications
+// SWR fetcher — notifications
 // ──────────────────────────────────────────────
 async function fetchNotifications(): Promise<Notification[]> {
   const res = await fetch(`${BASE}/notifications?limit=5`, {
@@ -94,18 +95,27 @@ async function fetchNotifications(): Promise<Notification[]> {
 }
 
 export default function DashboardPage() {
-  const [board, setBoard] = useState<Board | null>(null);
-  const [boardLoading, setBoardLoading] = useState(true);
-  const [boardError, setBoardError] = useState(false);
+  // ── SWR: 보드 데이터 ──
+  const {
+    data: board,
+    error: boardError,
+    isLoading: boardLoading,
+    mutate: mutateBoard,
+  } = useSWR(`dashboard-board-${BOARD_ID}`, () => api.getBoard(BOARD_ID), {
+    revalidateOnFocus: false,
+  });
 
-  const [activities, setActivities] = useState<ActivityEvent[]>([]);
-  const [activityLoading, setActivityLoading] = useState(false);
+  // ── SWR: 알림 데이터 (404 등 에러 시 빈 상태로 처리) ──
+  const {
+    data: notifications = [],
+    isLoading: notifLoading,
+    mutate: mutateNotif,
+  } = useSWR('dashboard-notifications', fetchNotifications, {
+    revalidateOnFocus: false,
+    onErrorRetry: () => {}, // 미구현 엔드포인트 → 재시도 없이 빈 상태 유지
+  });
 
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [notifLoading, setNotifLoading] = useState(true);
-  const [notifError, setNotifError] = useState(false);
-
-  // 화면 폭 감지 (모바일 여부)
+  // 화면 폭 감지 (모바일 여부) — non-fetch useEffect, 유지
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 479px)');
@@ -115,45 +125,8 @@ export default function DashboardPage() {
     return () => mq.removeEventListener('change', handler);
   }, []);
 
-  // ── 보드 로드 ──
-  const loadBoard = useCallback(async () => {
-    try {
-      const data = await api.getBoard(BOARD_ID);
-      setBoard(data);
-      setBoardError(false);
-      // 보드 데이터에서 활동 파생
-      setActivities(deriveActivitiesFromBoard(data));
-    } catch {
-      setBoardError(true);
-    } finally {
-      setBoardLoading(false);
-      setActivityLoading(false);
-    }
-  }, []);
-
-  // ── 알림 로드 ──
-  const loadNotifications = useCallback(async () => {
-    setNotifLoading(true);
-    try {
-      const data = await fetchNotifications();
-      setNotifications(data);
-      setNotifError(false);
-    } catch {
-      // notifications 엔드포인트 미구현 — 빈 상태 처리
-      setNotifications([]);
-      setNotifError(false); // 404는 에러가 아닌 빈 상태로 처리
-    } finally {
-      setNotifLoading(false);
-    }
-  }, []);
-
-  // ── 초기 로드 + WebSocket ──
+  // ── WebSocket — non-fetch, SWR mutate로 재검증 트리거 ──
   useEffect(() => {
-    setBoardLoading(true);
-    setActivityLoading(true);
-    void loadBoard();
-    void loadNotifications();
-
     const wsUrl = BASE.replace(/^http/, 'ws');
     let ws: WebSocket | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -162,7 +135,6 @@ export default function DashboardPage() {
 
     const connect = () => {
       if (disposed) { return; }
-      // 이전 소켓이 남아있으면 정리
       if (ws) {
         ws.onclose = null;
         ws.onmessage = null;
@@ -172,8 +144,8 @@ export default function DashboardPage() {
       ws.onmessage = () => {
         if (debounceTimer) { clearTimeout(debounceTimer); }
         debounceTimer = setTimeout(() => {
-          void loadBoard();
-          void loadNotifications();
+          void mutateBoard();
+          void mutateNotif();
         }, 300);
       };
       ws.onclose = () => {
@@ -195,42 +167,32 @@ export default function DashboardPage() {
         ws.close();
       }
     };
-  }, [loadBoard, loadNotifications]);
+  }, [mutateBoard, mutateNotif]);
 
   // ── 파생 데이터 ──
+  const activities = useMemo<ActivityEvent[]>(
+    () => board ? deriveActivitiesFromBoard(board) : [],
+    [board]
+  );
   const allCards: Card[] = board?.columns.flatMap((col) => col.cards) ?? [];
   const summary = board ? computeSummary(board) : null;
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
+  // 낙관적 업데이트 — SWR cache를 직접 갱신 (API 호출 없음)
   const handleMarkAllRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
-  }, []);
+    void mutateNotif(
+      notifications.map((n) => ({ ...n, is_read: 1 })),
+      false,
+    );
+  }, [mutateNotif, notifications]);
 
   return (
-    <main
-      style={{
-        minHeight: '100vh',
-        background: 'var(--color-bg-base)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <main className="min-h-screen bg-[var(--color-bg-base)] flex flex-col">
       {/* ── 헤더 ── */}
       <DashboardHeader unreadCount={unreadCount} />
 
       {/* ── 대시보드 콘텐츠 ── */}
-      <div
-        style={{
-          flex: 1,
-          padding: isMobile ? '12px' : '24px 28px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: isMobile ? 12 : 16,
-          maxWidth: 1280,
-          margin: '0 auto',
-          width: '100%',
-        }}
-      >
+      <div className="flex-1 p-3 sm:py-6 sm:px-7 flex flex-col gap-3 sm:gap-4 max-w-[1280px] mx-auto w-full">
         {/* Row 1 — Summary Stats (4개 수치 카드) */}
         <div className="dashboard-grid dashboard-grid--stats">
           <SummaryStatCard
@@ -239,7 +201,7 @@ export default function DashboardPage() {
             label="Total Cards"
             accentColor="var(--color-action-primary)"
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
           <SummaryStatCard
             icon="✅"
@@ -247,7 +209,7 @@ export default function DashboardPage() {
             label="Completion Rate"
             accentColor="var(--color-col-done)"
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
           <SummaryStatCard
             icon="⚠️"
@@ -255,7 +217,7 @@ export default function DashboardPage() {
             label="WIP Violations"
             accentColor="var(--color-priority-high)"
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
           <SummaryStatCard
             icon="🔴"
@@ -263,22 +225,22 @@ export default function DashboardPage() {
             label="Due Soon"
             accentColor="var(--color-due-warning)"
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
         </div>
 
         {/* Row 2 — Column Status + WIP Monitor */}
         <div className="dashboard-grid dashboard-grid--two-col">
           <ColumnStatusOverview
-            board={board}
+            board={board ?? null}
             loading={boardLoading}
-            error={boardError}
-            onRetry={() => void loadBoard()}
+            error={!!boardError}
+            onRetry={() => void mutateBoard()}
           />
           <WipMonitor
-            board={board}
+            board={board ?? null}
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
         </div>
 
@@ -287,21 +249,21 @@ export default function DashboardPage() {
           <PriorityDistribution
             cards={allCards}
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
           <AgentWorkload
             cards={allCards}
             loading={boardLoading}
-            error={boardError}
+            error={!!boardError}
           />
         </div>
 
         {/* Row 4 — Recent Activity Feed */}
         <RecentActivityFeed
           activities={activities}
-          loading={activityLoading}
+          loading={boardLoading}
           error={false}
-          onRetry={() => void loadBoard()}
+          onRetry={() => void mutateBoard()}
           isMobile={isMobile}
         />
 
@@ -309,7 +271,7 @@ export default function DashboardPage() {
         <NotificationPreview
           notifications={notifications}
           loading={notifLoading}
-          error={notifError}
+          error={false}
           onMarkAllRead={handleMarkAllRead}
         />
       </div>
