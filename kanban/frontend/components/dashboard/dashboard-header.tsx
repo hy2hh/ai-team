@@ -13,6 +13,7 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
 
   const isBoard = pathname === '/';
   const isDashboard = pathname === '/dashboard';
+  const isProfile = pathname === '/profile';
 
   return (
     <header
@@ -103,6 +104,25 @@ export default function DashboardHeader({ unreadCount = 0 }: DashboardHeaderProp
             }}
           >
             Dashboard
+          </Link>
+          <Link
+            href="/profile"
+            className={isProfile ? 'text-[color:var(--color-point)]' : 'text-text-secondary'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              height: 52,
+              padding: '0 14px',
+              fontSize: 14,
+              fontWeight: 500,
+              textDecoration: 'none',
+              borderBottom: isProfile ? '2px solid var(--color-point)' : '2px solid transparent',
+              transition: 'color var(--duration-fast), border-color var(--duration-fast)',
+              whiteSpace: 'nowrap',
+            }}
+            aria-current={isProfile ? 'page' : undefined}
+          >
+            Profile
           </Link>
         </nav>
       </div>
