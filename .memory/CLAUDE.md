@@ -14,6 +14,8 @@ Entry point: `index.md`
 4. Scan `facts/agents/{your-role}/` → operational 지식 있으면 Read
 5. Check `handoff/index.md` → 본인 role 포함 파일만 Read
 
+> **Sprint 사용 규칙**: `.agent/sprint/current.md`는 **읽기 전용 히스토리 로그**. 후속 태스크를 sprint `**Next:**` 섹션에 기록하지 말 것 — `.memory/tasks/active-{role}.md`에 직접 등록.
+
 ## Read/Write Rules
 - **facts/**: Read always. `project-context.md`, `team-profile.md`는 Marge 관리. 나머지 파일과 `facts/agents/{role}/`는 관련 에이전트 직접 작성 가능.
 - **tasks/**: Each agent updates ONLY their own `active-{role}.md`. Completed → `done.md`.

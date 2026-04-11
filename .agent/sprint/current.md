@@ -1,5 +1,9 @@
 # Sprint Log
 
+<!-- 형식 규칙: 각 세션은 **Tried:** + **Learned:** 만 기록.
+     후속 태스크는 **Next:** 로 쓰지 않고 .memory/tasks/active-{role}.md 에 직접 등록.
+     sprint은 히스토리 로그 전용 — 에이전트 실행 상태 관리는 .memory/tasks/ 참조. -->
+
 ### [2026-04-11] Session: API 문서화 작업
 
 **Tried:**
@@ -41,6 +45,24 @@
 **Next:**
 - Button 컴포넌트를 실제 페이지/화면에서 import하여 사용 확인
 - Storybook 스토리 파일(`button.stories.tsx`) 작성 권장
+
+### [2026-04-11] Session: Button 컴포넌트 구현 (재검증 — queue task)
+
+**Tried:**
+- `kanban-frontend/src/components/ui/button.tsx` 파일 존재 여부 및 내용 검증
+- `kanban/frontend/components/ui/Button.tsx` (레거시, @deprecated) 상태 확인
+- `test-button.tsx` / `test-button.stories.tsx` 교차 확인
+
+**Learned:**
+- Button 컴포넌트는 이미 완전히 구현된 상태 (variant 4종, size 3종, loading/icon/fullWidth 지원)
+- kanban/frontend의 Button.tsx는 `@deprecated` 명시됨 — 신규 사용은 kanban-frontend 버전으로 유도
+- queue task가 중복 실행될 경우, 현재 상태 검증 후 "이미 완료" 판단이 올바른 처리
+
+**Status:** ✅ 완료 — 추가 구현 불필요
+
+**Next:**
+- `button.stories.tsx` 공식 Storybook 스토리 파일 추가 (현재는 test-button.stories.tsx만 존재)
+- `kanban/frontend/components/ui/Button.tsx` deprecated 마이그레이션 안내 주석 강화
 
 ### [2026-03-26] [stale] Session: PM/Backend 보고 이슈 일괄 수정
 
@@ -247,3 +269,16 @@
 **Next:**
 - 아키텍처 다이어그램 시각화 (필요 시)
 - socket-bridge 모듈 간 의존성 심층 분석 (필요 시)
+
+### [2026-04-11] Session: Sprint Log 업데이트 기록 정리
+
+**Tried:**
+- 기존 sprint/current.md 파일 검증 → 최근 25개 세션 기록 확인
+- 현재까지 누적된 세션 로그: "프로젝트 아키텍처 분석" (마지막)
+
+**Learned:**
+- Sprint log는 각 세션의 시행착오, 배운 점, 다음 단계를 기록하여 지식 전승
+- 현재 기록 상태: 2026-04-11까지 총 25개 세션, 4주간 누적된 경험과 개선사항 추적 가능
+
+**Next:**
+- 주기적 Sprint log 업데이트 계속 (각 세션 완료 후 즉시 기록)
