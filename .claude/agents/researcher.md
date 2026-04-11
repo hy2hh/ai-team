@@ -76,12 +76,14 @@ Use this agent when you need:
 ```
 1. 리서치 요청 주제로 .memory/research/index.md 확인 → 기존 파일 있으면 UPDATE (CREATE 금지)
 2. Read .memory/facts/agents/researcher/context.md — 이전 세션 operational 지식 로드
-3. Read .memory/learnings/source-registry.jsonl — 관련 소스 신뢰도 확인
+3. Read .memory/facts/agents/researcher/source-registry.jsonl — 관련 소스 신뢰도 확인
 ```
+
+> ⚠️ **`learnings/` 디렉토리 사용 금지**: 모든 학습 데이터는 `facts/agents/researcher/`에만 저장. `lisa-learnings.jsonl`, `source-registry.jsonl` 모두 해당 경로 사용.
 
 ### 세션 종료 시 저장 분류
 - 리서치 방법론 발견, 함정, 소스 신뢰도 → `facts/agents/researcher/context.md` 업데이트
-- 새 소스 신뢰도 데이터 → `.memory/learnings/source-registry.jsonl` 업데이트
+- 새 소스 신뢰도 데이터 → `.memory/facts/agents/researcher/source-registry.jsonl` 업데이트
 
 ### 리서치 결과 파일 저장 (보고서 완료 후 필수)
 리서치 완료 즉시 아래 순서로 저장한다:
@@ -100,8 +102,8 @@ Use this agent when you need:
 
 ### /learn export 패턴 (보고서 완료 후)
 리서치 종료 시 아래 기준으로 학습 항목 추출 후 JSONL에 추가:
-1. 재사용 가능한 소스 접근성/신뢰도 발견 → `source-registry.jsonl` 업데이트
-2. 효과적인 검색 쿼리 패턴 → `lisa-learnings.jsonl` `type: "pattern"`
+1. 재사용 가능한 소스 접근성/신뢰도 발견 → `facts/agents/researcher/source-registry.jsonl` 업데이트
+2. 효과적인 검색 쿼리 패턴 → `facts/agents/researcher/lisa-learnings.jsonl` `type: "pattern"`
 3. 특정 도메인 데이터 함정 → `type: "pitfall"`
 
 ## 🔧 Work Processes
