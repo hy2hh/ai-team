@@ -27,6 +27,10 @@
 | 04-09 | `2026-04-09_meeting-10_Krusty-토스-디자인-에이전트-구현-계획-수립-재작업` | designer,frontend,backend | design-system | Krusty 토스 디자인 구현 계획 재수립 (회의 #10) |
 | 04-09 | `2026-04-09_meeting-11_새로운-알림-시스템-설계-DB-스키마-및-UI-컴포넌트` | backend,designer | architecture | 알림 시스템 DB 2-테이블 구조·Partial Index·pg_notify 설계 (회의 #11) |
 | 04-09 | `2026-04-09_meeting-12_새로운-알림-시스템-설계-DB-스키마-UI-컴포넌트` | backend,designer | architecture | 알림 시스템 단일 테이블·Redis 캐싱·월별 파티셔닝 설계 (회의 #12) |
+| 04-10 | `2026-04-10_meeting-13_에이전트-프롬프트-개선-방향-논의` | all | prompt-engineering | 프롬프트 개선 방향 논의 — 슬림화·유령참조·SSOT·워크플로우 옵션 검토 (회의 #13) |
+| 04-10 | `2026-04-10_meeting-14_에이전트-프롬프트-개선-방향-결정` | all | prompt-engineering | 프롬프트 슬림화·유령참조 제거·SSOT 단일화·2-track 워크플로우 결정 (회의 #14) |
+| 04-10 | `2026-04-10_meeting-14_pockiewalletextension-AI-Agent-기능-설계-구현-범위-확정-및-아키` | backend,frontend,designer,secops | architecture | pockie-wallet-extension AI Agent 구현 범위 확정 및 아키텍처 결정 (회의 #14) |
+| 04-10 | `2026-04-10_meeting-15_pockie-wallet-AI-agent-기능-설계` | backend,frontend,designer,secops | product | pockie-wallet AI Agent Tier 1 기능 설계 — 자연어 tx·리스크 시뮬레이션·가스 최적화 (회의 #15) |
 
 ## 2026-03 결정사항 (아카이브)
 

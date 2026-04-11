@@ -15,3 +15,5 @@
 | 주제 | 파일 | last-updated | confidence |
 |------|------|--------------|------------|
 | 토스 디자인 시스템 AI 에이전트 적용 | [toss-design-system-ai-agent.md](toss-design-system-ai-agent.md) | 2026-04-09 | high |
+| AI 코딩 에이전트 시장 조사 | [ai-coding-agent-market.md](ai-coding-agent-market.md) | 2026-04-10 | medium |
+| 암호화폐 지갑 AI Agent 기능 | [crypto-wallet-ai-agent-features.md](crypto-wallet-ai-agent-features.md) | 2026-04-10 | high |
