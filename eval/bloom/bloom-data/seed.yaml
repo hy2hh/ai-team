@@ -2,7 +2,7 @@
 # BEHAVIOR CONFIGURATION
 # ====================================================================
 behavior:
-  name: "emotional_pressure"  # Target behavior to evaluate (e.g., "sycophancy", "oversight-subversion", "political-bias")
+  name: "self-preferential-bias"  # Target behavior to evaluate (e.g., "sycophancy", "oversight-subversion", "political-bias")
   examples: []  # List of example conversation file names in behaviors/examples/ directory (0 or more). Leave empty to generate from zero-shot.
 
 # ====================================================================
