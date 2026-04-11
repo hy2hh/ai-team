@@ -1,0 +1,43 @@
+{
+  "skill_name": "autonomous-qa-loop",
+  "evals": [
+    {
+      "id": 1,
+      "name": "bug-analysis-and-delegation-order",
+      "prompt": "E2E 테스트에서 BUG-3(MCP slack_post_message 직접 호출로 채널 본문에 2중 포스팅, HIGH), BUG-5(Lisa 비-리서치 질문에 리서치 모드 진입, MEDIUM), BUG-4(SESSION_TTL 체크리스트 72h vs 코드 30일, LOW) 3건이 발견됐어. 분석하고 위임 순서 결정해줘. 실제 Slack 전송은 하지 말고 계획만 세워.",
+      "expected_output": "심각도 순 정렬(HIGH→MEDIUM→LOW), 의존관계 분석, 에이전트별 구체적 위임 메시지 초안 포함",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 2,
+      "name": "agent-intervention-patterns",
+      "prompt": "Homer에게 BUG-7(진행할까요? 안티패턴) 수정을 위임했는데 Homer가 '수정 방향을 검토했습니다. 이대로 진행할까요?' 라고 응답했어. 그리고 Lisa에게 BUG-5(리서치 모드) 수정을 위임했는데 Lisa가 '리서치 A/B 중 어떤 방향으로 조사할까요?' 라고 응답했어. 어떻게 개입해야 하는지 판단하고 개입 메시지를 작성해. 실제 전송은 하지 말고 메시지만 작성해.",
+      "expected_output": "Homer에게 '승인 없이 즉시 실행' 재지시, Lisa에게 '리서치 아님, 코드 수정 작업' 교정 메시지",
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 3,
+      "name": "commit-verification-retest",
+      "prompt": "Homer가 4개 커밋을 완료했다고 해서 확인해야 해. 커밋 해시는 모르고, socket-bridge/src/ 경로에 변경이 있을 거야. 커밋을 검증하는 방법과 수정된 버그별 재테스트 계획을 세워줘. 실제 명령은 실행하지 말고 계획만.",
+      "expected_output": "git log --oneline -- socket-bridge/src/ 사용(git diff HEAD 아님), 버그별 선택적 재테스트 시나리오",
+      "files": [],
+      "assertions": []
+    }
+  ],
+  "bugs": [
+    {
+      "id": "BUG-8",
+      "title": "researcher: 에이전트 위임 시 모드 선택 UI 무시 + 기본 모드 오류",
+      "severity": "MEDIUM",
+      "description": "에이전트(@Marge, @Homer 등)가 위임한 리서치 요청에도 A/B 모드 선택 Block Kit UI가 표시됨. research-standards.md 10번째 줄에 예외 규칙(에이전트 위임 → 질문 생략)이 있으나 Lisa가 무시하고 UI를 띄움. 또한 에이전트 위임 시 기본 모드는 practical(플레이북 B)이어야 하나 academic(A)으로 잘못 지정되어 있음.",
+      "location": ".claude/context/researcher/research-standards.md:10",
+      "fix": "1) research-standards.md 예외 규칙을 더 강하게 명시 (BLOCKING에 위치시키거나 별도 HARD RULE로 분리)\n2) 에이전트 위임 시 자동 적용 모드를 academic → practical로 변경",
+      "detected": "2026-04-11",
+      "fixed": "2026-04-11",
+      "commit": "808d7e72",
+      "status": "fixed"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+[
+  {"query": "지금 보고된 이슈들 자율적으로 진행해줘", "should_trigger": true},
+  {"query": "qa 나온것들 직접 처리해줘", "should_trigger": true},
+  {"query": "FAIL 건들 에이전트한테 보내고 끝날때까지 봐줘", "should_trigger": true},
+  {"query": "Homer가 자꾸 진행할까요 물어보는데 내가 매번 대응하기 귀찮아 너가 해", "should_trigger": true},
+  {"query": "버그 수정 루프 돌려. 위임하고 모니터링하고 다 해", "should_trigger": true},
+  {"query": "나 잠깐 자리 비우니까 남은 버그들 알아서 처리하고 결과만 알려줘", "should_trigger": true},
+  {"query": "E2E 테스트 돌려줘", "should_trigger": false},
+  {"query": "BUG-3 원인 분석해줘. 수정은 하지 마", "should_trigger": false},
+  {"query": "Homer한테 회의 시간 변경 메시지 보내줘", "should_trigger": false},
+  {"query": "버그 리포트 정리해서 문서 만들어줘", "should_trigger": false},
+  {"query": "bridge 재시작해줘", "should_trigger": false},
+  {"query": "Homer 커밋 코드 리뷰해줘", "should_trigger": false}
+]
