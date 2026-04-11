@@ -7,6 +7,7 @@
 - [ ] Sprint log 강제 업데이트 메커니즘 도입 | 2026-04-11 | MEDIUM
   - queue-processor에서 세션 완료 후 sprint/current.md mtime 체크
   - 업데이트 미발생 시 에이전트에 재주입하는 자동화 로직
+  - [2026-04-11] 검증 세션에서 sprint log 수동 업데이트 정상 확인. 자동화 로직은 아직 미구현.
 
 ## Enqueue 경로 개선 (2026-04-01 이관)
 

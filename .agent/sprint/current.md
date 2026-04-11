@@ -282,3 +282,17 @@
 
 **Next:**
 - 주기적 Sprint log 업데이트 계속 (각 세션 완료 후 즉시 기록)
+
+---
+
+### [2026-04-11] Session: Sprint/Memory 역할 분리 시스템 검증
+
+**Tried:**
+- `.memory/tasks/active-backend.md` 읽기 → 미완료 태스크 2건 확인
+- `git check-ignore -v .env` 실행 → .gitignore 포함 여부 검증
+- `.agent/sprint/current.md` 세션 항목 추가 (완료 조건 이행)
+
+**Learned:**
+- `.env`는 `.gitignore:1` 에 명시됨 → git 추적 제외 정상 처리됨 (Wiggum 세션 지적과 달리 현재 상태는 안전)
+- `active-backend.md` 미완료 태스크 2건: Sprint log 강제 업데이트 메커니즘(MEDIUM), syncEnqueuedTasksToKanban 제거(LOW)
+- Sprint/Memory 분리 워크플로 정상 — sprint log는 히스토리 전용, 미완료 태스크는 .memory/tasks/에서 관리하는 구조 검증됨
