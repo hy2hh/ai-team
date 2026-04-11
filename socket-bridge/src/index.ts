@@ -676,6 +676,43 @@ const DELEGATION_RESULT_LIMIT = Number(
   process.env.DELEGATION_RESULT_LIMIT ?? 3000,
 );
 
+/** QA FAIL 시 이전 step 재작업 최대 횟수 */
+const QA_AUTO_RETRY_MAX = 3;
+
+/**
+ * Chalmers QA 결과 텍스트에서 전체 판정과 Critical Fix 정보를 추출한다.
+ * @param text - Chalmers가 포스팅한 결과 텍스트
+ */
+const parseQaVerdict = (
+  text: string,
+): { isFail: boolean; isFlaky: boolean; criticalFix: string } => {
+  // FAIL 판정 탐지: qa-loop.ts의 파싱 패턴과 동일하게 지원
+  const isFail =
+    /결과:\s*\d+\s*PASS,\s*[1-9]\d*\s*FAIL/i.test(text) ||
+    /종합\s*판정[:\s]+FAIL/i.test(text) ||
+    /\*종합\s*판정[*:\s]+FAIL/i.test(text) ||
+    /전체\s*판정[:\s]+FAIL/i.test(text);
+
+  if (!isFail) {
+    return { isFail: false, isFlaky: false, criticalFix: '' };
+  }
+
+  // flaky-only 판단: Critical 수정 섹션이 없고 flaky/불안정 언급만 있는 경우
+  const hasCriticalFix = /Critical Fix|즉시 수정|수정 필요|블로킹/.test(text);
+  const hasFlaky = /flaky|불안정|intermittent|간헐|비결정적/.test(text);
+  const isFlaky = !hasCriticalFix && hasFlaky;
+
+  // Critical Fix 섹션 추출 (없으면 빈 문자열)
+  const criticalFixMatch = text.match(
+    /(?:Critical Fix Required?|즉시 수정 필요)[^\n]*\n([\s\S]*?)(?=\n##|\n\*\*[^*]|$)/i,
+  );
+  const criticalFix = criticalFixMatch
+    ? criticalFixMatch[1].trim().slice(0, 2000)
+    : '';
+
+  return { isFail, isFlaky, criticalFix };
+};
+
 const safeSlice = (str: string, maxLen: number): string => {
   if (str.length <= maxLen) {
     return str;
@@ -879,6 +916,194 @@ const runSequentialSteps = async (
       break;
     }
 
+    // ─── Part A: QA FAIL 자동 재시도 ─────────────────────────
+    // QA step이 오류 없이 완료됐지만 FAIL 판정인 경우,
+    // 이전 step을 Critical Fix 정보와 함께 재실행하고 QA를 다시 검증한다.
+    // flaky 테스트 실패만 있는 경우는 재작업 없이 통과 처리.
+    if (step.agents.includes('qa') && si > 0) {
+      const qaEntry = [...results].reverse().find((r) => r.agent === 'qa');
+      const verdict = qaEntry ? parseQaVerdict(qaEntry.text) : null;
+
+      if (verdict?.isFail && !verdict.isFlaky) {
+        const prevStep = steps[si - 1];
+        let qaRetryCount = 0;
+        let qaRetryPassed = false;
+        let currentCriticalFix = verdict.criticalFix;
+
+        console.log(
+          `[qa-retry] QA FAIL 감지 — 이전 step(${prevStep.agents.join(', ')}) 재작업 시작 (max ${QA_AUTO_RETRY_MAX}회)`,
+        );
+
+        while (qaRetryCount < QA_AUTO_RETRY_MAX && !qaRetryPassed) {
+          qaRetryCount++;
+          console.log(`[qa-retry] 재시도 ${qaRetryCount}/${QA_AUTO_RETRY_MAX}`);
+
+          // 이전 step 재실행 (Critical Fix 정보 포함)
+          const retryBeforeSnapshot = snapshotChangedFiles();
+          const retryTaskText = currentCriticalFix
+            ? `${prevStep.task}\n\n[QA FAIL 수정 요청 - ${qaRetryCount}차]\n${currentCriticalFix}`
+            : prevStep.task;
+
+          const retryPrevResults = await Promise.allSettled(
+            prevStep.agents.map((target) => {
+              const targetApp = findAgentApp(target, apps);
+              const retryEvent: SlackEvent = {
+                ...event,
+                text: [
+                  `[QA 수정 재작업 ${qaRetryCount}/${QA_AUTO_RETRY_MAX}] ${retryTaskText}`,
+                  '',
+                  currentCriticalFix
+                    ? `*QA FAIL 원인 및 수정 요구사항:*\n${currentCriticalFix}`
+                    : '',
+                  '',
+                  results.length > 0
+                    ? `*이전 단계 결과:*\n${results.map((r) => `[${r.agent}] ${r.text.slice(0, 500)}`).join('\n\n')}`
+                    : '',
+                  '',
+                  '[원본 요청]',
+                  event.text,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              };
+              return handleMessage(
+                target,
+                retryEvent,
+                'delegation',
+                targetApp,
+                true,
+                false,
+                prevStep.tier ?? 'standard',
+                null,
+              );
+            }),
+          );
+          const retryAfterSnapshot = snapshotChangedFiles();
+          const retryChangedFiles = diffSnapshots(
+            retryBeforeSnapshot,
+            retryAfterSnapshot,
+          );
+
+          const retryPrevHasFail = retryPrevResults.some(
+            (r) =>
+              r.status === 'rejected' ||
+              (r.status === 'fulfilled' && r.value.isMaxTurns),
+          );
+          for (let i = 0; i < prevStep.agents.length; i++) {
+            const r = retryPrevResults[i];
+            results.push({
+              agent: prevStep.agents[i],
+              text:
+                r.status === 'fulfilled'
+                  ? r.value.text
+                  : `[재작업 실패 ${qaRetryCount}차]`,
+              changedFiles: retryChangedFiles,
+            });
+          }
+
+          if (retryPrevHasFail) {
+            console.warn(`[qa-retry] 재작업 에이전트 실패 — 재시도 중단`);
+            break;
+          }
+
+          // QA 재검증 실행
+          const qaRetryBeforeSnapshot = snapshotChangedFiles();
+          const retryQaResults = await Promise.allSettled(
+            step.agents.map((target) => {
+              const targetApp = findAgentApp(target, apps);
+              const qaRetryEvent: SlackEvent = {
+                ...event,
+                text: [
+                  `[QA 재검증 ${qaRetryCount}/${QA_AUTO_RETRY_MAX}] ${step.task}`,
+                  '',
+                  `*수정 작업 완료 — QA 재검증 요청 (${qaRetryCount}차)*`,
+                  '',
+                  results.length > 0
+                    ? `*이전 단계 결과:*\n${results.map((r) => `[${r.agent}] ${r.text.slice(0, 500)}`).join('\n\n')}`
+                    : '',
+                  '',
+                  '[원본 요청]',
+                  event.text,
+                ]
+                  .filter(Boolean)
+                  .join('\n'),
+              };
+              return handleMessage(
+                target,
+                qaRetryEvent,
+                'delegation',
+                targetApp,
+                true,
+                false,
+                step.tier ?? 'standard',
+                null,
+              );
+            }),
+          );
+          const qaRetryAfterSnapshot = snapshotChangedFiles();
+          const qaRetryChangedFiles = diffSnapshots(
+            qaRetryBeforeSnapshot,
+            qaRetryAfterSnapshot,
+          );
+
+          let newQaText = '';
+          for (let i = 0; i < step.agents.length; i++) {
+            const r = retryQaResults[i];
+            const text =
+              r.status === 'fulfilled'
+                ? r.value.text
+                : `[QA 재검증 실패 ${qaRetryCount}차]`;
+            results.push({
+              agent: step.agents[i],
+              text,
+              changedFiles: qaRetryChangedFiles,
+            });
+            if (step.agents[i] === 'qa') {
+              newQaText = text;
+            }
+          }
+
+          const newVerdict = parseQaVerdict(newQaText);
+          if (!newVerdict.isFail || newVerdict.isFlaky) {
+            qaRetryPassed = true;
+            console.log(`[qa-retry] QA 재검증 PASS (${qaRetryCount}차)`);
+          } else {
+            currentCriticalFix =
+              newVerdict.criticalFix || currentCriticalFix;
+            console.warn(
+              `[qa-retry] QA 재검증 FAIL (${qaRetryCount}/${QA_AUTO_RETRY_MAX})`,
+            );
+          }
+        }
+
+        if (!qaRetryPassed) {
+          console.warn(
+            `[qa-retry] 최대 재시도(${QA_AUTO_RETRY_MAX}) 초과 — PM 에스컬레이션`,
+          );
+          try {
+            await pmApp.client.chat.postMessage({
+              channel: event.channel,
+              thread_ts: event.thread_ts ?? event.ts,
+              text: [
+                `⚠️ *QA 자동 재시도 ${QA_AUTO_RETRY_MAX}회 모두 FAIL* — PM 수동 검토 및 재위임 필요`,
+                currentCriticalFix
+                  ? `\n마지막 QA Critical Fix:\n${currentCriticalFix.slice(0, 500)}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(''),
+            });
+          } catch {
+            // 알림 실패 무시
+          }
+        }
+      } else if (verdict?.isFail && verdict.isFlaky) {
+        console.log(
+          `[qa-retry] QA FAIL이지만 flaky 테스트만 — 재작업 없이 통과 처리`,
+        );
+      }
+    }
+
     // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
     if (si < steps.length - 1) {
       const nextStep = steps[si + 1];
@@ -1064,20 +1289,71 @@ const executeSingle = async (
       'high',
     );
 
+    // ─── Part C: PM 재위임 의도 텍스트 감지 + 실제 위임 없음 → 1회 재시도 ───
+    // PM이 "재위임하겠습니다" 등 텍스트로만 의도를 표현하고
+    // delegate_sequential 도구를 호출하지 않은 경우 탐지 후 재시도.
+    const seqReviewHasDelegation =
+      (seqPmReview.delegationSteps && seqPmReview.delegationSteps.length > 0) ||
+      seqPmReview.delegationTargets.filter(
+        (t) => t.agent !== 'pm' && isValidAgent(t.agent),
+      ).length > 0;
+
+    let effectivePmReview = seqPmReview;
+
+    if (
+      !seqReviewHasDelegation &&
+      /재위임|재작업|수정.*위임|다시.*위임|다시.*실행/.test(seqPmReview.text)
+    ) {
+      console.warn(
+        '[hub] PM 리뷰에서 재위임 의도 텍스트 감지 + 실제 위임 없음 — delegate_sequential 도구 사용 지시 후 1회 재시도',
+      );
+      const retryReviewEvent: SlackEvent = {
+        ...reviewEvent,
+        text: [
+          reviewEvent.text,
+          '',
+          '[시스템 안내] 재위임이 필요하다면 반드시 delegate_sequential 도구를 호출하세요.',
+          '텍스트로만 의도를 표현하면 실제 위임이 실행되지 않습니다.',
+          '재위임이 필요 없으면 LGTM으로 응답해 주세요.',
+        ].join('\n'),
+      };
+      const retryPmReview = await handleMessage(
+        'pm',
+        retryReviewEvent,
+        'hub-review',
+        pmApp,
+        true,
+        false,
+        'high',
+      );
+      const retryHasDelegation =
+        (retryPmReview.delegationSteps &&
+          retryPmReview.delegationSteps.length > 0) ||
+        retryPmReview.delegationTargets.filter(
+          (t) => t.agent !== 'pm' && isValidAgent(t.agent),
+        ).length > 0;
+      if (retryHasDelegation) {
+        console.log('[hub] PM 리뷰 재시도: 위임 확인 — 재시도 결과 사용');
+        effectivePmReview = retryPmReview;
+      } else {
+        console.log('[hub] PM 리뷰 재시도: 재시도에도 위임 없음 — 종료');
+      }
+    }
+
     // C-1-4 fix: PM 리뷰에서 추가 순차 위임이 발생한 경우 실행 (QA FAIL → 수정 재위임 등)
-    if (seqPmReview.delegationSteps && seqPmReview.delegationSteps.length > 0) {
-      console.log(`[hub] PM 순차 리뷰에서 추가 위임: ${seqPmReview.delegationSteps.length} steps`);
+    if (effectivePmReview.delegationSteps && effectivePmReview.delegationSteps.length > 0) {
+      console.log(`[hub] PM 순차 리뷰에서 추가 위임: ${effectivePmReview.delegationSteps.length} steps`);
       await runSequentialSteps(
-        seqPmReview.delegationSteps,
+        effectivePmReview.delegationSteps,
         event,
         apps,
         pmApp,
-        seqPmReview.postedTs ?? seqPmTs,
+        effectivePmReview.postedTs ?? seqPmTs,
         seqResults,
       );
     }
     // C-1-4 fix: PM 리뷰에서 병렬 위임이 발생한 경우 실행
-    const seqReviewTargets = seqPmReview.delegationTargets.filter(
+    const seqReviewTargets = effectivePmReview.delegationTargets.filter(
       (t) => t.agent !== 'pm' && isValidAgent(t.agent),
     );
     if (seqReviewTargets.length > 0) {
