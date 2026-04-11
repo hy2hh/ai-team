@@ -47,7 +47,12 @@
    - 다음 세션에서 같은 실수를 반복할 수 있는 패턴
    > 형식: `- [사실] — [왜 비자명한지]`  
    > placeholder("직접 기록된 내용 없음")로 남기면 안 됨.
-2. **Operational 지식 저장** — 위 Learned에서 재사용 가능한 구조적 사실이면 `facts/agents/{role}/` 도 업데이트
+2. **Operational 지식 저장 [필수 — 건너뛰기 금지]** — Sprint Learned에 항목이 하나라도 있으면 `facts/agents/{role}/context.md` **반드시** 업데이트:
+   - 예상과 다른 동작 → `Undocumented Behaviors` 섹션
+   - 반복 실수 패턴 → `Common Pitfalls` 섹션
+   - 도구/API 제약 → `Known Constraints` 섹션
+   - 기타 운영 팁 → `Operational Tips` 섹션
+   > ⛔ "Learned 없음"이어도 context.md를 열어서 오늘 업무와 관련된 섹션이 최신인지 확인. 내용이 맞으면 그대로 두되, `last-updated` frontmatter를 오늘 날짜로 갱신.
 3. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)
 4. Slack 완료 보고 (행동 + 결과 + 다음 단계)
 
