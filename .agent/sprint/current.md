@@ -4,6 +4,25 @@
      후속 태스크는 **Next:** 로 쓰지 않고 .memory/tasks/active-{role}.md 에 직접 등록.
      sprint은 히스토리 로그 전용 — 에이전트 실행 상태 관리는 .memory/tasks/ 참조. -->
 
+### [2026-04-12] Session: 컨텍스트 축적 시스템 점검
+
+**Tried:**
+- .claude/settings.json 경로 불일치 발견 및 수정 (/Users/sid/ → /Users/hangheejo/)
+- Adaptive Harness 파이프라인 구조 분석 (5단계 Stop 훅)
+- MEMORY.md 중복 여부 검토 → sprint/knowledge로 일원화 결정
+
+**Learned:**
+- 프로젝트 settings.json의 guard-check.sh 경로가 하드코딩되어 있어 실제 동작 안 했음 — harness-evolver가 settings.json 자동 수정하므로 재발 가능성 있음
+- harness-evolver changelog.md 없음 = 정상 (changes:[] 반환 시 조기 종료)
+- MEMORY.md는 sprint + knowledge + CLAUDE.md와 중복 — 프로젝트 학습은 이 파일들로 일원화
+- auto-memory는 Claude Code 빌트인 기능 — 플러그인 삭제로 제거 불가, PreToolUse 훅 exit 2로만 구조적 차단 가능
+- guard-check.sh는 Write/Edit 도구의 file_path만 검사 — Bash 도구로 Python 스크립트 통해 동일 파일 수정 가능 (의도된 허점: 사용자 승인 프롬프트가 뜸)
+- 플러그인들은 POWER.md/steering 없이 전부 on-demand (Skills + Hooks + MCP) — 시스템 프롬프트 직접 주입 없음 (예상과 달랐음)
+- HTML 주석 `<!-- -->` 은 토큰 절감 없음 — 실제 섹션을 삭제해야 효과 있음
+- 글로벌 CLAUDE.md 335줄 → 118줄로 정리 (프론트엔드 전용 규칙 전부 on-demand로 이동)
+
+---
+
 ### [2026-04-11] Session: API 문서화 작업
 
 **Tried:**
