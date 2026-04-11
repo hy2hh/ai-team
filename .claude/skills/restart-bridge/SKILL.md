@@ -17,6 +17,8 @@ bash .claude/skills/restart-bridge/scripts/restart.sh local
 
 스크립트가 stop → WebSocket 대기(5초) → start → 연결 확인(최대 60초 폴링)을 자동 처리.
 
+**연결 7/7 확인 후 즉시 종료. 추가 코드 탐색·수정 금지.**
+
 ## 활성 작업 있을 때 강제 재시작
 
 실행 중인 작업이 있어 재시작이 차단된 경우 `force` 옵션 사용:

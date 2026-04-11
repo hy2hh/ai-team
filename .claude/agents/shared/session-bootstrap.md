@@ -40,13 +40,16 @@
 > - `_index.md` 테이블 미갱신 = 금지
 
 ## Session End Protocol
-1. **Operational 지식 저장** — 아래 중 하나라도 해당하면 `facts/agents/{role}/` 즉시 업데이트:
-   - 도구/MCP/API에서 문서에 없는 동작 발견
-   - 반복될 수 있는 실수 패턴 또는 함정 확인
-   - 시스템 제약/한계 발견 (rate limit, 인증 오류 패턴 등)
-   - 다음 세션에서 알면 시간을 아낄 operational 사실
-2. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)
-3. Slack 완료 보고 (행동 + 결과 + 다음 단계)
+1. **Sprint Learned 기록** — 아래 중 하나라도 해당하면 `.agent/sprint/current.md` 현재 세션 `Learned:` 섹션에 **즉시**(발견 시점에) 기록:
+   - 예상과 다른 동작 발견
+   - 문서에 없는 시스템 동작 확인
+   - 오해 교정 (잘못 알고 있던 사실이 수정된 경우)
+   - 다음 세션에서 같은 실수를 반복할 수 있는 패턴
+   > 형식: `- [사실] — [왜 비자명한지]`  
+   > placeholder("직접 기록된 내용 없음")로 남기면 안 됨.
+2. **Operational 지식 저장** — 위 Learned에서 재사용 가능한 구조적 사실이면 `facts/agents/{role}/` 도 업데이트
+3. Memory 업데이트 (collaboration-rules.md Memory Protocol 참조)
+4. Slack 완료 보고 (행동 + 결과 + 다음 단계)
 
 ## 프로세스 (스킬 자동 로드)
 위임→`/agent-delegate` | 핸드오프→`/agent-handoff` | 디버깅→`/agent-debug` | 리뷰→`/agent-review` | 기획→`/agent-plan` | 구현→`/agent-implement` | 완료→`/agent-verify` | API→`/agent-api-contract` | TDD→`/agent-tdd`
