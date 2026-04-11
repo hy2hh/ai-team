@@ -71,20 +71,20 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
 
   CONNECTED=$(tmux capture-pane -t "$BRIDGE_SESSION" -p 2>/dev/null | grep -c '연결 완료' || true)
 
-  if [ "$CONNECTED" -ge 6 ]; then
+  if [ "$CONNECTED" -ge 7 ]; then
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "✅ Bridge 재시작 완료 — 6/6 연결 정상"
+    echo "✅ Bridge 재시작 완료 — 7/7 연결 정상"
     exit 0
   fi
 
-  echo "  ... ${CONNECTED}/6 연결됨 (${ELAPSED}s)"
+  echo "  ... ${CONNECTED}/7 연결됨 (${ELAPSED}s)"
 done
 
 # 타임아웃
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "⚠️  ${CONNECTED}/6 연결됨 (60초 타임아웃)"
+echo "⚠️  ${CONNECTED}/7 연결됨 (60초 타임아웃)"
 echo ""
 echo "  pong 타임아웃 로그:"
 tmux capture-pane -t "$BRIDGE_SESSION" -p 2>/dev/null | grep -i 'pong\|WARN\|error' | tail -5
