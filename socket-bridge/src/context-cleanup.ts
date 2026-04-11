@@ -547,6 +547,33 @@ export const runContextCleanup = async (): Promise<CleanupResult> => {
 
 // ─── 자정 스케줄러 ─────────────────────────────────────────
 
+/** 마지막 실행 시각을 기록하는 파일 경로 */
+const LAST_RUN_PATH = join(MEMORY_DIR, '.context-cleanup-last-run');
+
+/** 마지막 실행 시각을 파일에 저장한다. */
+const saveLastRunTime = async (): Promise<void> => {
+  try {
+    await writeFile(LAST_RUN_PATH, new Date().toISOString(), 'utf-8');
+  } catch {
+    // 저장 실패 시 무시
+  }
+};
+
+/**
+ * 마지막 실행 이후 경과 시간(ms)을 반환한다.
+ * 파일이 없으면 Infinity를 반환해 즉시 실행을 유도한다.
+ */
+const msSinceLastRun = async (): Promise<number> => {
+  try {
+    const content = await readFile(LAST_RUN_PATH, 'utf-8');
+    const last = new Date(content.trim());
+    if (isNaN(last.getTime())) { return Infinity; }
+    return Date.now() - last.getTime();
+  } catch {
+    return Infinity;
+  }
+};
+
 /**
  * 다음 자정까지 남은 밀리초를 계산한다.
  * 현재 시간이 자정과 정확히 같으면 24시간 후를 반환한다.
@@ -558,9 +585,14 @@ export const msUntilMidnight = (): number => {
   return midnight.getTime() - now.getTime();
 };
 
+/** 24시간(ms) */
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * 매일 자정에 runContextCleanup을 실행하는 스케줄러를 시작한다.
- * onComplete 콜백을 통해 Slack 알림 등 외부 동작을 연결할 수 있다.
+ *
+ * **누락 실행 자동 복구**: 시작 시 마지막 실행 기록을 확인하고,
+ * 24시간 이상 경과(또는 기록 없음)이면 즉시 실행한 뒤 다음 자정을 예약한다.
  *
  * @returns 스케줄러를 중단하는 cleanup 함수
  */
@@ -568,24 +600,42 @@ export const startContextCleanupScheduler = (
   onComplete?: (result: CleanupResult) => void,
 ): (() => void) => {
   let timer: ReturnType<typeof setTimeout>;
+  let stopped = false;
 
-  const schedule = () => {
+  const runAndSchedule = async () => {
+    if (stopped) { return; }
+    const result = await runContextCleanup();
+    await saveLastRunTime();
+    onComplete?.(result);
+    scheduleNext();
+  };
+
+  const scheduleNext = () => {
+    if (stopped) { return; }
     const ms = msUntilMidnight();
     const nextRun = new Date(Date.now() + ms).toISOString();
     console.log(
       `[context-cleanup] 다음 실행 예정: ${nextRun} (${Math.round(ms / 1000 / 60)}분 후)`,
     );
-
-    timer = setTimeout(async () => {
-      const result = await runContextCleanup();
-      onComplete?.(result);
-      schedule();
-    }, ms);
+    timer = setTimeout(runAndSchedule, ms);
   };
 
-  schedule();
+  // 시작 시 누락 실행 여부 확인
+  msSinceLastRun().then((elapsed) => {
+    if (stopped) { return; }
+    if (elapsed >= ONE_DAY_MS) {
+      const reason = elapsed === Infinity
+        ? '실행 기록 없음'
+        : `마지막 실행으로부터 ${Math.round(elapsed / 1000 / 60 / 60)}시간 경과`;
+      console.log(`[context-cleanup] 누락 실행 감지 (${reason}) — 즉시 실행`);
+      void runAndSchedule();
+    } else {
+      scheduleNext();
+    }
+  });
 
   return () => {
+    stopped = true;
     clearTimeout(timer);
     console.log('[context-cleanup] 스케줄러 중단됨');
   };
