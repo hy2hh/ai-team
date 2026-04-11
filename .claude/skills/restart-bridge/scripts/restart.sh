@@ -55,6 +55,8 @@ bash "$PROJECT_DIR/scripts/start-all.sh" $START_MODE
 # 4. 연결 확인 (최대 60초 대기)
 echo ""
 echo "  🔍 연결 확인 중 (최대 60초)..."
+# 이전 세션 tmux 버퍼를 지워 stale '연결 완료' 카운트 방지
+tmux clear-history -t "$BRIDGE_SESSION" 2>/dev/null || true
 MAX_WAIT=60
 ELAPSED=0
 INTERVAL=5
