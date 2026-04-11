@@ -6,30 +6,57 @@
   },
   "permissions": {
     "allow": [
-      "Read(/Users/sid/git/ai-team/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/agents/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/agents/shared/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/settings.json)",
-      "Edit(/Users/sid/git/ai-team/.memory/**)",
-      "Write(/Users/sid/git/ai-team/.memory/**)",
-      "Write(/Users/sid/git/ai-team/.claude/agents/shared/**)",
-      "Write(/Users/sid/git/ai-team/.claude/agents/**)",
-      "Write(/Users/sid/git/ai-team/.claude/settings.json)",
-      "Edit(/Users/sid/git/ai-team/.claude/skills/**)",
-      "Write(/Users/sid/git/ai-team/.claude/skills/**)",
-      "Edit(/Users/sid/git/ai-team/.claude/context/**)",
-      "Write(/Users/sid/git/ai-team/.claude/context/**)"
+      "Read(/Users/hangheejo/git/ai-team/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/settings.json)",
+      "Edit(/Users/hangheejo/git/ai-team/.memory/**)",
+      "Write(/Users/hangheejo/git/ai-team/.memory/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/agents/shared/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/agents/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/settings.json)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/skills/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/skills/**)",
+      "Edit(/Users/hangheejo/git/ai-team/.claude/context/**)",
+      "Write(/Users/hangheejo/git/ai-team/.claude/context/**)"
     ]
   },
   "hooks": {
     "PreToolUse": [
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$HOME\"/.claude/hooks/memory-block.sh",
+            "timeout": 10,
+            "statusMessage": "auto-memory 경로 차단 확인 중..."
+          }
+        ]
+      },
+      {
         "matcher": "Bash|Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/sid/git/ai-team/.claude/hooks/guard-check.sh",
+            "command": "bash /Users/hangheejo/git/ai-team/.claude/hooks/guard-check.sh",
             "statusMessage": "Guard Hook 검사 중..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat 2>/dev/null); CMD=$(echo \"$INPUT\" | jq -r '.tool_input.command // empty' 2>/dev/null);   if echo \"$CMD\" | grep -qiE 'agent-browser|e2e'; then if ! command -v agent-browser &>/dev/null; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"additionalContext\":\"[E2E 사전 체크] agent-browser가 설치되지 않았습니다. npm install -g agent-browser && agent-browser install 을 먼저 실행하세요.\"}}'; fi; fi",
+            "statusMessage": "E2E 의존성 확인 중..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/stack-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Tech Stack 검사 중..."
           }
         ]
       }
@@ -40,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q '\\.md\"'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"[Token Optimization] .md 파일 수정됨 — frontmatter(date/topic/roles/summary/status) 존재 확인, 50줄 초과 시 인덱스+상세 분리, _index.md 갱신 여부 점검. 규칙: /token-optimized-docs 스킬 참조.\"}}'; fi",
+            "command": "INPUT=$(cat 2>/dev/null); FILE=$(echo \"$INPUT\" | jq -r '.tool_input.file_path // empty' 2>/dev/null); if echo \"$FILE\" | grep -qE '\\.md$'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"[Token Optimization] .md 파일 수정됨 — frontmatter(date/topic/roles/summary/status) 존재 확인, 50줄 초과 시 인덱스+상세 분리, _index.md 갱신 여부 점검. 규칙: /token-optimized-docs 스킬 참조.\"}}'; fi",
             "statusMessage": "토큰 최적화 규칙 확인 중..."
           }
         ]
@@ -51,8 +78,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo '{\"systemMessage\":\"[Phase Check] 작업 완료 시 recommend_next_phase를 호출하여 다음 단계를 추천하세요.\"}'",
-            "statusMessage": "다음 단계 확인 중..."
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-save.sh\" 2>/dev/null; echo '{\"systemMessage\":\"[Session saved] sprint log + context-handoff 자동 갱신됨\"}'",
+            "statusMessage": "세션 저장 중..."
           }
         ]
       }
