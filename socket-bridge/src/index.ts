@@ -806,7 +806,10 @@ const runSequentialSteps = async (
     let stepHasFailure = false;
     for (let i = 0; i < step.agents.length; i++) {
       const r = stepResults[i];
-      const isFailed = r.status === 'rejected';
+      // error_max_turns는 fulfilled로 반환되므로 isMaxTurns도 failure로 처리
+      const isFailed =
+        r.status === 'rejected' ||
+        (r.status === 'fulfilled' && r.value.isMaxTurns === true);
       if (isFailed) {
         stepHasFailure = true;
       }
@@ -819,9 +822,15 @@ const runSequentialSteps = async (
       });
 
       if (r.status === 'fulfilled' && r.value.kanbanCardId) {
-        moveToDone(r.value.kanbanCardId).catch((err) =>
-          console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
-        );
+        if (r.value.isMaxTurns) {
+          moveToBlocked(r.value.kanbanCardId).catch((err) =>
+            console.warn('[kanban-sync] 순차 위임 moveToBlocked 실패:', err),
+          );
+        } else {
+          moveToDone(r.value.kanbanCardId).catch((err) =>
+            console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
+          );
+        }
       }
     }
 
@@ -850,7 +859,10 @@ const runSequentialSteps = async (
 
     if (stepHasFailure) {
       const failedAgents = step.agents.filter(
-        (_, i) => stepResults[i].status === 'rejected',
+        (_, i) =>
+          stepResults[i].status === 'rejected' ||
+          (stepResults[i].status === 'fulfilled' &&
+            (stepResults[i] as PromiseFulfilledResult<Awaited<ReturnType<typeof handleMessage>>>).value.isMaxTurns === true),
       );
       console.warn(
         `[hub] 순차 위임 중단: step ${si + 1} 실패 [${failedAgents.join(', ')}] — 후속 ${steps.length - si - 1}개 step 스킵`,
