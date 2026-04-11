@@ -2,6 +2,8 @@
  * Task Queue Processor
  * 폴링 루프로 큐에서 태스크를 꺼내 독립 에이전트 세션으로 실행
  */
+import { existsSync, statSync } from 'fs';
+import { join } from 'path';
 import type { App } from '@slack/bolt';
 import type { SlackEvent } from './types.js';
 import {
@@ -23,6 +25,11 @@ import { emit } from './hook-events.js';
 
 // ─── 상수 ─────────────────────────────────────────────
 
+const PROJECT_DIR = join(import.meta.dirname, '..', '..');
+
+/** Sprint log 경로 */
+const SPRINT_LOG_PATH = join(PROJECT_DIR, '.agent', 'sprint', 'current.md');
+
 /** 폴링 주기 (ms) */
 const POLL_INTERVAL_MS = 5000;
 
@@ -31,6 +38,93 @@ const TASK_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** 재시도 backoff 대기 시간 (ms) — 30초 후 재시도 (브리지 안정화 대기) */
 const RETRY_BACKOFF_MS = 30_000;
+
+// ─── Sprint Log 강제 ───────────────────────────────────
+
+/** Sprint log 수정 시각(ms) — 파일 없으면 0 */
+const getSprintLogMtime = (): number => {
+  try {
+    return existsSync(SPRINT_LOG_PATH) ? statSync(SPRINT_LOG_PATH).mtimeMs : 0;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * Sprint log 미업데이트 감지 시 에이전트에게 자동 재주입
+ *
+ * 프롬프트 지시만으로는 에이전트가 sprint log를 건너뛸 수 있으므로
+ * 코드 레벨에서 mtime을 비교하여 미업데이트 시 별도 세션으로 강제 실행
+ *
+ * @remarks 이 함수는 호출부에서 fire-and-forget으로 실행됨 — 완료를 보장하지 않음.
+ * 내부의 await는 enforceSprintLogUpdate 함수 자체 내에서만 순서를 보장하며,
+ * caller(processSingleTask)는 이 함수의 완료를 기다리지 않고 다음 단계로 진행함.
+ */
+const enforceSprintLogUpdate = async (
+  slackApp: App,
+  task: TaskQueueRow,
+  taskResult: string,
+): Promise<void> => {
+  const today = new Date().toISOString().split('T')[0];
+  const sprintPrompt = [
+    `[Sprint Log 업데이트 필수 — 코드 강제]`,
+    ``,
+    `방금 작업을 완료했지만 \`.agent/sprint/current.md\`가 업데이트되지 않았습니다.`,
+    `지금 즉시 해당 파일 끝에 아래 형식으로 이번 세션을 추가하세요:`,
+    ``,
+    `### [${today}] Session: {작업 제목 한 줄 요약}`,
+    ``,
+    `**Tried:**`,
+    `- (시도한 것)`,
+    ``,
+    `**Learned:**`,
+    `- (배운 점, 실패 원인, 예상치 못한 동작)`,
+    ``,
+    `**Next:**`,
+    `- (다음 단계)`,
+    ``,
+    `---`,
+    `완료한 작업: ${truncate(task.task, 200)}`,
+    `작업 결과: ${truncate(taskResult, 500)}`,
+    ``,
+    `파일 업데이트 후 간단히 완료 보고하세요. 다른 작업은 하지 마세요.`,
+  ].join('\n');
+
+  const sprintEvent: SlackEvent = {
+    type: 'sprint_log_enforce',
+    channel: task.channel,
+    channel_name: 'queue',
+    user: 'queue-processor',
+    text: sprintPrompt,
+    ts: `sprint-enforce-${task.id}`,
+    thread_ts: task.thread_ts,
+    threadTopic: `sprint-enforce:${task.id}`,
+    mentions: [],
+    raw: {},
+  };
+
+  console.log(`[sprint-enforce] ${task.agent} — sprint log 미업데이트 감지, 자동 재주입`);
+
+  try {
+    await slackApp.client.chat.postMessage({
+      channel: task.channel,
+      thread_ts: task.thread_ts,
+      text: `📝 *Sprint log 업데이트 강제* — ${agentDisplayName(task.agent)}의 sprint log가 미업데이트 상태입니다. 자동으로 업데이트를 요청합니다.`,
+    });
+  } catch {
+    // 알림 실패는 무시 — 강제 주입 자체는 계속 진행
+  }
+
+  await handleMessage(
+    task.agent,
+    sprintEvent,
+    'sprint-log-enforce',
+    slackApp,
+    true,  // skipReaction
+    true,  // skipPosting — sprint 업데이트는 결과 메시지 불필요
+    'fast', // 파일 쓰기 전용이므로 fast 모델로 충분
+  );
+};
 
 // ─── 상태 ─────────────────────────────────────────────
 
@@ -73,7 +167,7 @@ const postTaskProgress = async (
   slackApp: App,
   task: TaskQueueRow,
   status: 'running' | 'completed' | 'failed',
-  result?: string,
+  _result?: string,
   error?: string,
 ): Promise<void> => {
   let message: string;
@@ -189,6 +283,7 @@ const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null, agentNam
       '1. 위 이전 진행 상태를 기반으로 남은 작업을 이어서 완료하세요',
       '2. 이미 완료된 작업을 반복하지 마세요',
       '3. 결과를 간결하게 보고하세요',
+      '4. **[필수]** 작업 완료 후 `.agent/sprint/current.md`에 Tried/Learned/Next 형식으로 이번 세션을 기록하세요. 미업데이트 시 브리지가 자동으로 재실행합니다.',
     );
     return [memoryPrefix, parts.join('\n')].join('\n\n');
   }
@@ -205,6 +300,7 @@ const buildTaskPrompt = (task: TaskQueueRow, prevResult: string | null, agentNam
   }
 
   taskBody += '\n\n이 태스크는 큐 시스템에서 실행됩니다. 결과를 간결하게 보고하세요.';
+  taskBody += '\n\n**[필수]** 작업 완료 후 `.agent/sprint/current.md`에 Tried/Learned/Next 형식으로 이번 세션을 기록하세요. 미업데이트 시 브리지가 자동으로 재실행합니다.';
 
   return [memoryPrefix, taskBody].join('\n\n');
 };
@@ -259,6 +355,9 @@ const notifyPmOfFailure = async (
 const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
   const slackApp = slackAppRef!; // processNextTask에서 null 체크 완료
   console.log(`[queue-processor] 태스크 시작: ${task.id} (${task.agent})`);
+
+  // Sprint log mtime 기록 — 태스크 완료 후 업데이트 여부 검증에 사용
+  const sprintMtimeBefore = getSprintLogMtime();
 
   // Backlog 카드 ID 조회 (PM이 생성한 카드) — catch 블록에서도 접근 필요
   const kanbanCardId = getKanbanCardId(task.id);
@@ -343,6 +442,14 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
 
     // 완료 처리
     markCompleted(task.id, result.text);
+
+    // Sprint log 업데이트 강제 — mtime 비교로 미업데이트 감지 시 자동 재주입
+    const sprintMtimeAfter = getSprintLogMtime();
+    if (sprintMtimeAfter <= sprintMtimeBefore) {
+      enforceSprintLogUpdate(slackApp, task, result.text).catch((err) =>
+        console.error('[sprint-enforce] 재주입 실패:', err),
+      );
+    }
 
     // 칸반 카드 이동 (fire-and-forget)
     const doneCardId = result.kanbanCardId ?? kanbanCardId;
