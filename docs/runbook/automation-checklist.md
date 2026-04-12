@@ -103,9 +103,9 @@ tail -f scripts/watch.log
 
 ### 유틸리티 스킬 (독립 실행 가능)
 
-- [~] **upload-screenshot** ⚠️ BLOCKED
-  - 이유: `capture.js`가 Playwright 의존. 프로젝트 스택은 agent-browser (Stack Guard 경고)
-  - 조치 필요: capture.js를 agent-browser 또는 다른 방식으로 교체
+- [x] **upload-screenshot** ✅
+  - capture.js(Playwright) → capture.sh(agent-browser) 교체
+  - E2E 검증: https://example.com 촬영 → #ai-team 업로드 (file_id: F0ASATD6PC2)
 - [x] **token-optimized-docs** 동작 확인 ✅
   - 결과: SKILL.md 정상, 문서 작성 가이드 완비 (frontmatter 5필드, 50줄 cap 등)
 
@@ -119,7 +119,7 @@ tail -f scripts/watch.log
 | autonomous-qa-loop | 구조 검증 | ✅ 스킬 정상 (사이클 테스트 보류) |
 | e2e-test | Slack 메시지 직접 전송 | ✅ 44.1초 완주 |
 | agent-verify | SKILL.md 검증 | ✅ 가이드 정상 |
-| upload-screenshot | bash로 직접 실행 | ⚠️ Playwright 의존 → BLOCKED |
+| upload-screenshot | bash로 직접 실행 | ✅ agent-browser 교체 + Slack 업로드 확인 |
 
 ---
 

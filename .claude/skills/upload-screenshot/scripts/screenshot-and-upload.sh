@@ -22,7 +22,7 @@ fi
 TMP_FILE="/tmp/screenshot-$(date +%s).png"
 
 echo "📸 스크린샷 촬영: $URL"
-node "$SCRIPT_DIR/capture.js" "$URL" "$TMP_FILE" "$WIDTH" "900"
+bash "$SCRIPT_DIR/capture.sh" "$URL" "$TMP_FILE" "$WIDTH" "900"
 
 TITLE="${TITLE:-Screenshot $(date '+%Y-%m-%d %H:%M')}"
 bash "$SCRIPT_DIR/upload.sh" "$TMP_FILE" "$CHANNEL_ID" "$THREAD_TS" "$TITLE"

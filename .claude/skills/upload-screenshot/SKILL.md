@@ -2,7 +2,7 @@
 name: upload-screenshot
 description: >
   URL 스크린샷 촬영 또는 로컬 파일을 Slack에 업로드.
-  Playwright로 촬영 → Slack Files API (getUploadURLExternal) 방식으로 업로드.
+  agent-browser로 촬영 → Slack Files API (getUploadURLExternal) 방식으로 업로드.
   트리거: "스크린샷 업로드", "screenshot upload", "Slack에 스크린샷", UI 검증 후 Slack 공유 필요 시.
 ---
 
@@ -41,9 +41,9 @@ bash .claude/skills/upload-screenshot/scripts/upload.sh \
   "UI 검증 스크린샷"
 ```
 
-### C. Playwright만 촬영 (업로드 없이)
+### C. agent-browser만 촬영 (업로드 없이)
 ```bash
-node .claude/skills/upload-screenshot/scripts/capture.js \
+bash .claude/skills/upload-screenshot/scripts/capture.sh \
   <url> <output_path> [width] [height]
 ```
 
@@ -59,7 +59,7 @@ node .claude/skills/upload-screenshot/scripts/capture.js \
 | token_env_var | 사용할 봇 토큰 환경변수 | SLACK_BOT_TOKEN_FRONTEND |
 
 ## 내부 동작
-1. `capture.js` — Playwright chromium으로 URL 촬영, 전체 body 높이 기준 fullpage
+1. `capture.sh` — agent-browser로 URL 촬영 (open → set viewport → screenshot --full)
 2. `upload.sh` — Slack `files.getUploadURLExternal` → PUT → `files.completeUploadExternal` (3단계 업로드)
 3. 임시 파일 자동 삭제 (screenshot-and-upload.sh 사용 시)
 
@@ -73,6 +73,6 @@ node .claude/skills/upload-screenshot/scripts/capture.js \
 4. **스레드 내 요청이면 `thread_ts` 필수** — 스레드에서 요청받은 경우 해당 스레드에 업로드.
 
 ## 주의사항
-- Playwright(`@playwright/test`)가 node_modules에 설치되어 있어야 함 — 프로젝트 루트에서 실행 권장
+- `agent-browser`가 설치되어 있어야 함 — `npm install -g agent-browser && agent-browser install`
 - 로컬 서버 스크린샷은 서버가 실행 중이어야 함
 - 토큰은 `.env`에서 자동 로드 (`SLACK_BOT_TOKEN_FRONTEND` 기본)
