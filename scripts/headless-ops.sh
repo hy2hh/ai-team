@@ -115,10 +115,17 @@ $(echo "$entries" | grep -E '\[DOWN\]|\[RESTART_FAILED\]' | head -5)
 \`\`\`"
   fi
 
+  local payload
+  payload=$(printf '%s' "$message" | python3 -c "
+import sys, json
+text = sys.stdin.read()
+print(json.dumps({'channel': '${channel}', 'text': text}))
+")
+
   curl -s -X POST https://slack.com/api/chat.postMessage \
     -H "Authorization: Bearer $token" \
-    -H "Content-Type: application/json" \
-    -d "{\"channel\":\"$channel\",\"text\":\"$message\"}" \
+    -H "Content-Type: application/json; charset=utf-8" \
+    -d "$payload" \
     > /dev/null
 
   echo "✅ 일일 요약 발송 완료 (${yesterday}): 장애 ${down_count}회, 복구 ${recovered_count}회"

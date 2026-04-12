@@ -36,6 +36,9 @@ alias ai-status="bash $PROJECT_DIR/scripts/headless-ops.sh status"
 alias ai-logs="bash $PROJECT_DIR/scripts/headless-ops.sh logs"
 alias ai-watch="bash $PROJECT_DIR/scripts/watch-bridge.sh"
 alias ai-incidents="cat $PROJECT_DIR/scripts/incidents.log 2>/dev/null || echo '인시던트 없음'"
+alias ai-host-claim="make -C $PROJECT_DIR/scripts host-claim"
+alias ai-host-release="make -C $PROJECT_DIR/scripts host-release"
+alias ai-host-status="make -C $PROJECT_DIR/scripts host-status"
 # make 단축키 (scripts/ 디렉토리 기준)
 alias aim="make -C $PROJECT_DIR/scripts"
 # ai-team aliases end

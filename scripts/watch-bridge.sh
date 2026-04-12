@@ -5,6 +5,9 @@
 
 set -euo pipefail
 
+# cron 환경에서 Homebrew PATH 보완
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 ENV_FILE="$PROJECT_DIR/.env"
@@ -30,10 +33,16 @@ slack_notify() {
     return
   fi
 
+  local payload
+  payload=$(printf '%s' "$message" | python3 -c "
+import sys, json
+text = sys.stdin.read()
+print(json.dumps({'channel': '${channel}', 'text': text}))
+")
   curl -s -X POST https://slack.com/api/chat.postMessage \
     -H "Authorization: Bearer $token" \
-    -H "Content-Type: application/json" \
-    -d "{\"channel\":\"$channel\",\"text\":\"$message\"}" \
+    -H "Content-Type: application/json; charset=utf-8" \
+    -d "$payload" \
     > /dev/null
 }
 
@@ -81,6 +90,12 @@ rotate_bridge_log() {
 
 # ─── 메인 ──────────────────────────────────────────────────────
 main() {
+  # 호스트 확인: 이 머신이 bridge 호스트가 아니면 조용히 종료
+  local host_file="$SCRIPT_DIR/.bridge-host"
+  if [ ! -f "$host_file" ] || [ "$(cat "$host_file")" != "$(hostname)" ]; then
+    exit 0
+  fi
+
   rotate_bridge_log
 
   local status

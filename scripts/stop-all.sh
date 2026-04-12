@@ -1,6 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BRIDGE_SESSION="ai-team-bridge"
 
 echo "🛑 AI Team 종료 중..."
@@ -29,7 +30,7 @@ else
 fi
 
 # 좀비 bridge 프로세스 정리 (tmux kill로 안 죽은 경우)
-ZOMBIE_COUNT=$(pgrep -f "tsx src/index.ts" 2>/dev/null | wc -l | tr -d ' ')
+ZOMBIE_COUNT=$(pgrep -f "tsx src/index.ts" 2>/dev/null | wc -l | tr -d ' ') || true
 if [ "$ZOMBIE_COUNT" -gt 0 ]; then
   pkill -f "tsx src/index.ts" 2>/dev/null || true
   echo "  🧹 좀비 bridge 프로세스 ${ZOMBIE_COUNT}개 정리"
@@ -38,3 +39,7 @@ fi
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "✅ ${STOPPED}개 프로세스 종료 완료"
+
+# bridge 호스트 등록 해제 (watchdog 멀티-머신 지원)
+rm -f "$SCRIPT_DIR/.bridge-host"
+echo "  🔓 호스트 등록 해제: $(hostname)"

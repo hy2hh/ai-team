@@ -2,7 +2,8 @@
 # 사용법: make <command>
 # 설치: make 는 macOS 기본 포함
 
-PROJECT_DIR := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+SCRIPT_DIR  := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+PROJECT_DIR := $(shell dirname $(SCRIPT_DIR))
 
 .PHONY: start stop restart status logs watch watch-install watch-remove summary summary-install summary-remove setup help
 
@@ -60,6 +61,26 @@ summary-remove:  ## Daily summary cron 제거
 
 setup:           ## 전체 자동화 한번에 설치 (단축키 + watchdog + daily summary)
 	@bash $(PROJECT_DIR)/scripts/setup-aliases.sh all
+
+## 멀티-머신 호스트 관리
+host-claim:  ## 이 머신을 bridge 호스트로 등록 (watchdog 활성화)
+	@echo "$$(hostname)" > $(SCRIPT_DIR)/.bridge-host && echo "✅ 호스트 등록: $$(hostname)"
+
+host-release: ## bridge 호스트 등록 해제 (watchdog 비활성화)
+	@rm -f $(SCRIPT_DIR)/.bridge-host && echo "✅ 호스트 등록 해제"
+
+host-status: ## 현재 bridge 호스트 확인
+	@if [ -f $(SCRIPT_DIR)/.bridge-host ]; then \
+		registered=$$(cat $(SCRIPT_DIR)/.bridge-host); \
+		current=$$(hostname); \
+		if [ "$$registered" = "$$current" ]; then \
+			echo "✅ 이 머신이 호스트: $$registered"; \
+		else \
+			echo "⚠️  다른 머신이 호스트: $$registered (현재: $$current)"; \
+		fi; \
+	else \
+		echo "❌ 호스트 미등록 (ai-start 또는 make host-claim 실행)"; \
+	fi
 
 ## 도움말
 help:        ## 이 도움말

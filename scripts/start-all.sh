@@ -69,3 +69,6 @@ echo "  tmux attach -t $BRIDGE_SESSION    # 세션 접속"
 echo "  Ctrl+B, D                         # 세션에서 빠져나오기"
 echo "  ./scripts/stop-all.sh             # 전체 종료"
 echo ""
+
+# 이 머신을 bridge 호스트로 등록 (watchdog 멀티-머신 지원)
+echo "$(hostname)" > "$SCRIPT_DIR/.bridge-host"

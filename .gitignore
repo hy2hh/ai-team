@@ -26,3 +26,6 @@ socket-bridge/thread-sessions.json.backup.*
 # Playwright test results
 test-results/
 kanban/backend/test-results/
+
+# Bridge 호스트 락 파일 (머신별 상태)
+scripts/.bridge-host
