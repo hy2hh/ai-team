@@ -75,7 +75,6 @@ import {
   agentDisplayName,
 } from './queue-processor.js';
 import { cancelQueueByThread, getRunningTaskIdsByThread } from './queue-manager.js';
-import { moveToDone, moveToBlocked, updateCard } from './kanban-sync.js';
 import { resolvePermissionRequest } from './permission-request.js';
 import {
   getRunContext,
@@ -785,7 +784,7 @@ const buildPmReviewEvent = (
  * 기존 인라인 for 루프를 재사용 가능한 헬퍼로 추출.
  */
 const runSequentialSteps = async (
-  steps: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast'; kanbanCardIds?: Record<string, number> }[],
+  steps: { agents: string[]; task: string; tier?: 'high' | 'standard' | 'fast' }[],
   event: SlackEvent,
   apps: App[],
   pmApp: App,
@@ -822,7 +821,6 @@ const runSequentialSteps = async (
             event.text,
           ].filter(Boolean).join('\n'),
         };
-        const existingCardId = step.kanbanCardIds?.[target] ?? null;
         return handleMessage(
           target,
           stepEvent,
@@ -831,7 +829,6 @@ const runSequentialSteps = async (
           true,
           false,
           step.tier ?? 'standard',
-          existingCardId,
           { current: si + 1, total: steps.length },
         );
       }),
@@ -858,17 +855,6 @@ const runSequentialSteps = async (
         changedFiles: stepChangedFiles,
       });
 
-      if (r.status === 'fulfilled' && r.value.kanbanCardId) {
-        if (r.value.isMaxTurns) {
-          moveToBlocked(r.value.kanbanCardId).catch((err) =>
-            console.warn('[kanban-sync] 순차 위임 moveToBlocked 실패:', err),
-          );
-        } else {
-          moveToDone(r.value.kanbanCardId).catch((err) =>
-            console.warn('[kanban-sync] 순차 위임 moveToDone 실패:', err),
-          );
-        }
-      }
     }
 
     // ✅ 각 에이전트 완료 메시지에 체크 리액션
@@ -904,6 +890,11 @@ const runSequentialSteps = async (
       console.warn(
         `[hub] 순차 위임 중단: step ${si + 1} 실패 [${failedAgents.join(', ')}] — 후속 ${steps.length - si - 1}개 step 스킵`,
       );
+      // ⚒️ → ❌ PM 메시지 실패 리액션 전환
+      if (pmTs) {
+        await safeSwapReaction(firstTargetApp, event.channel, pmTs, 'writing_hand', 'x');
+        console.log(`[reaction] ❌ 순차 위임 step ${si + 1} 실패 → PM 메시지: ${pmTs}`);
+      }
       try {
         await pmApp.client.chat.postMessage({
           channel: event.channel,
@@ -974,7 +965,6 @@ const runSequentialSteps = async (
                 true,
                 false,
                 prevStep.tier ?? 'standard',
-                null,
               );
             }),
           );
@@ -1036,7 +1026,6 @@ const runSequentialSteps = async (
                 true,
                 false,
                 step.tier ?? 'standard',
-                null,
               );
             }),
           );
@@ -1104,20 +1093,6 @@ const runSequentialSteps = async (
       }
     }
 
-    // 다음 step의 Backlog 카드에 이전 step 결과를 description으로 업데이트
-    if (si < steps.length - 1) {
-      const nextStep = steps[si + 1];
-      const prevSummary = results
-        .filter((r) => step.agents.includes(r.agent))
-        .map((r) => r.text.slice(0, 200))
-        .join(' | ');
-      if (nextStep.kanbanCardIds) {
-        for (const [agent, cardId] of Object.entries(nextStep.kanbanCardIds)) {
-          updateCard(cardId, { description: `이전 단계(${step.agents.join(', ')}) 결과: ${prevSummary}`.slice(0, 500) }).catch(() => {});
-          console.log(`[kanban-sync] 다음 step 카드 #${cardId} (${agent}) description 업데이트`);
-        }
-      }
-    }
   }
 };
 
@@ -1190,19 +1165,6 @@ const executeSingle = async (
       false,
       modelTier,
     );
-  }
-
-  // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동 (max_turns 실패 시 Blocked로)
-  if (result.kanbanCardId) {
-    if (result.isMaxTurns) {
-      moveToBlocked(result.kanbanCardId).catch((err) =>
-        console.warn('[kanban-sync] executeSingle moveToBlocked 실패:', err),
-      );
-    } else {
-      moveToDone(result.kanbanCardId).catch((err) =>
-        console.warn('[kanban-sync] executeSingle moveToDone 실패:', err),
-      );
-    }
   }
 
   // 비PM 에이전트가 escalate_to_pm을 호출한 경우 → PM으로 재라우팅
@@ -1362,7 +1324,7 @@ const executeSingle = async (
       const parallelResults = await Promise.allSettled(
         seqReviewTargets.map((t) => {
           const targetApp = findAgentApp(t.agent, apps);
-          return handleMessage(t.agent, event, 'delegation', targetApp, true, false, t.tier ?? 'standard', t.kanbanCardId ?? undefined);
+          return handleMessage(t.agent, event, 'delegation', targetApp, true, false, t.tier ?? 'standard');
         }),
       );
       const afterSnapshot = snapshotChangedFiles();
@@ -1523,7 +1485,6 @@ const executeSingle = async (
           true,
           false,
           targetObj.tier ?? 'standard',
-          targetObj.kanbanCardId ?? null,
         ),
         target,
         event.ts,
@@ -1531,13 +1492,6 @@ const executeSingle = async (
 
       const afterSingle = snapshotChangedFiles();
       const singleChangedFiles = diffSnapshots(beforeSingle, afterSingle);
-
-      // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
-      if (delegationResult.kanbanCardId) {
-        moveToDone(delegationResult.kanbanCardId).catch((err) =>
-          console.warn('[kanban-sync] 위임 moveToDone 실패:', err),
-        );
-      }
 
       // ✅ 위임받은 에이전트 앱으로 완료 전환
       if (currentPmTs) {
@@ -1608,7 +1562,6 @@ const executeSingle = async (
             true,
             false,
             targetObj.tier ?? 'standard',
-            targetObj.kanbanCardId ?? null,
           );
         }),
       );
@@ -1626,13 +1579,6 @@ const executeSingle = async (
               : `[실패: ${(r as PromiseRejectedResult).reason}]`,
           changedFiles: batchChangedFiles,
         });
-
-        // 에이전트가 create_kanban_card로 생성한 카드 → Done 이동
-        if (r.status === 'fulfilled' && r.value.kanbanCardId) {
-          moveToDone(r.value.kanbanCardId).catch((err) =>
-            console.warn('[kanban-sync] 병렬 위임 moveToDone 실패:', err),
-          );
-        }
 
         // ✅ 각 에이전트 앱으로 완료 전환
         if (currentPmTs) {
@@ -1939,13 +1885,6 @@ const executeParallel = async (
         result: batchResults[j],
       });
 
-      // 병렬 실행 완료 시 칸반 카드 → Done 이동
-      const r = batchResults[j];
-      if (r.status === 'fulfilled' && r.value.kanbanCardId) {
-        moveToDone(r.value.kanbanCardId).catch((err) =>
-          console.warn('[kanban-sync] 병렬 실행 moveToDone 실패:', err),
-        );
-      }
     }
   }
 
@@ -3525,12 +3464,6 @@ const main = async () => {
               console.log(
                 `[control] ⛔ 큐 태스크 ${queueResult.count}개 취소: thread=${threadTs}`,
               );
-              // 취소된 태스크의 칸반 카드 → Blocked 이동
-              for (const cardId of queueResult.kanbanCardIds) {
-                moveToBlocked(cardId).catch((err) =>
-                  console.warn('[kanban-sync] 취소 카드 Blocked 이동 실패:', err),
-                );
-              }
             }
             break;
           }
@@ -3655,7 +3588,7 @@ const main = async () => {
 
   // 앱 순차 시작 (연결 간 5초 딜레이로 Slack pong 타임아웃 방지)
   const CONNECTION_DELAY_MS = 5000;
-  const CLIENT_PING_TIMEOUT_MS = 15000;
+  const CLIENT_PING_TIMEOUT_MS = 60000;
   console.log('[start] Socket Mode 연결 중...');
   for (let i = 0; i < apps.length; i++) {
     // Bolt가 clientPingTimeout을 노출하지 않으므로 내부 SocketModeClient에 직접 패치
@@ -3795,21 +3728,31 @@ const main = async () => {
     }
     console.log(`[${label}] ${orphans.length}개 미처리 작업 감지 — 수동 처리 알림`);
 
-    // ⚒️ 리액션 제거 — 고착 claim 원본 메시지에서 처리 중 이모지 정리
+    // ⚒️ → ⚠️ 리액션 전환 — 고착 claim 원본 메시지에서 처리 중 이모지 → 경고로 교체
     await Promise.allSettled(
       orphans
         .filter((o) => o.channel)
-        .map((orphan) =>
-          apps[0].client.reactions.remove({
-            channel: orphan.channel!,
-            timestamp: orphan.messageTs,
-            name: 'writing_hand',
-          }).then(() => {
-            console.log(`[${label}] ⚒️ 제거: ${orphan.messageTs}`);
-          }).catch(() => {
+        .map(async (orphan) => {
+          try {
+            await apps[0].client.reactions.remove({
+              channel: orphan.channel!,
+              timestamp: orphan.messageTs,
+              name: 'writing_hand',
+            });
+          } catch {
             // 이미 제거됐거나 없는 경우 무시
-          }),
-        ),
+          }
+          try {
+            await apps[0].client.reactions.add({
+              channel: orphan.channel!,
+              timestamp: orphan.messageTs,
+              name: 'warning',
+            });
+            console.log(`[${label}] ⚠️ 미처리 표시: ${orphan.messageTs}`);
+          } catch {
+            // 이미 있거나 추가 실패 무시
+          }
+        }),
     );
 
     const notifyChannel =
@@ -3866,7 +3809,6 @@ const main = async () => {
 
   // 재시작 시 미처리 claim 알림 — processing 상태 항목만 체크 (failed 재확인 제거)
   // recoverRecentFailedClaimsOnStartup 제거: 재시작 반복 시 같은 claim을 중복 알림하는 원인
-  // 칸반 카드 정리는 kanban backend startup-cleanup에서 task_queue 동기화 기반으로 처리
   {
     const startupOrphans = recoverProcessingClaimsOnStartup();
     if (startupOrphans.length > 0) {

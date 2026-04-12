@@ -27,7 +27,7 @@ import {
 import { classifyRisk } from './risk-matrix.js';
 import { rateLimited } from './rate-limiter.js';
 import { runMeeting, type MeetingType } from './meeting.js';
-import { enqueue, inferTier, createBacklogCards, type QueueTask, type EnqueueResult } from './queue-manager.js';
+import { enqueue, inferTier, type QueueTask, type EnqueueResult } from './queue-manager.js';
 import { postQueueStarted } from './queue-processor.js';
 import { buildMessageBlocks } from './slack-table.js';
 import {
@@ -36,7 +36,6 @@ import {
   storeRunContext,
   deleteRunContext,
 } from './agent-control-buttons.js';
-import { createCard, moveToInProgress, updateCard, cleanSlackText } from './kanban-sync.js';
 import {
   emitAgentStarted,
   emitAgentCompleted,
@@ -1154,25 +1153,12 @@ const loadPersona = (agentName: string): string => {
 
     console.log(`[persona] ${agentName}: persona=${persona.length}c`);
 
-    const kanbanInstruction = [
-      '',
-      '## 칸반 카드 관리 (필수 — 최우선)',
-      '**모든 작업에서 가장 먼저 `create_kanban_card`를 호출하세요.** 분석, 조사, 회의 소집, 코드 작성, 리뷰 등 어떤 작업이든 예외 없이 호출합니다.',
-      '- **title**: 사용자가 요청한 작업의 핵심 내용을 사용자 관점에서 요약. 에이전트 내부 프로세스(라우팅, 전달, 위임)가 아니라 실제 수행될 작업을 적을 것.',
-      '  - 좋은 예: "socket-bridge 코드 디버깅", "Slack 라우팅 키워드 테이블 리팩토링"',
-      '  - 나쁜 예: "Homer에게 디버깅 요청 전달", "사용자 요청 수신 및 라우팅"',
-      '- **description**: 구체적 실행 내용이나 작업 범위. 정보가 부족하면 비워두기',
-      '- **예외 없음**: "안녕"도, "1+1=?"도, 단답형 답변도 모두 카드를 먼저 생성합니다.',
-      '',
-    ].join('\n');
-
     // 구조: 행동 규칙(최상위) → 에이전트 정체성(persona) → 에이전트별 주입
     // 메모리(sharedMemory, agentMemory)는 system에서 제거 — user turn 직전에 주입 (recency 효과)
     return [
       buildContextRulesPrefix(agentName),
       persona,
       pmPlanningEnforcement,
-      kanbanInstruction,
     ].join('\n');
   } catch (err) {
     console.error(
@@ -1378,8 +1364,6 @@ export interface DelegationStep {
   task: string;
   /** 이 step에서 사용할 모델 tier ('high'=Opus, 'standard'=Sonnet, 'fast'=Haiku). 기본값: 'standard' */
   tier?: 'high' | 'standard' | 'fast';
-  /** PM이 생성한 Backlog 칸반 카드 ID (에이전트별) */
-  kanbanCardIds?: Record<string, number>;
 }
 
 /** 병렬 위임 대상 */
@@ -1387,8 +1371,6 @@ export interface DelegationTarget {
   agent: string;
   /** 이 에이전트 실행 시 사용할 모델 tier. 기본값: 'standard' */
   tier?: 'high' | 'standard' | 'fast';
-  /** PM이 생성한 Backlog 칸반 카드 ID */
-  kanbanCardId?: number;
 }
 
 /** handleMessage 반환 타입 */
@@ -1403,8 +1385,6 @@ export interface HandleMessageResult {
   delegationSteps?: DelegationStep[];
   /** 에이전트가 escalate_to_pm 도구를 호출한 경우 이유 (PM 재라우팅 트리거) */
   escalationReason?: string;
-  /** 에이전트가 create_kanban_card 도구로 생성한 칸반 카드 ID */
-  kanbanCardId?: number;
   /** 사용자 ⛔ 리액션 또는 stale 타임아웃으로 중단된 경우 true */
   aborted?: boolean;
   /** error_max_turns 발생 시 덮어쓰기 전 마지막 assistant 텍스트 */
@@ -1421,7 +1401,6 @@ export const handleMessage = async (
   skipReaction = false,
   skipPosting = false,
   modelTier: 'high' | 'standard' | 'fast' = 'standard',
-  existingKanbanCardId?: number | null,
   _stepInfo?: { current: number; total: number },
   _antiPatternRetry = false,
 ): Promise<HandleMessageResult> => {
@@ -1798,12 +1777,10 @@ export const handleMessage = async (
                 `[delegation] PM delegate 호출: [${valid.join(', ')}]${tierLabel} — ${reason}`,
               );
 
-              // 위임 대상별 Backlog 카드 생성 + 카드 ID를 target에 저장
-              const targets: DelegationTarget[] = [];
-              for (const agent of valid) {
-                const cardId = await createCard(reason.slice(0, 200), agent).catch(() => null);
-                targets.push({ agent, tier: tier ?? inferTier(agent, reason), kanbanCardId: cardId ?? undefined });
-              }
+              const targets: DelegationTarget[] = valid.map((agent) => ({
+                agent,
+                tier: tier ?? inferTier(agent, reason),
+              }));
               delegationQueue.push(...targets);
 
               return {
@@ -1877,18 +1854,6 @@ export const handleMessage = async (
                 `[delegation] PM delegate_sequential 호출 (${validSteps.length} steps):\n${summary}`,
               );
 
-              // 각 step의 에이전트별 Backlog 카드 생성 + 카드 ID를 step에 저장
-              for (const step of validSteps) {
-                const cardIds: Record<string, number> = {};
-                for (const agent of step.agents) {
-                  const cardId = await createCard(step.task.slice(0, 200), agent).catch(() => null);
-                  if (cardId !== null) {
-                    cardIds[agent] = cardId;
-                  }
-                }
-                step.kanbanCardIds = cardIds;
-              }
-
               return {
                 content: [
                   {
@@ -1939,11 +1904,6 @@ export const handleMessage = async (
                   validTasks,
                   event.thread_ts ?? event.ts,
                   event.channel,
-                );
-
-                // 칸반 Backlog에 카드 생성 (PM 플랜 기반 제목)
-                createBacklogCards(result).catch((err) =>
-                  console.warn('[kanban-sync] Backlog 카드 생성 실패:', err),
                 );
 
                 // Slack에 큐 시작 알림
@@ -2283,74 +2243,6 @@ export const handleMessage = async (
     baseMcpServers.permission = permissionServer;
     baseTools.push('mcp__permission__request_permission');
 
-    // 모든 에이전트: 칸반 카드 생성/업데이트 도구
-    let kanbanCardId: number | undefined = existingKanbanCardId ?? undefined;
-    const kanbanServer = createSdkMcpServer({
-      name: 'kanban',
-      tools: [
-        tool(
-          'create_kanban_card',
-          '현재 작업의 칸반 카드를 생성합니다. 작업을 이해한 후 호출하세요. title은 실제 수행할 작업의 요약(예: "Slack 라우팅 키워드 테이블 리팩토링"), description은 구체적 실행 내용을 적습니다. 사용자의 원문 메시지를 그대로 넣지 마세요.',
-          {
-            title: z.string().max(200).describe('작업 제목 — 에이전트가 수행할 작업의 핵심 요약'),
-            description: z.string().max(500).optional().describe('구체적 실행 내용 또는 작업 범위'),
-            priority: z.enum(['low', 'medium', 'high']).optional().describe('우선순위. 기본값: medium'),
-          },
-          async ({ title, description, priority }) => {
-            // 기존 Backlog 카드가 있으면 업데이트 + In Progress 이동만 수행
-            if (kanbanCardId !== undefined) {
-              await updateCard(kanbanCardId, { title, description }).catch(() => {});
-              await moveToInProgress(kanbanCardId).catch(() => {});
-              if (priority && priority !== 'medium') {
-                await updateCard(kanbanCardId, { priority }).catch(() => {});
-              }
-              return { content: [{ type: 'text' as const, text: `칸반 카드 #${kanbanCardId} 업데이트 → In Progress 이동 완료. 작업을 진행하세요.` }] };
-            }
-            // 새 카드 생성 (직접 메시지 경로)
-            const cardId = await createCard(
-              title,
-              agentName,
-              description,
-            );
-            if (cardId === null) {
-              return { content: [{ type: 'text' as const, text: '칸반 카드 생성 실패 (백엔드 응답 없음). 작업은 계속 진행하세요.' }] };
-            }
-            kanbanCardId = cardId;
-            await moveToInProgress(cardId).catch(() => {});
-            if (priority && priority !== 'medium') {
-              await updateCard(cardId, { priority }).catch(() => {});
-            }
-            return { content: [{ type: 'text' as const, text: `칸반 카드 #${cardId} 생성 완료 (In Progress). 작업을 진행하세요.` }] };
-          },
-        ),
-        tool(
-          'update_kanban_card',
-          '현재 작업의 칸반 카드를 업데이트합니다. 진행률 변경, 설명 보강 등에 사용합니다.',
-          {
-            progress: z.number().min(0).max(100).optional().describe('진행률 (0-100)'),
-            description: z.string().max(500).optional().describe('업데이트할 설명'),
-            title: z.string().max(200).optional().describe('업데이트할 제목'),
-          },
-          async ({ progress, description: desc, title }) => {
-            if (kanbanCardId === undefined) {
-              return { content: [{ type: 'text' as const, text: '칸반 카드가 아직 생성되지 않았습니다. 먼저 create_kanban_card를 호출하세요.' }] };
-            }
-            const fields: Record<string, unknown> = {};
-            if (progress !== undefined) { fields.progress = progress; }
-            if (desc !== undefined) { fields.description = desc; }
-            if (title !== undefined) { fields.title = title; }
-            if (Object.keys(fields).length === 0) {
-              return { content: [{ type: 'text' as const, text: '업데이트할 필드가 없습니다.' }] };
-            }
-            await updateCard(kanbanCardId, fields as { title?: string; description?: string; progress?: number }).catch(() => {});
-            return { content: [{ type: 'text' as const, text: `칸반 카드 #${kanbanCardId} 업데이트 완료.` }] };
-          },
-        ),
-      ],
-    });
-    baseMcpServers.kanban = kanbanServer;
-    baseTools.push('mcp__kanban__create_kanban_card', 'mcp__kanban__update_kanban_card');
-
     const selectedModel = modelTier === 'high'
       ? MODEL_HIGH
       : modelTier === 'fast'
@@ -2564,7 +2456,6 @@ export const handleMessage = async (
             skipReaction,
             skipPosting,
             modelTier,
-            kanbanCardId,
             _stepInfo,
             true, // _antiPatternRetry = true → 재감지 시 경고만
           );
@@ -2784,17 +2675,6 @@ export const handleMessage = async (
       Date.now() - startTime,
     );
 
-    // 칸반 카드 미생성 fallback — 에이전트가 create_kanban_card를 호출하지 않은 경우 자동 생성
-    if (kanbanCardId === undefined) {
-      const fallbackTitle = cleanSlackText(event.text).slice(0, 200);
-      const fallbackCardId = await createCard(fallbackTitle, agentName).catch(() => null);
-      if (fallbackCardId !== null) {
-        kanbanCardId = fallbackCardId;
-        await moveToInProgress(fallbackCardId).catch(() => {});
-        console.log(`[kanban-sync] fallback 카드 생성: #${fallbackCardId} "${fallbackTitle.slice(0, 40)}"`);
-      }
-    }
-
     return {
       text: resultText,
       postedTs: postedTs ?? statusMessageTs,
@@ -2802,7 +2682,6 @@ export const handleMessage = async (
       delegationTargets: [...delegationQueue],
       delegationSteps: sequentialSteps.length > 0 ? [...sequentialSteps] : undefined,
       escalationReason,
-      kanbanCardId,
       ...(hitMaxTurns ? {
         partialResult: partialResultText || undefined,
         isMaxTurns: true,

@@ -15,10 +15,8 @@ import {
   getPreviousTaskResult,
   recoverOrphanTasks,
   requeueForRetry,
-  getKanbanCardId,
   type TaskQueueRow,
 } from './queue-manager.js';
-import { moveToDone, moveToBlocked } from './kanban-sync.js';
 import { handleMessage, buildUserMemoryPrefix, type HandleMessageResult } from './agent-runtime.js';
 import { emit } from './hook-events.js';
 // buildMessageBlocks — handleMessage 내부에서 처리하므로 별도 import 불필요
@@ -359,9 +357,6 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
   // Sprint log mtime 기록 — 태스크 완료 후 업데이트 여부 검증에 사용
   const sprintMtimeBefore = getSprintLogMtime();
 
-  // Backlog 카드 ID 조회 (PM이 생성한 카드) — catch 블록에서도 접근 필요
-  const kanbanCardId = getKanbanCardId(task.id);
-
   try {
     // 상태 → running
     markRunning(task.id);
@@ -390,7 +385,7 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
       raw: {},
     };
 
-    // 에이전트 실행 (독립 세션, 기존 Backlog 카드 ID 전달)
+    // 에이전트 실행 (독립 세션)
     const result = await Promise.race([
       handleMessage(
         task.agent,
@@ -400,7 +395,6 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
         true,  // skipReaction
         false, // skipPosting=false — "작업중" 메시지를 결과로 직접 업데이트
         task.tier as 'high' | 'standard' | 'fast',
-        kanbanCardId,
       ),
       timeout(TASK_TIMEOUT_MS),
     ]) as HandleMessageResult | 'TIMEOUT';
@@ -449,20 +443,6 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
       enforceSprintLogUpdate(slackApp, task, result.text).catch((err) =>
         console.error('[sprint-enforce] 재주입 실패:', err),
       );
-    }
-
-    // 칸반 카드 이동 (fire-and-forget)
-    const doneCardId = result.kanbanCardId ?? kanbanCardId;
-    if (doneCardId !== null && doneCardId !== undefined) {
-      if (result.isMaxTurns) {
-        moveToBlocked(doneCardId).catch((err) =>
-          console.warn('[kanban-sync] moveToBlocked 실패:', err),
-        );
-      } else {
-        moveToDone(doneCardId).catch((err) =>
-          console.warn('[kanban-sync] moveToDone 실패:', err),
-        );
-      }
     }
 
     // 결과는 handleMessage 내부에서 "작업중" 메시지를 업데이트하여 표시 (별도 postMessage 없음)
@@ -514,13 +494,6 @@ const processSingleTask = async (task: TaskQueueRow): Promise<void> => {
     } else {
       // 실패 처리
       markFailed(task.id, errorMsg);
-
-      // 칸반 Blocked 이동 (fire-and-forget)
-      if (kanbanCardId !== null) {
-        moveToBlocked(kanbanCardId).catch((blockedErr) =>
-          console.warn('[kanban-sync] moveToBlocked 실패:', blockedErr),
-        );
-      }
 
       await postTaskProgress(slackApp, task, 'failed', undefined, errorMsg);
 

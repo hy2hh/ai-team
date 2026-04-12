@@ -4,7 +4,6 @@
  */
 import { randomUUID } from 'crypto';
 import { getDb } from './db.js';
-import { createCard } from './kanban-sync.js';
 
 // ─── 타입 정의 ────────────────────────────────────────
 
@@ -41,7 +40,6 @@ export interface TaskQueueRow {
   completed_at: number | null;
   retry_count: number;
   max_retries: number;
-  kanban_card_id: number | null;
   checkpoint: string | null;
   priority: number;
 }
@@ -303,56 +301,6 @@ export const markSkipped = (id: string, reason: string): void => {
   `).run(reason.slice(0, 500), Date.now(), id);
   console.log(`[queue] skipped: ${id}`);
 };
-// ─── 칸반 카드 ID 관리 ────────────────────────────────
-
-/**
- * 태스크에 칸반 카드 ID 저장
- */
-export const setKanbanCardId = (taskId: string, cardId: number): void => {
-  const db = getDb();
-  db.prepare('UPDATE task_queue SET kanban_card_id = ? WHERE id = ?').run(cardId, taskId);
-};
-
-/**
- * 태스크의 칸반 카드 ID 조회
- */
-export const getKanbanCardId = (taskId: string): number | null => {
-  const db = getDb();
-  const row = db
-    .prepare('SELECT kanban_card_id FROM task_queue WHERE id = ?')
-    .get(taskId) as { kanban_card_id: number | null } | undefined;
-  return row?.kanban_card_id ?? null;
-};
-
-/**
- * queue에서 활성(queued/running) 태스크의 칸반 카드 ID 목록 조회
- * cleanup 시 활성 카드를 보호하기 위해 사용
- */
-export const getActiveKanbanCardIds = (): number[] => {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `SELECT DISTINCT kanban_card_id FROM task_queue
-       WHERE status IN ('queued', 'running') AND kanban_card_id IS NOT NULL`,
-    )
-    .all() as Array<{ kanban_card_id: number }>;
-  return rows.map((r) => r.kanban_card_id);
-};
-
-/**
- * PM 플랜 기반으로 enqueue된 태스크들을 칸반 Backlog에 카드로 생성
- * - PM이 해석한 task 설명을 제목으로 사용 (원문 텍스트 아님)
- */
-export const createBacklogCards = async (result: EnqueueResult): Promise<void> => {
-  for (const task of result.tasks) {
-    const title = task.task.slice(0, 200);
-    const cardId = await createCard(title, task.agent, `큐 태스크 [${task.sequence + 1}/${result.taskCount}]`);
-    if (cardId !== null) {
-      setKanbanCardId(task.id, cardId);
-    }
-  }
-};
-
 // ─── 의존 태스크 스킵 처리 ─────────────────────────────
 
 /**
@@ -384,18 +332,10 @@ export const skipDependentTasks = (parentQueueId: string, failedSequence: number
 
 /**
  * 특정 스레드의 모든 queued 상태 태스크를 skipped 처리
- * @returns 취소된 태스크 수와 해당 칸반 카드 ID 목록
+ * @returns 취소된 태스크 수
  */
-export const cancelQueueByThread = (threadTs: string): { count: number; kanbanCardIds: number[] } => {
+export const cancelQueueByThread = (threadTs: string): { count: number } => {
   const db = getDb();
-
-  // 취소 대상의 칸반 카드 ID 먼저 조회
-  const cards = db
-    .prepare(`
-      SELECT kanban_card_id FROM task_queue
-      WHERE thread_ts = ? AND status IN ('queued', 'running') AND kanban_card_id IS NOT NULL
-    `)
-    .all(threadTs) as Array<{ kanban_card_id: number }>;
 
   const result = db
     .prepare(`
@@ -405,10 +345,7 @@ export const cancelQueueByThread = (threadTs: string): { count: number; kanbanCa
     `)
     .run(Date.now(), threadTs);
   console.log(`[queue] 취소: thread ${threadTs} (${result.changes}개 태스크)`);
-  return {
-    count: result.changes,
-    kanbanCardIds: cards.map((c) => c.kanban_card_id),
-  };
+  return { count: result.changes };
 };
 
 /**
