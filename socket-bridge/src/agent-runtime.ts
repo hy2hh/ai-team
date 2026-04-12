@@ -1033,6 +1033,7 @@ const getToolsForAgent = (agentName: string): string[] => {
         'Bash(git:*)',
         'Bash(node:*)',
         'Bash(npx:*)',
+        'Bash(agent-browser:*)',
         'WebSearch',
         'WebFetch',
         ...CONFLUENCE_COMMENT_TOOLS,
@@ -1104,6 +1105,19 @@ const getToolsForAgent = (agentName: string): string[] => {
         'Bash(gh:*)',
         'Bash(git:*)',
         'Bash(npx:*)',
+        'WebSearch',
+        'WebFetch',
+        ...CONFLUENCE_COMMENT_TOOLS,
+      ];
+    case 'qa':
+      return [
+        ...BASE_TOOLS,
+        'Write',
+        'Edit',
+        'Glob',
+        'Grep',
+        ...BASH_LIMITED_TOOLS,
+        'Bash(agent-browser:*)',
         'WebSearch',
         'WebFetch',
         ...CONFLUENCE_COMMENT_TOOLS,

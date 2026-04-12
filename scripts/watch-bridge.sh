@@ -60,8 +60,24 @@ check_bridge() {
     return
   fi
 
+  # heartbeat DB로 실제 bridge 활성 여부 확인
+  # tmux 스크롤백에서 시작 로그가 밀려나는 오탐 방지
+  local db_path="$PROJECT_DIR/.memory/memory.db"
+  if [ -f "$db_path" ]; then
+    local cutoff=$(( $(date +%s) * 1000 - 10 * 60 * 1000 ))
+    local alive
+    alive=$(sqlite3 "$db_path" \
+      "SELECT COUNT(*) FROM heartbeats WHERE role='bridge' AND last_seen >= $cutoff;" \
+      2>/dev/null || echo "0")
+    if [ "$alive" -ge 1 ]; then
+      echo "OK:7"
+      return
+    fi
+  fi
+
+  # DB 없거나 heartbeat 만료 → tmux 로그로 fallback
   local connected
-  connected=$(tmux capture-pane -t "$BRIDGE_SESSION" -p 2>/dev/null | grep -c '연결 완료' || true)
+  connected=$(tmux capture-pane -t "$BRIDGE_SESSION" -p -S -5000 2>/dev/null | grep -c '연결 완료' || true)
 
   if [ "$connected" -ge 7 ]; then
     echo "OK:$connected"
