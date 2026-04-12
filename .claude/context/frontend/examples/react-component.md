@@ -39,7 +39,7 @@ export const DataTable = memo<DataTableProps>(({ data, columns, onRowClick }) =>
         return (
           <div
             key={virtualItem.key}
-            className="flex items-center border-b hover:bg-gray-50 cursor-pointer"
+            className="flex items-center border-b hover:bg-muted cursor-pointer"
             onClick={() => handleRowClick(row)}
             role="row"
             tabIndex={0}
