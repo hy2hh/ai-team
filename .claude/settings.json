@@ -77,12 +77,32 @@
     "SessionEnd": [
       {
         "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-save.sh\" 2>/dev/null; echo '{\"systemMessage\":\"[Session saved] sprint log + context-handoff 자동 갱신됨\"}'",
-            "statusMessage": "세션 저장 중..."
-          }
-        ]
+        {
+          "type": "command",
+          "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-save.sh\" 2>/dev/null; echo '{\"systemMessage\":\"[Session saved] sprint log + context-handoff 자동 갱신됨\"}'",
+          "statusMessage": "세션 저장 중..."
+        },
+        {
+          "type": "command",
+          "command": "\"$HOME\"/.claude/hooks/kanban-notify.sh",
+          "timeout": 5
+        },
+        {
+          "type": "command",
+          "command": "python3 \"$HOME\"/.claude/hooks/pattern-aggregator.py",
+          "timeout": 15
+        },
+        {
+          "type": "command",
+          "command": "\"$HOME\"/.claude/hooks/discovery-logger.sh",
+          "timeout": 30
+        },
+        {
+          "type": "command",
+          "command": "\"$HOME\"/.claude/hooks/harness-evolver.sh",
+          "timeout": 60
+        }
+      ]
       }
     ]
   }
