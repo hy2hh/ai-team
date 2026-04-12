@@ -29,3 +29,4 @@ kanban/backend/test-results/
 
 # Bridge 호스트 락 파일 (머신별 상태)
 scripts/.bridge-host
+scripts/.watchdog-disabled

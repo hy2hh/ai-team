@@ -106,6 +106,11 @@ rotate_bridge_log() {
 
 # ─── 메인 ──────────────────────────────────────────────────────
 main() {
+  # 워치독 비활성화 플래그 확인 (머신 전환 시 사용)
+  if [ -f "$SCRIPT_DIR/.watchdog-disabled" ]; then
+    exit 0
+  fi
+
   # 호스트 확인: 이 머신이 bridge 호스트가 아니면 조용히 종료
   local host_file="$SCRIPT_DIR/.bridge-host"
   if [ ! -f "$host_file" ] || [ "$(cat "$host_file")" != "$(hostname)" ]; then
