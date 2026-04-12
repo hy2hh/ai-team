@@ -61,6 +61,10 @@ sid (human lead)
 - `.memory/CLAUDE.md` — Memory 시스템 (세션 시작, R/W 규칙)
 - `socket-bridge/CLAUDE.md` — Bridge 재시작 규칙
 
+## Known Restrictions
+
+- **`.claude/settings.json` 및 `.claude/hooks/` 직접 수정 금지**: guard-check.sh가 차단함. 변경 필요 시 정확한 수정 내용을 출력하고 sid에게 직접 수정 요청.
+
 ## Operations Rules
 
 - **즉시 종료 원칙**: 인프라 작업(restart, deploy, kill, status check, config update) 완료 후 → 결과만 보고하고 즉시 종료. 추가 코드 탐색·개선 제안·관련 파일 분석 일절 금지.
