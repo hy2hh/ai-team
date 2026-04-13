@@ -116,6 +116,10 @@ const ALL_AGENT_NAMES = [
 const SEQUENTIAL_PATTERN =
   /(?:하고|그리고|후에|다음에|한\s*뒤에?|완료\s*후)/i;
 
+/** 팀 회의 요청 패턴 — 주제와 무관하게 PM 우선 라우팅 */
+const MEETING_REQUEST_PATTERN =
+  /팀\s*회의|회의\s*진행|회의\s*소집|회의\s*열어|회의\s*해줘|회의\s*요청|회의\s*부탁|다같이\s*논의|같이\s*논의|함께\s*논의|모여서\s*논의|전체\s*논의|다같이\s*얘기|다같이\s*이야기/i;
+
 /** 키워드 기반 라우팅 규칙 */
 const ROUTING_RULES: Record<string, RegExp> = {
   backend: /API|서버|DB|데이터베이스|엔드포인트|배포|인프라/i,
@@ -592,6 +596,19 @@ export const routeMessage = async (
       agents: [toRoutingAgent('pm')],
       execution: 'single',
       method: 'conversational',
+    };
+  }
+
+  // 2.5순위: 회의 요청 패턴 → PM 직행 (주제 키워드와 무관하게 우선)
+  // "팀 회의", "같이 논의" 등은 PM이 convene_meeting으로 처리해야 함
+  if (MEETING_REQUEST_PATTERN.test(text)) {
+    console.log(
+      `[perf] stage=meeting-request elapsed=${Date.now() - routeStart}ms`,
+    );
+    return {
+      agents: [toRoutingAgent('pm')],
+      execution: 'single',
+      method: 'keyword',
     };
   }
 
