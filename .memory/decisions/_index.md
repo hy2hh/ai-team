@@ -31,6 +31,8 @@
 | 04-10 | `2026-04-10_meeting-14_에이전트-프롬프트-개선-방향-결정` | all | prompt-engineering | 프롬프트 슬림화·유령참조 제거·SSOT 단일화·2-track 워크플로우 결정 (회의 #14) |
 | 04-10 | `2026-04-10_meeting-14_pockiewalletextension-AI-Agent-기능-설계-구현-범위-확정-및-아키` | backend,frontend,designer,secops | architecture | pockie-wallet-extension AI Agent 구현 범위 확정 및 아키텍처 결정 (회의 #14) |
 | 04-10 | `2026-04-10_meeting-15_pockie-wallet-AI-agent-기능-설계` | backend,frontend,designer,secops | product | pockie-wallet AI Agent Tier 1 기능 설계 — 자연어 tx·리스크 시뮬레이션·가스 최적화 (회의 #15) |
+| 04-13 | `2026-04-13_meeting-15_JSON-vs-XML-API-형식-선택` | frontend,backend | architecture | JSON 단일 API 표준 채택 — 성능·크기·DX·생태계 전축 우위 (회의 #15) |
+| 04-13 | `2026-04-13_meeting-16_REST-vs-GraphQL-API-방식-선택` | frontend,backend | architecture | REST 단일 API 방식 채택 — 캐싱·모니터링·에이전트 호환성·DX 전축 우위 (회의 #16) |
 
 ## 2026-03 결정사항 (아카이브)
 
