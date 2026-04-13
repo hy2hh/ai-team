@@ -1232,6 +1232,23 @@ const executeSingle = async (
     // PM 위임 발표 메시지 ts (리액션 대상)
     const seqPmTs = result.postedTs;
 
+    // ─── 체인 시작 알림 (타이밍 보장) ───────────────────────
+    // delegate_sequential 호출 감지 즉시 Slack 알림 발송 — runSequentialSteps 실행 전 보장.
+    // PM 세션 출력 텍스트("시작합니다")보다 앞서 게시되어 순서 역전 방지.
+    try {
+      const chainStepsSummary = result.delegationSteps!
+        .map((s, i) => `  ${i + 1}. [${s.agents.join(', ')}] ${s.task}`)
+        .join('\n');
+      await pmApp.client.chat.postMessage({
+        channel: event.channel,
+        thread_ts: event.thread_ts ?? event.ts,
+        text: `⚙️ *구현 체인 시작* (${result.delegationSteps!.length}단계)\n${chainStepsSummary}`,
+      });
+      console.log(`[hub] 체인 시작 알림 게시 완료 (${result.delegationSteps!.length} steps)`);
+    } catch (err) {
+      console.warn('[hub] 체인 시작 알림 게시 실패 (무시):', err);
+    }
+
     await runSequentialSteps(result.delegationSteps!, event, apps, pmApp, seqPmTs, seqResults);
 
     // 전체 순차 위임 완료 → PM 리뷰
@@ -1305,6 +1322,20 @@ const executeSingle = async (
     // C-1-4 fix: PM 리뷰에서 추가 순차 위임이 발생한 경우 실행 (QA FAIL → 수정 재위임 등)
     if (effectivePmReview.delegationSteps && effectivePmReview.delegationSteps.length > 0) {
       console.log(`[hub] PM 순차 리뷰에서 추가 위임: ${effectivePmReview.delegationSteps.length} steps`);
+      // 재위임 체인 시작 알림 (순서 역전 방지)
+      try {
+        const reChainSummary = effectivePmReview.delegationSteps
+          .map((s, i) => `  ${i + 1}. [${s.agents.join(', ')}] ${s.task}`)
+          .join('\n');
+        await pmApp.client.chat.postMessage({
+          channel: event.channel,
+          thread_ts: event.thread_ts ?? event.ts,
+          text: `🔁 *재위임 체인 시작* (${effectivePmReview.delegationSteps.length}단계)\n${reChainSummary}`,
+        });
+        console.log(`[hub] 재위임 체인 시작 알림 게시 완료 (${effectivePmReview.delegationSteps.length} steps)`);
+      } catch (err) {
+        console.warn('[hub] 재위임 체인 시작 알림 게시 실패 (무시):', err);
+      }
       await runSequentialSteps(
         effectivePmReview.delegationSteps,
         event,
@@ -2524,18 +2555,27 @@ const main = async () => {
           const resolved = resolvePermissionRequest(permissionId, true);
           if (resolved) {
             const b = body as {
-              message?: { ts?: string };
+              message?: {
+                ts?: string;
+                blocks?: Array<{ type?: string; text?: { text?: string } }>;
+              };
               channel?: { id?: string };
               container?: { message_ts?: string; channel_id?: string };
             };
             const channel = b.channel?.id ?? b.container?.channel_id ?? '';
             const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            // 원본 승인 요청 내용 (첫 번째 section block의 텍스트)
+            const originalText = b.message?.blocks?.find(blk => blk.type === 'section')?.text?.text ?? '';
             if (channel && ts) {
               await app.client.chat.update({
                 channel,
                 ts,
-                text: '✅ 승인됨',
+                text: '✅ 승인됨 — 에이전트가 작업을 계속 진행합니다.',
                 blocks: [
+                  ...(originalText ? [{
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: `_승인한 내용:_\n${originalText}` },
+                  }] : []),
                   {
                     type: 'section',
                     text: {
@@ -2543,7 +2583,7 @@ const main = async () => {
                       text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.',
                     },
                   },
-                ],
+                ] as any,
               });
             }
           }
@@ -2568,18 +2608,27 @@ const main = async () => {
           const resolved = resolvePermissionRequest(permissionId, false);
           if (resolved) {
             const b = body as {
-              message?: { ts?: string };
+              message?: {
+                ts?: string;
+                blocks?: Array<{ type?: string; text?: { text?: string } }>;
+              };
               channel?: { id?: string };
               container?: { message_ts?: string; channel_id?: string };
             };
             const channel = b.channel?.id ?? b.container?.channel_id ?? '';
             const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            // 원본 거부 요청 내용 (첫 번째 section block의 텍스트)
+            const originalText = b.message?.blocks?.find(blk => blk.type === 'section')?.text?.text ?? '';
             if (channel && ts) {
               await app.client.chat.update({
                 channel,
                 ts,
-                text: '❌ 거부됨',
+                text: '❌ 거부됨 — 에이전트가 작업을 중단합니다.',
                 blocks: [
+                  ...(originalText ? [{
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: `_거부한 내용:_\n${originalText}` },
+                  }] : []),
                   {
                     type: 'section',
                     text: {
@@ -2587,7 +2636,7 @@ const main = async () => {
                       text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.',
                     },
                   },
-                ],
+                ] as any,
               });
             }
           }
