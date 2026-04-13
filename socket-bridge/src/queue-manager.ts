@@ -74,13 +74,21 @@ const TIER_FAST_PATTERN =
   /요약|정리|기록|업데이트|조회|목록|확인|문서화|주석|인덱스|로그|sprint.log/i;
 
 /**
+ * 코딩/구현 작업 키워드 — HIGH 패턴보다 먼저 체크하여 standard tier로 강제.
+ * "설계"·"계획" 같은 단어가 구현 태스크 설명에 섞여도 Opus로 격상되지 않도록 방지.
+ */
+const TIER_CODING_PATTERN =
+  /구현|개발|빌드|배포|환경\s*구축|코드\s*작성|통합\s*테스트|컴포넌트\s*작성|API\s*작성|스키마\s*작성|마이그레이션/i;
+
+/**
  * 에이전트 이름과 태스크 설명에서 적절한 모델 tier를 자동 추론한다.
  *
  * 우선순위:
  * 1. QA/SecOps 에이전트 → 항상 high (정밀 분석 필요)
- * 2. 태스크 내용에 설계/분석/검토 키워드 → high
- * 3. 태스크 내용에 단순 조회/문서화 키워드 → fast
- * 4. 그 외 → standard (일반 구현)
+ * 2. 코딩/구현 키워드 → standard 강제 (HIGH 패턴보다 우선 — Opus 오용 방지)
+ * 3. 태스크 내용에 설계/분석/검토 키워드 → high
+ * 4. 태스크 내용에 단순 조회/문서화 키워드 → fast
+ * 5. 그 외 → standard (일반 구현)
  *
  * @param agent - 에이전트 이름
  * @param task - 태스크 설명
@@ -91,6 +99,7 @@ export const inferTier = (
   task: string,
 ): 'high' | 'standard' | 'fast' => {
   if (agent === 'qa' || agent === 'secops') { return 'high'; }
+  if (TIER_CODING_PATTERN.test(task)) { return 'standard'; }  // 구현 작업은 high보다 우선
   if (TIER_HIGH_PATTERN.test(task)) { return 'high'; }
   if (TIER_FAST_PATTERN.test(task)) { return 'fast'; }
   return 'standard';
