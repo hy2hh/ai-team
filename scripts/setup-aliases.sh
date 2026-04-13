@@ -64,7 +64,7 @@ watch_install() {
   local label="com.ai-team.watch-bridge"
   local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if launchctl list | grep -q "$label"; then
+  if launchctl list "$label" > /dev/null 2>&1; then
     echo "✅ Watchdog LaunchAgent가 이미 등록되어 있습니다."
     return
   fi
@@ -104,12 +104,13 @@ watch_remove() {
   local label="com.ai-team.watch-bridge"
   local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if ! launchctl list | grep -q "$label"; then
+  if ! launchctl list "$label" > /dev/null 2>&1; then
     echo "ℹ️  등록된 watchdog LaunchAgent 없음"
+    rm -f "$plist"
     return
   fi
 
-  launchctl bootout "gui/$(id -u)" "$plist"
+  launchctl bootout "gui/$(id -u)/$label"
   rm -f "$plist"
   echo "✅ Watchdog LaunchAgent 제거 완료"
 }
@@ -119,7 +120,7 @@ summary_install() {
   local label="com.ai-team.daily-summary"
   local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if launchctl list | grep -q "$label"; then
+  if launchctl list "$label" > /dev/null 2>&1; then
     echo "✅ Daily summary LaunchAgent가 이미 등록되어 있습니다."
     return
   fi
@@ -163,12 +164,13 @@ summary_remove() {
   local label="com.ai-team.daily-summary"
   local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if ! launchctl list | grep -q "$label"; then
+  if ! launchctl list "$label" > /dev/null 2>&1; then
     echo "ℹ️  등록된 daily-summary LaunchAgent 없음"
+    rm -f "$plist"
     return
   fi
 
-  launchctl bootout "gui/$(id -u)" "$plist"
+  launchctl bootout "gui/$(id -u)/$label"
   rm -f "$plist"
   echo "✅ Daily summary LaunchAgent 제거 완료"
 }
