@@ -2557,7 +2557,11 @@ export const handleMessage = async (
     const hasDelegation = delegationQueue.length > 0 || sequentialSteps.length > 0;
     let postedTs: string | undefined;
     if (resultText && !skipPosting) {
-      const fullText = resultText + metaFooter;
+      // 원본 요청 메시지 링크를 인용구로 앞에 첨부 (여러 요청이 동시에 처리될 때 구분 용이)
+      const originalTs = event.ts;
+      const originalTsLink = originalTs.replace('.', '');
+      const originalQuote = `> 📌 _<https://slack.com/archives/${event.channel}/p${originalTsLink}|원본 요청 보기>_\n\n`;
+      const fullText = originalQuote + resultText + metaFooter;
       const messageBlocks = buildMessageBlocks(fullText);
 
       // 디버그: 테이블 블록 여부 로깅
