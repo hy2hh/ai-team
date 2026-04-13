@@ -123,6 +123,43 @@ if [[ "$TOOL_NAME" == "Write" || "$TOOL_NAME" == "Edit" ]]; then
 fi
 
 # ============================================================
+# OPS HARNESS 강제 — 직접 호출 차단, scripts/ops/ 사용 유도
+# ============================================================
+
+if [[ "$TOOL_NAME" == "Bash" ]]; then
+  # sqlite3 .memory 직접 호출 → memdb.sh 사용 강제
+  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)sqlite3\s+.*\.memory/memory\.db'; then
+    deny "sqlite3 직접 호출 금지. bash scripts/ops/memdb.sh <command> 를 사용하세요."
+  fi
+
+  # tmux capture-pane 직접 호출 → bridge-log.sh 사용 강제
+  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)tmux\s+capture-pane\s+-t\s+ai-team-bridge'; then
+    deny "tmux capture-pane 직접 호출 금지. bash scripts/ops/bridge-log.sh <command> 를 사용하세요."
+  fi
+fi
+
+# .memory/decisions/ 직접 Write → create-decision.sh 사용 강제
+if [[ "$TOOL_NAME" == "Write" ]]; then
+  if echo "$FILE_PATH" | grep -qE '\.memory/decisions/[0-9]{4}-' 2>/dev/null; then
+    deny ".memory/decisions/ 직접 생성 금지. bash scripts/ops/create-decision.sh 를 사용하세요."
+  fi
+fi
+
+# .memory/decisions/_index.md 직접 편집 → index-rebuild.sh 사용 강제
+if [[ "$TOOL_NAME" == "Write" || "$TOOL_NAME" == "Edit" ]]; then
+  if echo "$FILE_PATH" | grep -qE '\.memory/decisions/_index\.md' 2>/dev/null; then
+    deny "_index.md 직접 편집 금지. bash scripts/ops/index-rebuild.sh decisions 를 사용하세요."
+  fi
+fi
+
+# .memory/tasks/active-*.md, done.md 직접 Write → task-lifecycle.sh 사용 강제
+if [[ "$TOOL_NAME" == "Write" ]]; then
+  if echo "$FILE_PATH" | grep -qE '\.memory/tasks/(active-[a-z]+\.md|done\.md)' 2>/dev/null; then
+    deny ".memory/tasks/ 직접 생성 금지. bash scripts/ops/task-lifecycle.sh <command> 를 사용하세요."
+  fi
+fi
+
+# ============================================================
 # ALLOWLIST (hardcoded — agents cannot modify)
 # [주의] deny 이후에 위치 — allowlist가 deny를 우회하는 것을 방지
 # [이슈 1 수정] 체인 명령어(&&, ;, |)는 allowlist 스킵
