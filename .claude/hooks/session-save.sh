@@ -48,11 +48,11 @@ $TRIED_ITEMS
 
     # 주석 블록(--> 줄) 바로 다음에 새 세션 삽입
     TEMP=$(mktemp)
-    awk -v block="$SPRINT_BLOCK" '
-      /^-->/ && !inserted {
+    SPRINT_BLOCK="$SPRINT_BLOCK" awk '
+      /-->$/ && !inserted {
         print $0
         print ""
-        print block
+        print ENVIRON["SPRINT_BLOCK"]
         print ""
         inserted = 1
         next

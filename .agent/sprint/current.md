@@ -4,6 +4,23 @@
      후속 태스크는 **Next:** 로 쓰지 않고 .memory/tasks/active-{role}.md 에 직접 등록.
      sprint은 히스토리 로그 전용 — 에이전트 실행 상태 관리는 .memory/tasks/ 참조. -->
 
+### [2026-04-13] Session: chore(memory): add session auto-save hook and meeting decisions (#17, #18)
+
+**Tried:**
+- chore(memory): add session auto-save hook and meeting decisions (#17, #18)
+- feat(router): add meeting-request pattern for PM routing (Stage 2.5)
+- fix(stack-guard): adopt Playwright CLI as E2E tool, block MCP only
+- fix(ops): add run-all.sh to prevent Chalmers miscount in ops harness
+- feat(e2e): Playwright Phase 1 인프라 구축
+
+**Learned:**
+- (이 세션에서 직접 기록된 내용 없음 — 필요 시 수동 보완)
+
+**Commit:** 610a570a
+
+---
+
+
 ### [2026-04-12] Session: 컨텍스트 축적 시스템 점검
 
 **Tried:**
