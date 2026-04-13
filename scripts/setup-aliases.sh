@@ -1,9 +1,9 @@
 #!/bin/bash
-# setup-aliases.sh — 셸 단축키 등록 + watchdog cron 설정
+# setup-aliases.sh — 셸 단축키 등록 + watchdog LaunchAgent 설정
 # 사용법:
 #   bash scripts/setup-aliases.sh           — 단축키 설치 (zshrc/bashrc)
-#   bash scripts/setup-aliases.sh watch:install  — watchdog cron 등록
-#   bash scripts/setup-aliases.sh watch:remove   — watchdog cron 제거
+#   bash scripts/setup-aliases.sh watch:install  — watchdog LaunchAgent 등록
+#   bash scripts/setup-aliases.sh watch:remove   — watchdog LaunchAgent 제거
 
 set -euo pipefail
 
@@ -59,65 +59,118 @@ EOF
   echo "    aim <command>  make 단축키 (aim restart, aim status 등)"
 }
 
-# ─── Watchdog Cron 등록 ────────────────────────────────────────
+# ─── Watchdog LaunchAgent 등록 ────────────────────────────────
 watch_install() {
-  local cron_cmd="*/5 * * * * bash $PROJECT_DIR/scripts/watch-bridge.sh >> $PROJECT_DIR/scripts/watch.log 2>&1"
-  local marker="watch-bridge.sh"
+  local label="com.ai-team.watch-bridge"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if crontab -l 2>/dev/null | grep -q "$marker"; then
-    echo "✅ Watchdog cron이 이미 등록되어 있습니다."
-    crontab -l | grep "$marker"
+  if launchctl list | grep -q "$label"; then
+    echo "✅ Watchdog LaunchAgent가 이미 등록되어 있습니다."
     return
   fi
 
-  (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
-  echo "✅ Watchdog cron 등록 완료 (5분마다 실행)"
-  echo "   로그: $PROJECT_DIR/scripts/watch.log"
-  echo "   확인: crontab -l"
+  cat > "$plist" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>${SCRIPT_DIR}/watch-bridge.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>StandardOutPath</key>
+    <string>${SCRIPT_DIR}/watch.log</string>
+    <key>StandardErrorPath</key>
+    <string>${SCRIPT_DIR}/watch.log</string>
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
+PLIST
+
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+  echo "✅ Watchdog LaunchAgent 등록 완료 (5분마다 실행)"
+  echo "   로그: $SCRIPT_DIR/watch.log"
+  echo "   확인: launchctl list | grep $label"
 }
 
-# ─── Watchdog Cron 제거 ────────────────────────────────────────
+# ─── Watchdog LaunchAgent 제거 ────────────────────────────────
 watch_remove() {
-  local marker="watch-bridge.sh"
+  local label="com.ai-team.watch-bridge"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if ! crontab -l 2>/dev/null | grep -q "$marker"; then
-    echo "ℹ️  등록된 watchdog cron 없음"
+  if ! launchctl list | grep -q "$label"; then
+    echo "ℹ️  등록된 watchdog LaunchAgent 없음"
     return
   fi
 
-  crontab -l 2>/dev/null | grep -v "$marker" | crontab -
-  echo "✅ Watchdog cron 제거 완료"
+  launchctl bootout "gui/$(id -u)" "$plist"
+  rm -f "$plist"
+  echo "✅ Watchdog LaunchAgent 제거 완료"
 }
 
-# ─── Daily Summary Cron 등록 ───────────────────────────────────
+# ─── Daily Summary LaunchAgent 등록 ──────────────────────────
 summary_install() {
-  # 매일 오전 9시 발송
-  local cron_cmd="0 9 * * * bash $PROJECT_DIR/scripts/headless-ops.sh daily-summary >> $PROJECT_DIR/scripts/summary.log 2>&1"
-  local marker="daily-summary"
+  local label="com.ai-team.daily-summary"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if crontab -l 2>/dev/null | grep -q "$marker"; then
-    echo "✅ Daily summary cron이 이미 등록되어 있습니다."
-    crontab -l | grep "$marker"
+  if launchctl list | grep -q "$label"; then
+    echo "✅ Daily summary LaunchAgent가 이미 등록되어 있습니다."
     return
   fi
 
-  (crontab -l 2>/dev/null; echo "$cron_cmd") | crontab -
-  echo "✅ Daily summary cron 등록 완료 (매일 오전 9시)"
-  echo "   로그: $PROJECT_DIR/scripts/summary.log"
-  echo "   확인: crontab -l"
+  cat > "$plist" << PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${label}</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>${PROJECT_DIR}/scripts/headless-ops.sh</string>
+        <string>daily-summary</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>${SCRIPT_DIR}/summary.log</string>
+    <key>StandardErrorPath</key>
+    <string>${SCRIPT_DIR}/summary.log</string>
+</dict>
+</plist>
+PLIST
+
+  launchctl bootstrap "gui/$(id -u)" "$plist"
+  echo "✅ Daily summary LaunchAgent 등록 완료 (매일 오전 9시)"
+  echo "   로그: $SCRIPT_DIR/summary.log"
+  echo "   확인: launchctl list | grep $label"
 }
 
-# ─── Daily Summary Cron 제거 ───────────────────────────────────
+# ─── Daily Summary LaunchAgent 제거 ──────────────────────────
 summary_remove() {
-  local marker="daily-summary"
+  local label="com.ai-team.daily-summary"
+  local plist="$HOME/Library/LaunchAgents/${label}.plist"
 
-  if ! crontab -l 2>/dev/null | grep -q "$marker"; then
-    echo "ℹ️  등록된 daily-summary cron 없음"
+  if ! launchctl list | grep -q "$label"; then
+    echo "ℹ️  등록된 daily-summary LaunchAgent 없음"
     return
   fi
 
-  crontab -l 2>/dev/null | grep -v "$marker" | crontab -
-  echo "✅ Daily summary cron 제거 완료"
+  launchctl bootout "gui/$(id -u)" "$plist"
+  rm -f "$plist"
+  echo "✅ Daily summary LaunchAgent 제거 완료"
 }
 
 # ─── 전체 설치 ─────────────────────────────────────────────────
@@ -132,7 +185,7 @@ install_all() {
   echo ""
   echo "=== 완료 ==="
   echo "적용: source ~/.zshrc"
-  echo "확인: crontab -l"
+  echo "확인: launchctl list | grep com.ai-team"
 }
 
 # ─── 진입점 ────────────────────────────────────────────────────
