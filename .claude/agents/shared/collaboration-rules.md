@@ -126,8 +126,8 @@
 - **UI/UX 체인 권장**: Designer → Frontend 순서 권장이지만 강제 아님. PM 재량으로 직접 위임 가능
 - **Frontend 직접 위임 가능**: Designer 스펙 유무, 작업 성격에 무관하게 Frontend에 직접 `delegate` 가능
 
-## Auto-Commit Rule (코드 수정 에이전트)
-- 코드/설정 수정 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)
+## Auto-Commit Rule (전 에이전트 공통)
+- 파일 수정(코드·설정·에이전트 프롬프트·메모리 문서 등) 완료 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)
 - "커밋할까요?" 질문 금지. 직접 실행
 
 ## 세션 시작 시 메모리 동기화
