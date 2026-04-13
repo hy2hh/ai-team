@@ -3,8 +3,9 @@ INPUT=$(cat 2>/dev/null) || exit 0
 CMD=$(echo "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null) || exit 0
 WARNINGS=""
 
-if echo "$CMD" | grep -qiE 'playwright|npx playwright|@playwright'; then
-  WARNINGS="[Stack Guard] 이 프로젝트는 Playwright가 아닌 agent-browser를 사용합니다."
+ if echo "$CMD" | grep -qiE 'playwright-mcp|@playwright/mcp';
+  then
+    WARNINGS="[Stack Guard] Playwright MCP 아님 — CLI 사용: npx playwright test"
 fi
 
 if echo "$CMD" | grep -qiE 'npm install.*anthropic|pnpm add.*anthropic|pip install.*anthropic'; then

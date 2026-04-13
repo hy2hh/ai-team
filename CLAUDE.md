@@ -47,7 +47,7 @@ sid (human lead)
 | Process Manager | tmux | ai-team-bridge 세션 |
 | Agent Communication | Slack MCP (socket mode) | `.claude/settings.json`에 서버 정의 |
 | Shared State | 파일 기반 (.memory/) | DB 없음 |
-| E2E Testing | agent-browser | Playwright 아님 |
+| E2E Testing | Playwright CLI | MCP 아님 (`npx playwright test`로 실행) |
 | Bridge SDK | claude-agent-sdk | 표준 anthropic SDK 아님 |
 | Package Manager | pnpm | npm/yarn 아님 |
 | Data Sources | Gate.io API | 심볼 수 항상 전체 확인 후 사용 |

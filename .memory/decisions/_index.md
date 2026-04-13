@@ -34,6 +34,7 @@
 | 04-13 | `2026-04-13_meeting-15_JSON-vs-XML-API-형식-선택` | frontend,backend | architecture | JSON 단일 API 표준 채택 — 성능·크기·DX·생태계 전축 우위 (회의 #15) |
 | 04-13 | `2026-04-13_meeting-16_REST-vs-GraphQL-API-방식-선택` | frontend,backend | architecture | REST 단일 API 방식 채택 — 캐싱·모니터링·에이전트 호환성·DX 전축 우위 (회의 #16) |
 | 04-13 | `2026-04-13_ops-하네스-도입.md` | pm,backend | ops-하네스-도입 | 11개 bash 하네스 + guard hook 강제 |
+| 04-13 | `2026-04-13_meeting-17_btcfi-platform-스킬-vs-CLI…` | frontend,backend,researcher | architecture | btcfi 예제 레포 스킬 우선 + llms.txt 병행 채택, CLI는 스킬 내 bash 보조만 (회의 #17) |
 
 ## 2026-03 결정사항 (아카이브)
 
