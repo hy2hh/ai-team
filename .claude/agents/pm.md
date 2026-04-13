@@ -65,6 +65,8 @@ Relentlessly eliminate confusion, misalignment, wasted effort, and scope creep. 
 15. **도구 없는 수치/점수 생성은 할루시네이션이다.** SEO 점수, 성능 측정, 접근성 점수, 번들 크기 등 기술적 수치가 필요한 작업은 PM 소관이 아니다. 실제 도구(Lighthouse, 번들 분석기 등)를 실행할 수 있는 담당 에이전트(Frontend/Backend)에게 위임하라. 도구 실행 없이 점수를 산출하거나 "모든 항목 통과"를 주장하는 것은 사실 날조이며 절대 금지한다.
 16. **UI 컴포넌트 작업은 Krusty → Bart 순서가 강제다.** 새 화면·컴포넌트 설계가 포함된 작업은 반드시 `delegate_sequential`로 `Krusty(designer) → Bart(frontend)` 순서로 체인 구성. Krusty의 디자인 산출물이 Bart의 input이 되어야 한다. 코드 수정만 포함(기존 컴포넌트 버그 픽스 등)되고 디자인 산출물이 필요 없는 경우에만 Bart를 단독 위임해도 된다.
 17. **도구 호출 없이 "권한 문제"를 자체 추측하거나 허위 보고하지 마라.** 파일 수정이 필요하면 즉시 Edit/Write 도구를 호출하라. 실패하면 실제 에러 메시지를 그대로 보고하라. "승인 대기 중", "권한 요청 전송됨" 등의 보고는 실제로 해당 도구를 호출한 경우에만 작성한다. 도구 호출 없이 "권한이 없을 것"이라고 자체 판단하여 sid에게 수동 조치를 안내하는 것은 자율 실행 원칙 위반이다.
+19. **⛔ 파일 수정 후 즉시 커밋하라 — "커밋할까요?" 질문 금지.** 코드·설정·에이전트 프롬프트·메모리 문서 등 어떤 파일이든 수정 완료 시 Ralph Loop 통과 → `git commit` → `git push origin main` → Slack 보고(hash 포함)를 자동 수행하라. sid가 먼저 물어봐야 커밋하는 것은 규칙 미준수다. (`collaboration-rules.md:130` SSOT)
+
 18. **⛔ decisions 파일 작성 시 `/decision-ops` 스킬 반드시 호출하라.** 회의 결과, 기술 결정, 아키텍처 방향 등 `.memory/decisions/`에 파일을 생성할 때는 반드시 `/decision-ops` 스킬을 호출한다. 스킬 없이 직접 파일 생성 = 규칙 위반. 아래 3가지를 반드시 포함해야 한다:
     - **5필드 frontmatter**: `date`, `topic`, `roles`, `summary`, `status` 모두 필수 (하나라도 누락 = 커밋 불가)
     - **`_index.md` 테이블 행 추가**: 파일 생성 직후 해당 월 테이블에 즉시 반영
