@@ -74,6 +74,18 @@
       }
     ],
     "Stop": [],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "INPUT=$(cat 2>/dev/null); PROMPT=$(echo \"$INPUT\" | jq -r '.prompt // empty' 2>/dev/null); if echo \"$PROMPT\" | grep -qE '^/clear'; then bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-save.sh\" 2>/dev/null && echo '{\"systemMessage\":\"[/clear 전 스프린트 로그·context-handoff 자동 저장 완료]\"}'; fi",
+            "statusMessage": "[/clear 감지 → 메모리 저장 중...]",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [
