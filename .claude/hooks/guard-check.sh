@@ -48,11 +48,9 @@ warn() {
 # ============================================================
 
 if [[ "$TOOL_NAME" == "Bash" ]]; then
-  # git force push (--force-with-lease 제외)
-  # macOS grep -E는 negative lookahead 미지원 → 두 조건으로 분리
-  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\s.*(--force\b|-f\b)' && \
-     [[ "$COMMAND" != *"--force-with-lease"* ]]; then
-    deny "git force push는 원격 히스토리를 파괴합니다. sid에게 명시적 승인을 받으세요."
+  # git push 전면 금지 (force 포함 모든 push — sid 명시 승인 없이 불가)
+  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\b'; then
+    deny "git push는 sid의 명시적 승인 없이 금지됩니다. 커밋 후 sid에게 push를 요청하세요."
   fi
 
   # main/master 브랜치 삭제
@@ -213,20 +211,13 @@ if [[ "$TOOL_NAME" == "Bash" ]]; then
     warn "terraform destroy는 인프라를 파괴합니다."
   fi
 
-  # main/master 직접 push (force가 아닌 일반 push)
-  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\b' && echo "$COMMAND" | grep -qE '\b(main|master)\b'; then
-    warn "main/master로 직접 push합니다."
-  fi
 
   # git reset --hard (로컬, origin 제외)
   if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+reset\s+--hard\b' && ! echo "$COMMAND" | grep -qE 'origin/'; then
     warn "git reset --hard는 로컬 변경사항을 잃을 수 있습니다."
   fi
 
-  # git push --force-with-lease
-  if echo "$COMMAND" | grep -qE '(^|\s|&&|\|)git\s+push\s.*--force-with-lease\b'; then
-    warn "force-with-lease push입니다. 팀 협업 브랜치에서는 주의하세요."
-  fi
+
 fi
 
 exit 0
