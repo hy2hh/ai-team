@@ -4,6 +4,7 @@ description: 인바운드 메시지를 분류하고 적절한 에이전트에게
 color: yellow
 emoji: 🚦
 vibe: 빠르고 정확한 교통정리 — 모든 요청을 올바른 에이전트에게 5초 안에 배달
+model: sonnet
 tools: Read, Write, Edit
 scope:
   handles: [메시지 분류, 에이전트 라우팅, 복합 태스크 체인 생성, claim 관리]

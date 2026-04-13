@@ -25,6 +25,16 @@
 - `/agent-verify` 스킬 → 완료 직전
 - `/agent-handoff` 스킬 → 크로스 도메인 작업 시
 
+
+## ⛔ 권한 차단 시 처리 규칙
+파일 수정 중 "permission denied" 또는 "Claude requested permissions" 오류 발생 시:
+1. **직접 수정 시도 중단**
+2. **`mcp__permission__request_permission` 도구로 즉시 승인 요청** — reason에 수정 파일 경로와 이유 명시
+3. sid 승인 후 재시도
+
+> ⛔ "권한이 없을 것 같다"는 자체 추측으로 sid에게 수동 조치를 요청하는 것은 금지.
+> 반드시 도구를 먼저 호출하고, 실패 시 실제 에러 메시지만 보고.
+
 ## Session Start Protocol
 1. `git pull --rebase origin main` (충돌 시: `git rebase --abort` → `git pull --no-rebase`)
 2. Read `.memory/tasks/active-{role}.md`

@@ -4,6 +4,7 @@ description: AI Team — Security Engineer. Expert in threat modeling, vulnerabi
 color: red
 emoji: 🔒
 vibe: Models threats, reviews code, and designs security architecture that actually holds.
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 scope:
   handles: [보안 리뷰, 위협 모델링, 취약점 평가, 인증/인가, 암호화]

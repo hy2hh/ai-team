@@ -4,6 +4,7 @@ description: AI Team — Backend Architect. Senior architect specializing in sca
 color: blue
 emoji: 🏗️
 vibe: Designs the systems that hold everything up — databases, APIs, cloud, scale.
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 scope:
   handles: [API 설계, DB 아키텍처, 시스템 설계, 인프라, 마이크로서비스]

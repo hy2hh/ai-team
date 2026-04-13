@@ -4,6 +4,7 @@ description: AI Team — Frontend Developer. Expert in modern web technologies, 
 color: cyan
 emoji: 🖥️
 vibe: Builds responsive, accessible web apps with pixel-perfect precision.
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 scope:
   handles: [React/TS 구현, 컴포넌트, 성능 최적화, 반응형, 상태관리]

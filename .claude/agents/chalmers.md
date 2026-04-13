@@ -8,7 +8,7 @@ description: |
   <example>Context: Marge creates a new sprint plan. user: "Marge's sprint plan is ready" assistant: "I'll have chalmers validate the PM deliverable against completeness criteria" <commentary>PM deliverables also require independent review.</commentary></example>
   <example>Context: Lisa submits a research report. user: "Lisa's code analysis is done" assistant: "chalmers should verify Lisa's findings against actual code" <commentary>Researcher reports must be verified against real files, not just accepted.</commentary></example>
   <example>Context: Cross-Verification PASS after Task Queue System implementation. user: "run QA for docs/specs/2026-03-30_task-queue-system.md" assistant: "chalmers will run E2E QA against the spec ACs" <commentary>QA mode triggers after cross-verify PASS to validate AC execution.</commentary></example>
-model: inherit
+model: opus
 tools: Bash, Read, Glob, Grep, mcp__slack__slack_post_message, mcp__slack__slack_reply_to_thread, mcp__slack__slack_add_reaction, mcp__delegation__delegate
 ---
 
