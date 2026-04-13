@@ -265,7 +265,7 @@ export const synthesizeAndDecide = async (
     'delegation',
     slackApp,
     true,
-    false,
+    true,
     'high',
   );
 
