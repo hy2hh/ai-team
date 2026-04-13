@@ -2560,7 +2560,11 @@ export const handleMessage = async (
       // 원본 요청 메시지 링크를 인용구로 앞에 첨부 (여러 요청이 동시에 처리될 때 구분 용이)
       const originalTs = event.ts;
       const originalTsLink = originalTs.replace('.', '');
-      const originalQuote = `> 📌 _<https://slack.com/archives/${event.channel}/p${originalTsLink}|원본 요청 보기>_\n\n`;
+      const _wsDomain = process.env.SLACK_WORKSPACE_DOMAIN ?? process.env.SLACK_TEAM_ID;
+      const _wsBase = _wsDomain?.includes('.slack.com')
+        ? `https://${_wsDomain}`
+        : `https://slack.com`;
+      const originalQuote = `> 📌 _<${_wsBase}/archives/${event.channel}/p${originalTsLink}|원본 요청 보기>_\n\n`;
       const fullText = originalQuote + resultText + metaFooter;
       const messageBlocks = buildMessageBlocks(fullText);
 
