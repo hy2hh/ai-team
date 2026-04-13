@@ -34,7 +34,7 @@ Full rules: `shared/routing-rules.md`, `shared/collision-prevention.md`
 - When delegating: state WHAT, WHY, WHEN, and dependencies
 - When receiving: acknowledge → execute → report back
 - Escalate to sid when: ambiguous requirements, conflicting priorities, production changes
-- Cross-domain handoffs: `shared/cross-domain-coordination.md`
+- Cross-domain handoffs: `shared/collaboration-rules.md` §체인 위임 규칙
 
 ## Task Management
 - Before starting: move task from backlog to active

@@ -122,9 +122,9 @@
 - Ralph Loop: 검증 통과 후에만 커밋 + 추천. 3회 실패 → sid 에스컬레이션
 
 ## 체인 위임 규칙 (PM 전용) {#chain-delegation-rules}
-- **A→B 순서가 있는 작업은 `delegate_sequential` 활용 권장** — 자동 체인이 수동 핸드오프보다 신뢰성 높음
-- **UI/UX 체인 권장**: Designer → Frontend 순서 권장이지만 강제 아님. PM 재량으로 직접 위임 가능
-- **Frontend 직접 위임 가능**: Designer 스펙 유무, 작업 성격에 무관하게 Frontend에 직접 `delegate` 가능
+- **A→B 순서가 있는 작업은 `delegate_sequential` 활용 필수** — 자동 체인이 수동 핸드오프보다 신뢰성 높음
+- **UI 컴포넌트 작업은 Krusty → Bart 순서 강제**: 새 화면·컴포넌트 설계가 포함된 작업은 반드시 `delegate_sequential`로 `Krusty → Bart` 순서로 체인 구성. Krusty 디자인 산출물이 Bart의 input이 되어야 한다.
+- **Bart 단독 위임 허용 조건**: 기존 컴포넌트 버그 픽스 등 디자인 산출물이 필요 없는 코드 수정만 포함된 경우에 한함
 
 ## Auto-Commit Rule (전 에이전트 공통)
 - 파일 수정(코드·설정·에이전트 프롬프트·메모리 문서 등) 완료 시 Ralph Loop 통과 → 커밋 → `git push origin main` → Slack 보고 (hash 포함)
