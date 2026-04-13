@@ -2615,23 +2615,32 @@ const main = async () => {
           const resolved = await resolveApprovalById(approvalId, true, app);
           if (resolved) {
             const b = body as {
-              message?: { ts?: string };
+              message?: {
+                ts?: string;
+                blocks?: Array<{ type?: string; text?: { text?: string } }>;
+              };
               channel?: { id?: string };
               container?: { message_ts?: string; channel_id?: string };
             };
             const channel = b.channel?.id ?? b.container?.channel_id ?? '';
             const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            // 원본 승인 요청 내용 (첫 번째 section block의 텍스트)
+            const originalText = b.message?.blocks?.find(blk => blk.type === 'section')?.text?.text ?? '';
             if (channel && ts) {
               await app.client.chat.update({
                 channel,
                 ts,
                 text: '✅ 승인됨 — 에이전트가 작업을 계속 진행합니다.',
                 blocks: [
+                  ...(originalText ? [{
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: `_승인한 내용:_\n${originalText}` },
+                  }] : []),
                   {
                     type: 'section',
                     text: { type: 'mrkdwn', text: '✅ *승인됨* — 에이전트가 작업을 계속 진행합니다.' },
                   },
-                ],
+                ] as any,
               });
             }
             console.log(`[approval] ✅ 승인: approvalId=${approvalId}`);
@@ -2658,23 +2667,32 @@ const main = async () => {
           const resolved = await resolveApprovalById(approvalId, false, app);
           if (resolved) {
             const b = body as {
-              message?: { ts?: string };
+              message?: {
+                ts?: string;
+                blocks?: Array<{ type?: string; text?: { text?: string } }>;
+              };
               channel?: { id?: string };
               container?: { message_ts?: string; channel_id?: string };
             };
             const channel = b.channel?.id ?? b.container?.channel_id ?? '';
             const ts = b.message?.ts ?? b.container?.message_ts ?? '';
+            // 원본 승인 요청 내용 (첫 번째 section block의 텍스트)
+            const originalText = b.message?.blocks?.find(blk => blk.type === 'section')?.text?.text ?? '';
             if (channel && ts) {
               await app.client.chat.update({
                 channel,
                 ts,
                 text: '❌ 거부됨 — 에이전트가 작업을 중단합니다.',
                 blocks: [
+                  ...(originalText ? [{
+                    type: 'section',
+                    text: { type: 'mrkdwn', text: `_거부한 내용:_\n${originalText}` },
+                  }] : []),
                   {
                     type: 'section',
                     text: { type: 'mrkdwn', text: '❌ *거부됨* — 에이전트가 작업을 중단합니다.' },
                   },
-                ],
+                ] as any,
               });
             }
             console.log(`[approval] ❌ 거부: approvalId=${approvalId}`);
