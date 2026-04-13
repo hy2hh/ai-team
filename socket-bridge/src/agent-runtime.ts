@@ -1700,9 +1700,12 @@ export const handleMessage = async (
     // 스레드 내 연속 대화 시 이전 세션 재사용 (히스토리 + 시스템 프롬프트 캐싱)
     // threadTopic이 있으면 bridge가 맥락을 프리프로세싱했으므로 새 세션 강제
     // (이전 세션의 잘못된 히스토리가 맥락 지시를 압도하는 것 방지)
+    // 회의 모드(event.user === 'meeting')에서는 새 세션 강제
+    // — resume 시 기존 세션의 모델이 우선되어 high tier(opus)가 무시되는 버그 방지
     const threadKey = event.thread_ts ?? event.ts;
+    const isMeetingMode = event.user === 'meeting';
     // 인메모리 캐시 → 영구화 저장소 순서로 조회
-    const existingSessionId = event.threadTopic
+    const existingSessionId = (event.threadTopic || isMeetingMode)
       ? undefined
       : session.threadSessions.get(threadKey) ??
         getPersistedSessionId(agentName, threadKey);
