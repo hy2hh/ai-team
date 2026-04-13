@@ -7,28 +7,27 @@ description: Bridge E2E 테스트 실행. 체크리스트 기반으로 Slack 메
 
 ## Slack API 사용법
 
-**MCP Slack 도구가 `invalid_auth`일 때 curl fallback 사용:**
+**항상 하네스 스크립트를 사용한다. MCP Slack 도구 사용 금지 (항상 `invalid_auth`).**
 
 ```bash
-source /Users/hangheejo/git/ai-team/.env
+# 메시지 전송 → ts 반환
+ts=$(bash .claude/skills/e2e-test/scripts/slack.sh send "메시지 내용")
+ts=$(bash .claude/skills/e2e-test/scripts/slack.sh send "스레드 답글" "$parent_ts")
 
-# 메시지 전송
-curl -s -X POST -H "Authorization: Bearer $SLACK_USER_TOKEN" -H "Content-Type: application/json" \
-  "https://slack.com/api/chat.postMessage" \
-  -d '{"channel":"C0ANKEB4CRF","text":"메시지 내용"}' | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('ts','err'))"
+# 스레드 응답 확인 (JSON)
+bash .claude/skills/e2e-test/scripts/slack.sh replies "$ts"
 
-# 스레드 응답 확인
-curl -s -H "Authorization: Bearer $SLACK_USER_TOKEN" \
-  "https://slack.com/api/conversations.replies?channel=C0ANKEB4CRF&ts=MESSAGE_TS&limit=5" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-for m in d.get('messages',[])[1:]:
-    print(f'[{m.get(\"user\",\"?\")}] {m.get(\"text\",\"\")[:120]}')
-"
+# PM 중복 포스팅 검증
+bash .claude/skills/e2e-test/scripts/slack.sh pm_count "$ts"
 
-# 채널 히스토리 확인
-curl -s -H "Authorization: Bearer $SLACK_USER_TOKEN" \
-  "https://slack.com/api/conversations.history?channel=C0ANKEB4CRF&limit=10"
+# 특정 봇 메시지만 출력
+bash .claude/skills/e2e-test/scripts/slack.sh bot_messages "$ts" "B0ANKFERR0R"
+
+# 응답 대기 (최대 60초, 메시지 2개 이상 올 때까지)
+bash .claude/skills/e2e-test/scripts/slack.sh wait_reply "$ts" 60 2
+
+# 채널 최근 메시지
+bash .claude/skills/e2e-test/scripts/slack.sh history 10
 ```
 
 **주의: `reactions.get` API는 scope 없음 (`reactions:read` 미보유). 리액션 확인은 브리지 로그로 대체.**
