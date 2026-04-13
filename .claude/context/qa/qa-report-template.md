@@ -37,6 +37,13 @@ Layer 3-E2E — Playwright e2e Check (해당하는 경우)
 → {FAIL 있으면: 담당 에이전트에게 재작업 위임 중... / FAIL 없으면: ✅ 전체 PASS}
 ```
 
+## Ops Harness 전체 검사
+
+개별 스크립트 직접 실행 금지 — miscount 방지를 위해 반드시 집계 스크립트 사용:
+```bash
+bash scripts/ops/run-all.sh
+```
+
 ## 규칙
 - FAIL 항목에는 반드시 파일:라인 참조 또는 구체적 오류 내용 포함
 - SKIP은 선행 AC 실패 또는 타임아웃인 경우에만 사용
