@@ -185,6 +185,7 @@ export default function CardDetailModal({ card, columnName, onClose, onUpdate }:
     >
       <div
         ref={modalRef}
+        data-testid="card-detail-modal"
         className="detail-modal-container"
         onClick={(e) => e.stopPropagation()}
         style={{

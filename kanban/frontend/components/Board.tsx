@@ -344,6 +344,7 @@ export default function Board() {
   return (
     <main
       id="main-content"
+      data-testid="kanban-board"
       aria-label={`${board.name} 칸반보드`}
       aria-roledescription="칸반 보드"
     >
